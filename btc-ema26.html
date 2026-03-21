@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>BTC EMA26 Alerts</title>
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #d29922;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: 100px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.accent {
+  color: var(--accent);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.status-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.5);
+}
+
+#price-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  margin: 12px 0;
+}
+
+.current-price .label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.current-price .price {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.timeframe-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.card.bullish { border-color: var(--green); }
+.card.bearish { border-color: var(--red); }
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tf-badge {
+  background: var(--accent);
+  color: #000;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.signal {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.signal.above {
+  color: var(--green);
+  background: rgba(63, 185, 80, 0.12);
+}
+
+.signal.below {
+  color: var(--red);
+  background: rgba(248, 81, 73, 0.12);
+}
+
+.card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.metric .label {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+
+.metric .value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric .value.positive { color: var(--green); }
+.metric .value.negative { color: var(--red); }
+
+canvas {
+  width: 100%;
+  display: block;
+  padding: 8px 12px 12px;
+}
+
+#alert-log { margin: 16px 0; }
+
+#alert-log h2 {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.empty-state {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 16px;
+}
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.alert-item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.alert-item .dot.green { background: var(--green); }
+.alert-item .dot.red { background: var(--red); }
+
+.alert-item .time {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
+.btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:active { opacity: 0.8; }
+
+.btn.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn.enabled { background: var(--green); }
+
+.meta {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+@keyframes flashGreen { 0% { color: var(--green); } 100% { color: var(--text); } }
+@keyframes flashRed { 0% { color: var(--red); } 100% { color: var(--text); } }
+.flash-up { animation: flashGreen 1s ease; }
+.flash-down { animation: flashRed 1s ease; }
+
+@media (max-width: 380px) {
+  .current-price .price { font-size: 1.6rem; }
+  .card-body { gap: 4px; padding: 10px 12px; }
+}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>BTC Futures <span class="accent">EMA26</span></h1>
+      <div id="connection-status" class="status-dot connected" title="Connected"></div>
+    </header>
+
+    <section id="price-banner">
+      <div class="current-price">
+        <span class="label">BTCUSDT Perp</span>
+        <span id="live-price" class="price">--</span>
+      </div>
+    </section>
+
+    <section class="timeframe-cards">
+      <div class="card" id="card-4h">
+        <div class="card-header">
+          <span class="tf-badge">4H</span>
+          <span id="signal-4h" class="signal">--</span>
+        </div>
+        <div class="card-body">
+          <div class="metric">
+            <span class="label">Close</span>
+            <span id="close-4h" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">EMA26</span>
+            <span id="ema-4h" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Diff</span>
+            <span id="diff-4h" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Last Cross</span>
+            <span id="cross-4h" class="value">--</span>
+          </div>
+        </div>
+        <canvas id="chart-4h" height="120"></canvas>
+      </div>
+
+      <div class="card" id="card-1d">
+        <div class="card-header">
+          <span class="tf-badge">1D</span>
+          <span id="signal-1d" class="signal">--</span>
+        </div>
+        <div class="card-body">
+          <div class="metric">
+            <span class="label">Close</span>
+            <span id="close-1d" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">EMA26</span>
+            <span id="ema-1d" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Diff</span>
+            <span id="diff-1d" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Last Cross</span>
+            <span id="cross-1d" class="value">--</span>
+          </div>
+        </div>
+        <canvas id="chart-1d" height="120"></canvas>
+      </div>
+    </section>
+
+    <section id="alert-log">
+      <h2>Alert History</h2>
+      <div id="alerts-list">
+        <p class="empty-state">No alerts yet. Monitoring...</p>
+      </div>
+    </section>
+
+    <footer>
+      <button id="btn-notify" class="btn">Enable Notifications</button>
+      <button id="btn-sound" class="btn btn-secondary">Sound: ON</button>
+      <span id="last-update" class="meta">--</span>
+    </footer>
+  </div>
+
+  <audio id="alert-sound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2LkY2Ff3d3goqRjomDfXd5gYmOjYmEfnl5f4aMjYqGgHt5fIKIjIuIhH97eX2DiIyLiIR/e3l9g4iMi4iEf3t5fYOIi4uHg398en6EiYuKhoJ+enp/hYqLiYWBfXp7gIaKi4iFgX16e4GHiouIhIB8enuBh4qKiISAfHp8goiKioeDf3t6fIKIioqHg397enyDiIqKh4N/e3t8g4iKiYeDf3t7fIOIiomHg397e3yDiIqJh4N/e3t8g4iKiYeDf3t7fYSJiomGgn57e32EiYqJhoJ+e3t9hImKiYaCfnt7fYSJiomGgn57e32EiYqJhoJ+e3t9hImJiYaCfnt8fYSJiYmFgX57fH2FiYmJhYF+e3x+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWIiYiFgX58fH6FiImIhYF+fHx+hYiJiIWBfnx8foWIiYiFgX5+fH6FiImIhYF+fHx+hYiJiIWBfn58foWIiYiFgX5+fH6FiImIhYF+fnx+hYiJiIWBfn58foWIiYiFgX5+fH6FiImIhYF+fn5+hYiJiIWBfn5+foWIiYiFgX5+fn6FiIiIhYF+fn5+hYiIiIWBfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIiFgn5+foB/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIiFgn5+foB/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WHiIeFgn5+foB/hYeIh4WCfn5+gH+Fh4iHhYJ+fn6Af4WHiIeFgn5+foCAhYeIh4WCfn5+gICFh4iHhYJ+fn6AgIWHiIeFgn5+foCAhYeHh4WCfn5+gICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn5+gICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn6AgICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn6AgICFh4eHhYJ+gICAf4WHh4eFgn5+gICAf4WHh4eFgn6AgIB/hYeHh4WCfn6AgIB/hYeHh4WCfoCAf3+Fh4eHhYJ+gICAf4WHh4eFgn6AgH9/hYeHh4WCfoCAf3+Fh4eHhYKAfoB/f4WHh4eHgoB+gH9/hYeHh4eCgH6Af3+Fh4eHh4KAfn9/f4WHh4eHgoB+f39/hYeHh4eCgH5/f3+Fh4eHh4KAfn9/f4WHh4eHgoB+f39/hYeHh4eCgH5/f3+Fh4eHh4KAfn9/f4WHh4eHgoB+f3+AhYeHh4eCgH5/f4CFh4eHh4KAfn9/gIWHh4eHgoB+f3+AhYeHh4eCgH5/f4CFh4eHh4KAfn9/gIWHh4eHgoB+f3+AhYeHh4eCgIB/f4CFh4eHh4KAgH9/gIWHh4eHgoCAgH9/hYeHh4eCgICAf3+Fh4eHh4KAgIB/f4WHh4eHgoCAgH9/hYeHh4eCgICAf3+Fh4eHh4KAgIB/gIWHh4eHgoCAgH+AhYeHh4eCgICAf4CFh4eHh4KAgIB/gIWHh4eHgoCAgH+AhYeHh4eCgICAf4CFh4eHh4KAgIB/gA==" type="audio/wav">
+  </audio>
+
+  <script>
+// ── Config ──────────────────────────────────────────────────────────
+const SYMBOL = 'BTCUSDT';
+const BASE_URL = 'https://fapi.binance.com';
+const EMA_PERIOD = 26;
+const TIMEFRAMES = ['4h', '1d'];
+const POLL_MS = { '4h': 30000, '1d': 60000 };
+const CANDLE_LIMIT = 60;
+
+// ── State ───────────────────────────────────────────────────────────
+const state = {
+  notificationsEnabled: false,
+  soundEnabled: true,
+  lastSignal: { '4h': null, '1d': null },
+  alerts: JSON.parse(localStorage.getItem('ema26_alerts') || '[]'),
+  previousPrice: null,
+};
+
+// ── DOM refs ────────────────────────────────────────────────────────
+const $ = (sel) => document.querySelector(sel);
+const livePrice = $('#live-price');
+const connDot = $('#connection-status');
+const btnNotify = $('#btn-notify');
+const btnSound = $('#btn-sound');
+const lastUpdate = $('#last-update');
+const alertsList = $('#alerts-list');
+const alertAudio = $('#alert-sound');
+
+// ── EMA calculation ─────────────────────────────────────────────────
+function calcEMA(closes, period) {
+  const k = 2 / (period + 1);
+  const ema = [closes[0]];
+  for (let i = 1; i < closes.length; i++) {
+    ema.push(closes[i] * k + ema[i - 1] * (1 - k));
+  }
+  return ema;
+}
+
+// ── Binance Futures API ─────────────────────────────────────────────
+async function fetchCandles(tf) {
+  const url = BASE_URL + '/fapi/v1/klines?symbol=' + SYMBOL + '&interval=' + tf + '&limit=' + CANDLE_LIMIT;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const raw = await res.json();
+  return raw.map(function(c) {
+    return {
+      time: c[0],
+      open: +c[1],
+      high: +c[2],
+      low: +c[3],
+      close: +c[4],
+      isClosed: c[6] < Date.now(),
+    };
+  });
+}
+
+async function fetchPrice() {
+  const url = BASE_URL + '/fapi/v1/ticker/price?symbol=' + SYMBOL;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  return +data.price;
+}
+
+// ── Format helpers ──────────────────────────────────────────────────
+const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDiff = (n) => (n >= 0 ? '+' : '') + fmt(n);
+const fmtPct = (n) => (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+const fmtTime = (ts) => {
+  const d = new Date(ts);
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+const nowStr = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+// ── Mini chart drawing ──────────────────────────────────────────────
+function drawChart(canvasId, candles, emaValues) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width;
+  const H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const chartLen = Math.min(40, candles.length);
+  const c = candles.slice(-chartLen);
+  const e = emaValues.slice(-chartLen);
+
+  const allVals = c.flatMap(function(x) { return [x.high, x.low]; }).concat(e);
+  const min = Math.min.apply(null, allVals);
+  const max = Math.max.apply(null, allVals);
+  const range = max - min || 1;
+
+  const yOf = (v) => H - ((v - min) / range) * (H - 8) - 4;
+  const barW = Math.max(1, (W / chartLen) * 0.6);
+  const gap = W / chartLen;
+
+  c.forEach(function(candle, i) {
+    const x = i * gap + gap / 2;
+    const isGreen = candle.close >= candle.open;
+    ctx.strokeStyle = isGreen ? '#3fb950' : '#f85149';
+    ctx.fillStyle = isGreen ? '#3fb950' : '#f85149';
+
+    ctx.beginPath();
+    ctx.moveTo(x, yOf(candle.high));
+    ctx.lineTo(x, yOf(candle.low));
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const top = yOf(Math.max(candle.open, candle.close));
+    const bot = yOf(Math.min(candle.open, candle.close));
+    const bodyH = Math.max(1, bot - top);
+    ctx.fillRect(x - barW / 2, top, barW, bodyH);
+  });
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 1.5;
+  e.forEach(function(v, i) {
+    const x = i * gap + gap / 2;
+    const y = yOf(v);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+// ── Notifications ───────────────────────────────────────────────────
+function sendNotification(title, body) {
+  addAlertEntry(body);
+  if (state.soundEnabled) {
+    alertAudio.currentTime = 0;
+    alertAudio.play().catch(function() {});
+  }
+  if (state.notificationsEnabled && Notification.permission === 'granted') {
+    new Notification(title, {
+      body: body,
+      vibrate: [200, 100, 200],
+      tag: title,
+    });
+  }
+}
+
+function addAlertEntry(text) {
+  const isAbove = text.includes('ABOVE');
+  const entry = { text: text, time: Date.now(), type: isAbove ? 'green' : 'red' };
+  state.alerts.unshift(entry);
+  state.alerts = state.alerts.slice(0, 50);
+  localStorage.setItem('ema26_alerts', JSON.stringify(state.alerts));
+  renderAlerts();
+}
+
+function renderAlerts() {
+  if (state.alerts.length === 0) {
+    alertsList.innerHTML = '<p class="empty-state">No alerts yet. Monitoring...</p>';
+    return;
+  }
+  alertsList.innerHTML = state.alerts.map(function(a) {
+    return '<div class="alert-item">' +
+      '<span class="dot ' + a.type + '"></span>' +
+      '<span>' + a.text + '</span>' +
+      '<span class="time">' + fmtTime(a.time) + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+// ── Core update loop ────────────────────────────────────────────────
+async function updateTimeframe(tf) {
+  try {
+    const candles = await fetchCandles(tf);
+    const closes = candles.map(function(c) { return c.close; });
+    const emaValues = calcEMA(closes, EMA_PERIOD);
+
+    const lastCandle = candles[candles.length - 1];
+    const prevCandle = candles[candles.length - 2];
+    const currentEMA = emaValues[emaValues.length - 1];
+    const prevEMA = emaValues[emaValues.length - 2];
+
+    const diff = lastCandle.close - currentEMA;
+    const diffPct = (diff / currentEMA) * 100;
+    const isAbove = lastCandle.close > currentEMA;
+
+    const sfx = tf.replace(' ', '');
+    $('#close-' + sfx).textContent = fmt(lastCandle.close);
+    $('#ema-' + sfx).textContent = fmt(currentEMA);
+
+    const diffEl = $('#diff-' + sfx);
+    diffEl.textContent = fmtDiff(diff) + ' (' + fmtPct(diffPct) + ')';
+    diffEl.className = 'value ' + (diff >= 0 ? 'positive' : 'negative');
+
+    const sigEl = $('#signal-' + sfx);
+    sigEl.textContent = isAbove ? 'ABOVE EMA26' : 'BELOW EMA26';
+    sigEl.className = 'signal ' + (isAbove ? 'above' : 'below');
+
+    const card = $('#card-' + sfx);
+    card.className = 'card ' + (isAbove ? 'bullish' : 'bearish');
+
+    const prevSignal = state.lastSignal[tf];
+    const currentSignal = isAbove ? 'above' : 'below';
+
+    let crossIdx = -1;
+    for (let i = emaValues.length - 2; i >= 1; i--) {
+      const wasAbove = candles[i - 1].close > emaValues[i - 1];
+      const nowAbove = candles[i].close > emaValues[i];
+      if (wasAbove !== nowAbove) {
+        crossIdx = i;
+        break;
+      }
+    }
+    $('#cross-' + sfx).textContent = crossIdx >= 0 ? fmtTime(candles[crossIdx].time) : '--';
+
+    if (prevSignal !== null && prevSignal !== currentSignal) {
+      const dir = isAbove ? 'ABOVE' : 'BELOW';
+      const msg = '[' + tf.toUpperCase() + '] BTC closed ' + dir + ' EMA26 at $' + fmt(lastCandle.close);
+      sendNotification('BTC ' + tf.toUpperCase() + ' EMA26 Cross', msg);
+    }
+    state.lastSignal[tf] = currentSignal;
+
+    drawChart('chart-' + sfx, candles, emaValues);
+    connDot.className = 'status-dot connected';
+  } catch (err) {
+    console.error('Error updating ' + tf + ':', err);
+    connDot.className = 'status-dot';
+  }
+}
+
+async function updatePrice() {
+  try {
+    const price = await fetchPrice();
+    const prev = state.previousPrice;
+    livePrice.textContent = '$' + fmt(price);
+    if (prev !== null) {
+      livePrice.classList.remove('flash-up', 'flash-down');
+      void livePrice.offsetWidth;
+      livePrice.classList.add(price >= prev ? 'flash-up' : 'flash-down');
+    }
+    state.previousPrice = price;
+    lastUpdate.textContent = 'Updated ' + nowStr();
+  } catch (err) {
+    console.error('Price fetch error:', err);
+  }
+}
+
+// ── Init ────────────────────────────────────────────────────────────
+async function init() {
+  renderAlerts();
+  await updatePrice();
+  for (const tf of TIMEFRAMES) {
+    await updateTimeframe(tf);
+  }
+  setInterval(updatePrice, 5000);
+  setInterval(function() { updateTimeframe('4h'); }, POLL_MS['4h']);
+  setInterval(function() { updateTimeframe('1d'); }, POLL_MS['1d']);
+
+  btnNotify.addEventListener('click', async function() {
+    if (!('Notification' in window)) {
+      alert('Notifications not supported in this browser.');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    state.notificationsEnabled = perm === 'granted';
+    updateNotifyBtn();
+  });
+
+  btnSound.addEventListener('click', function() {
+    state.soundEnabled = !state.soundEnabled;
+    btnSound.textContent = 'Sound: ' + (state.soundEnabled ? 'ON' : 'OFF');
+    btnSound.classList.toggle('enabled', state.soundEnabled);
+  });
+
+  updateNotifyBtn();
+}
+
+function updateNotifyBtn() {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    state.notificationsEnabled = true;
+    btnNotify.textContent = 'Notifications ON';
+    btnNotify.classList.add('enabled');
+  } else {
+    btnNotify.textContent = 'Enable Notifications';
+    btnNotify.classList.remove('enabled');
+  }
+}
+
+init();
+  </script>
+</body>
+</html>
