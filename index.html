@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>BTC EMA26 Alerts</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>BTC Futures <span class="accent">EMA26</span></h1>
+      <div id="connection-status" class="status-dot connected" title="Connected"></div>
+    </header>
+
+    <section id="price-banner">
+      <div class="current-price">
+        <span class="label">BTCUSDT Perp</span>
+        <span id="live-price" class="price">--</span>
+      </div>
+    </section>
+
+    <section class="timeframe-cards">
+      <div class="card" id="card-4h">
+        <div class="card-header">
+          <span class="tf-badge">4H</span>
+          <span id="signal-4h" class="signal">--</span>
+        </div>
+        <div class="card-body">
+          <div class="metric">
+            <span class="label">Close</span>
+            <span id="close-4h" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">EMA26</span>
+            <span id="ema-4h" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Diff</span>
+            <span id="diff-4h" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Last Cross</span>
+            <span id="cross-4h" class="value">--</span>
+          </div>
+        </div>
+        <canvas id="chart-4h" height="120"></canvas>
+      </div>
+
+      <div class="card" id="card-1d">
+        <div class="card-header">
+          <span class="tf-badge">1D</span>
+          <span id="signal-1d" class="signal">--</span>
+        </div>
+        <div class="card-body">
+          <div class="metric">
+            <span class="label">Close</span>
+            <span id="close-1d" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">EMA26</span>
+            <span id="ema-1d" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Diff</span>
+            <span id="diff-1d" class="value">--</span>
+          </div>
+          <div class="metric">
+            <span class="label">Last Cross</span>
+            <span id="cross-1d" class="value">--</span>
+          </div>
+        </div>
+        <canvas id="chart-1d" height="120"></canvas>
+      </div>
+    </section>
+
+    <section id="alert-log">
+      <h2>Alert History</h2>
+      <div id="alerts-list">
+        <p class="empty-state">No alerts yet. Monitoring...</p>
+      </div>
+    </section>
+
+    <footer>
+      <button id="btn-notify" class="btn">Enable Notifications</button>
+      <button id="btn-sound" class="btn btn-secondary">Sound: ON</button>
+      <span id="last-update" class="meta">--</span>
+    </footer>
+  </div>
+
+  <audio id="alert-sound" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2LkY2Ff3d3goqRjomDfXd5gYmOjYmEfnl5f4aMjYqGgHt5fIKIjIuIhH97eX2DiIyLiIR/e3l9g4iMi4iEf3t5fYOIi4uHg398en6EiYuKhoJ+enp/hYqLiYWBfXp7gIaKi4iFgX16e4GHiouIhIB8enuBh4qKiISAfHp8goiKioeDf3t6fIKIioqHg397enyDiIqKh4N/e3t8g4iKiYeDf3t7fIOIiomHg397e3yDiIqJh4N/e3t8g4iKiYeDf3t7fYSJiomGgn57e32EiYqJhoJ+e3t9hImKiYaCfnt7fYSJiomGgn57e32EiYqJhoJ+e3t9hImJiYaCfnt8fYSJiYmFgX57fH2FiYmJhYF+e3x+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWIiYiFgX58fH6FiImIhYF+fHx+hYiJiIWBfnx8foWIiYiFgX5+fH6FiImIhYF+fHx+hYiJiIWBfn58foWIiYiFgX5+fH6FiImIhYF+fnx+hYiJiIWBfn58foWIiYiFgX5+fH6FiImIhYF+fn5+hYiJiIWBfn5+foWIiYiFgX5+fn6FiIiIhYF+fn5+hYiIiIWBfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIiFgn5+foB/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIiFgn5+foB/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WHiIeFgn5+foB/hYeIh4WCfn5+gH+Fh4iHhYJ+fn6Af4WHiIeFgn5+foCAhYeIh4WCfn5+gICFh4iHhYJ+fn6AgIWHiIeFgn5+foCAhYeHh4WCfn5+gICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn5+gICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn6AgICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn6AgICFh4eHhYJ+gICAf4WHh4eFgn5+gICAf4WHh4eFgn6AgIB/hYeHh4WCfn6AgIB/hYeHh4WCfoCAf3+Fh4eHhYJ+gICAf4WHh4eFgn6AgH9/hYeHh4WCfoCAf3+Fh4eHhYKAfoB/f4WHh4eHgoB+gH9/hYeHh4eCgH6Af3+Fh4eHh4KAfn9/f4WHh4eHgoB+f39/hYeHh4eCgH5/f3+Fh4eHh4KAfn9/f4WHh4eHgoB+f39/hYeHh4eCgH5/f3+Fh4eHh4KAfn9/f4WHh4eHgoB+f3+AhYeHh4eCgH5/f4CFh4eHh4KAfn9/gIWHh4eHgoB+f3+AhYeHh4eCgH5/f4CFh4eHh4KAfn9/gIWHh4eHgoB+f3+AhYeHh4eCgIB/f4CFh4eHh4KAgH9/gIWHh4eHgoCAgH9/hYeHh4eCgICAf3+Fh4eHh4KAgIB/f4WHh4eHgoCAgH9/hYeHh4eCgICAf3+Fh4eHh4KAgIB/gIWHh4eHgoCAgH+AhYeHh4eCgICAf4CFh4eHh4KAgIB/gIWHh4eHgoCAgH+AhYeHh4eCgICAf4CFh4eHh4KAgIB/gA==" type="audio/wav">
+  </audio>
+
+  <script src="app.js"></script>
+</body>
+</html>
