@@ -10,8 +10,9 @@ import useBuyerStore from '../../stores/buyerStore'
 
 const QUICK_SEARCHES = [
   'Apartment in Amsterdam under €500k',
-  '3-bedroom house in Utrecht',
-  'Family home with garden in Rotterdam',
+  'Urban family home near Utrecht',
+  '3-bedroom house in Rotterdam',
+  'Family home with garden in Den Haag',
   'Starter apartment in Groningen',
 ]
 
@@ -29,7 +30,7 @@ const BEDROOM_OPTIONS = [1, 2, 3, 4, 5]
 function parseSearchQuery(query) {
   const q = query.toLowerCase()
   const filters = {}
-  const cities = { amsterdam: 'Amsterdam', rotterdam: 'Rotterdam', utrecht: 'Utrecht', 'den haag': 'Den Haag', hague: 'Den Haag', maastricht: 'Maastricht', groningen: 'Groningen' }
+  const cities = { amsterdam: 'Amsterdam', rotterdam: 'Rotterdam', utrecht: 'Utrecht', bilthoven: 'Utrecht', 'de bilt': 'Utrecht', zeist: 'Utrecht', 'den haag': 'Den Haag', hague: 'Den Haag', maastricht: 'Maastricht', groningen: 'Groningen' }
   for (const [key, val] of Object.entries(cities)) {
     if (q.includes(key)) { filters.city = val; break }
   }
@@ -43,7 +44,7 @@ function parseSearchQuery(query) {
   }
   const brMatch = q.match(/(\d)\s*(?:-|\s)?(?:bedroom|bed|kamer|slaapkamer|br)/i)
   if (brMatch) filters.minBedrooms = parseInt(brMatch[1])
-  const types = { apartment: 'Appartement', appartement: 'Appartement', house: 'Tussenwoning', huis: 'Tussenwoning', villa: 'Villa', 'family home': 'Tussenwoning', herenhuis: 'Herenhuis', starter: 'Appartement' }
+  const types = { apartment: 'Appartement', appartement: 'Appartement', house: 'Tussenwoning', huis: 'Tussenwoning', villa: 'Villa', herenhuis: 'Herenhuis', starter: 'Appartement' }
   for (const [key, val] of Object.entries(types)) {
     if (q.includes(key)) { filters.propertyType = val; break }
   }

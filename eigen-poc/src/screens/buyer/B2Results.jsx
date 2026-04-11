@@ -13,6 +13,16 @@ import useBuyerStore from '../../stores/buyerStore'
 import mockProperties from '../../data/mockProperties'
 import { formatCurrency } from '../../utils/formatCurrency'
 
+const CITY_REGIONS = {
+  'Utrecht': ['Utrecht', 'Bilthoven', 'De Bilt', 'Zeist', 'Amersfoort'],
+  'Amsterdam': ['Amsterdam', 'Amstelveen', 'Diemen'],
+  'Rotterdam': ['Rotterdam', 'Schiedam', 'Capelle'],
+  'Den Haag': ['Den Haag', 'Rijswijk', 'Voorburg'],
+  'Maastricht': ['Maastricht'],
+  'Groningen': ['Groningen'],
+  'Bilthoven': ['Bilthoven', 'Utrecht', 'De Bilt', 'Zeist'],
+}
+
 const SORT_OPTIONS = [
   { id: 'match', label: 'Best Match' },
   { id: 'price_asc', label: 'Lowest Price' },
@@ -105,7 +115,10 @@ export default function B2Results() {
     let results = [...mockProperties]
     const f = searchFilters
 
-    if (f.city) results = results.filter((p) => p.city === f.city)
+    if (f.city) {
+      const regionCities = CITY_REGIONS[f.city] || [f.city]
+      results = results.filter((p) => regionCities.includes(p.city))
+    }
     if (f.minPrice) results = results.filter((p) => p.askingPrice >= f.minPrice)
     if (f.maxPrice) results = results.filter((p) => p.askingPrice <= f.maxPrice)
     if (f.minBedrooms) results = results.filter((p) => p.bedrooms >= f.minBedrooms)
