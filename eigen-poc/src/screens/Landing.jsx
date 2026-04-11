@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, Search, ArrowRight, Sparkles, Shield, TrendingUp } from 'lucide-react'
+import { Home, Search, ArrowRight, Sparkles, Shield, TrendingUp, EyeOff } from 'lucide-react'
 import useAppStore from '../stores/appStore'
 
 const container = {
@@ -98,6 +98,22 @@ export default function Landing() {
               <p className="text-sm text-gray-500">AI-powered search with smart insights</p>
             </div>
             <ArrowRight size={18} className="text-eigen-blue shrink-0" />
+          </motion.button>
+
+          {/* Stille Verkoop card */}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => { setRole('seller'); navigate('/sell/explore') }}
+            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-purple-200 bg-purple-50 text-left transition-shadow hover:shadow-md"
+          >
+            <div className="w-12 h-12 bg-eigen-purple rounded-xl flex items-center justify-center shrink-0">
+              <EyeOff size={22} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-eigen-navy text-base">Stille Verkoop</p>
+              <p className="text-sm text-gray-500">Explore buyer interest without listing</p>
+            </div>
+            <ArrowRight size={18} className="text-eigen-purple shrink-0" />
           </motion.button>
         </motion.div>
 

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { UserCircle, Check, Info, Star, Lock, Sparkles } from 'lucide-react'
+import { UserCircle, Check, Info, Star, Lock, Sparkles, EyeOff, SlidersHorizontal } from 'lucide-react'
 import AppShell from '../../components/layout/AppShell'
 import BottomCTA from '../../components/layout/BottomCTA'
 import Button from '../../components/ui/Button'
@@ -9,15 +9,17 @@ import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Chip from '../../components/ui/Chip'
 import Modal from '../../components/ui/Modal'
+import Input from '../../components/ui/Input'
+import AIBubble from '../../components/ai/AIBubble'
 import useSellerStore from '../../stores/sellerStore'
 import { formatCurrency } from '../../utils/formatCurrency'
 
 const MOCK_BUYERS = [
-  { id: 1, matchScore: 92, type: 'Starter', prequalified: true, areaPreference: 'Utrecht-West', budget: '€350.000 — €425.000', criteria: '3-kamer, garden, close to schools', lookingFor: '4 months', revealedName: 'Anna van den Berg', mortgageApproval: 410000 },
-  { id: 2, matchScore: 87, type: 'Doorstromer', prequalified: true, areaPreference: 'Amsterdam-Zuid', budget: '€500.000 — €650.000', criteria: '4+ kamers, balcony, modern kitchen', lookingFor: '2 months', revealedName: 'Mark & Lisa Jansen', mortgageApproval: 620000 },
-  { id: 3, matchScore: 81, type: 'Starter', prequalified: false, areaPreference: 'Utrecht-Oost', budget: '€300.000 — €380.000', criteria: '2-kamer, near public transport', lookingFor: '6 months', revealedName: 'Thomas de Groot', mortgageApproval: null },
-  { id: 4, matchScore: 76, type: 'Investor', prequalified: true, areaPreference: 'Amsterdam-Centrum', budget: '€400.000 — €550.000', criteria: 'Good rental yield, low VvE', lookingFor: '1 month', revealedName: 'R. Bakker BV', mortgageApproval: null },
-  { id: 5, matchScore: 71, type: 'Doorstromer', prequalified: true, areaPreference: 'Haarlem', budget: '€350.000 — €475.000', criteria: 'Tuin, 3 slaapkamers, rustige buurt', lookingFor: '3 months', revealedName: 'Sophie & Jan Visser', mortgageApproval: 450000 },
+  { id: 1, type: 'Starter', prequalified: true, areaPreference: 'Utrecht-West', budget: [350000, 425000], criteria: '3-kamer, garden, close to schools', lookingFor: '4 months', revealedName: 'Anna van den Berg', mortgageApproval: 410000, financingClause: true, closingWeeks: 8 },
+  { id: 2, type: 'Doorstromer', prequalified: true, areaPreference: 'Amsterdam-Zuid', budget: [500000, 650000], criteria: '4+ kamers, balcony, modern kitchen', lookingFor: '2 months', revealedName: 'Mark & Lisa Jansen', mortgageApproval: 620000, financingClause: true, closingWeeks: 6 },
+  { id: 3, type: 'Starter', prequalified: false, areaPreference: 'Utrecht-Oost', budget: [300000, 380000], criteria: '2-kamer, near public transport', lookingFor: '6 months', revealedName: 'Thomas de Groot', mortgageApproval: null, financingClause: true, closingWeeks: 10 },
+  { id: 4, type: 'Investor', prequalified: true, areaPreference: 'Amsterdam-Centrum', budget: [400000, 550000], criteria: 'Good rental yield, low VvE', lookingFor: '1 month', revealedName: 'R. Bakker BV', mortgageApproval: null, financingClause: false, closingWeeks: 3 },
+  { id: 5, type: 'Doorstromer', prequalified: true, areaPreference: 'Haarlem', budget: [350000, 475000], criteria: 'Tuin, 3 slaapkamers, rustige buurt', lookingFor: '3 months', revealedName: 'Sophie & Jan Visser', mortgageApproval: 450000, financingClause: true, closingWeeks: 8 },
 ]
 
 const FILTERS = [
@@ -28,8 +30,77 @@ const FILTERS = [
   { id: 'Investor', label: 'Investors' },
 ]
 
+const CLOSING_OPTIONS = [
+  { value: 4, label: '4 weeks' },
+  { value: 6, label: '6 weeks' },
+  { value: 8, label: '8 weeks' },
+  { value: 12, label: '12 weeks' },
+  { value: 0, label: 'Flexible' },
+]
+
+const CONDITION_OPTIONS = [
+  { id: 'no_financing', label: 'No financing clause' },
+  { id: 'fast_close', label: 'Closing within 6 weeks' },
+  { id: 'prequalified', label: 'Must be pre-qualified' },
+  { id: 'no_inspection', label: 'No inspection clause' },
+]
+
+const TYPE_COLORS = { Starter: 'blue', Doorstromer: 'purple', Investor: 'gray' }
+
+function calculateConditionMatch(buyer, conditions) {
+  const checks = []
+  let matched = 0
+  let total = 0
+
+  if (conditions.minPrice > 0) {
+    total++
+    const meetsPrice = buyer.budget[1] >= conditions.minPrice
+    if (meetsPrice) matched++
+    checks.push({ label: `Budget ≥ ${formatCurrency(conditions.minPrice)}`, met: meetsPrice })
+  }
+
+  if (conditions.closingWeeks > 0) {
+    total++
+    const meetsClosing = buyer.closingWeeks <= conditions.closingWeeks
+    if (meetsClosing) matched++
+    checks.push({ label: `Closing ≤ ${conditions.closingWeeks} weeks`, met: meetsClosing })
+  }
+
+  if (conditions.mustHave.includes('no_financing')) {
+    total++
+    const meets = !buyer.financingClause
+    if (meets) matched++
+    checks.push({ label: 'No financing clause', met: meets })
+  }
+
+  if (conditions.mustHave.includes('fast_close')) {
+    total++
+    const meets = buyer.closingWeeks <= 6
+    if (meets) matched++
+    checks.push({ label: 'Close within 6 weeks', met: meets })
+  }
+
+  if (conditions.mustHave.includes('prequalified')) {
+    total++
+    const meets = buyer.prequalified
+    if (meets) matched++
+    checks.push({ label: 'Pre-qualified', met: meets })
+  }
+
+  if (conditions.mustHave.includes('no_inspection')) {
+    total++
+    // Investors typically don't need inspection
+    const meets = buyer.type === 'Investor'
+    if (meets) matched++
+    checks.push({ label: 'No inspection clause', met: meets })
+  }
+
+  const score = total === 0 ? 75 : Math.round((matched / total) * 100)
+  return { score, checks, matched, total }
+}
+
 function ScoreBadge({ score }) {
-  const color = score >= 85 ? 'bg-eigen-green' : score >= 75 ? 'bg-eigen-amber' : 'bg-eigen-red'
+  const color = score >= 85 ? 'bg-eigen-green' : score >= 60 ? 'bg-eigen-amber' : 'bg-eigen-red'
   return (
     <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center`}>
       <span className="text-white text-sm font-bold">{score}%</span>
@@ -37,15 +108,30 @@ function ScoreBadge({ score }) {
   )
 }
 
-const TYPE_COLORS = { Starter: 'blue', Doorstromer: 'purple', Investor: 'gray' }
-
 export default function S7Explore() {
   const navigate = useNavigate()
-  const { reveals, addReveal, isPro, setIsPro } = useSellerStore()
+  const { reveals, addReveal, isPro, setIsPro, valuation } = useSellerStore()
   const [activeFilters, setActiveFilters] = useState([])
   const [showPaywall, setShowPaywall] = useState(false)
   const [showTooltip, setShowTooltip] = useState(null)
   const [revealLoading, setRevealLoading] = useState(null)
+  const [showConditions, setShowConditions] = useState(true)
+
+  // Condition state
+  const [conditions, setConditions] = useState({
+    minPrice: valuation?.estimate ? Math.round(valuation.estimate * 0.95 / 5000) * 5000 : 400000,
+    closingWeeks: 8,
+    mustHave: [],
+  })
+
+  const toggleMustHave = (id) => {
+    setConditions((prev) => ({
+      ...prev,
+      mustHave: prev.mustHave.includes(id)
+        ? prev.mustHave.filter((c) => c !== id)
+        : [...prev.mustHave, id],
+    }))
+  }
 
   const toggleFilter = (id) => {
     setActiveFilters((prev) =>
@@ -53,19 +139,26 @@ export default function S7Explore() {
     )
   }
 
+  // Calculate match for each buyer based on conditions
+  const buyersWithMatch = useMemo(() => {
+    return MOCK_BUYERS.map((buyer) => {
+      const match = calculateConditionMatch(buyer, conditions)
+      return { ...buyer, conditionMatch: match }
+    }).sort((a, b) => b.conditionMatch.score - a.conditionMatch.score)
+  }, [conditions])
+
   const filteredBuyers = useMemo(() => {
-    return MOCK_BUYERS.filter((buyer) => {
-      if (activeFilters.includes('match80') && buyer.matchScore <= 80) return false
+    return buyersWithMatch.filter((buyer) => {
+      if (activeFilters.includes('match80') && buyer.conditionMatch.score <= 80) return false
       if (activeFilters.includes('prequalified') && !buyer.prequalified) return false
       if (activeFilters.includes('Starter') && buyer.type !== 'Starter') return false
       if (activeFilters.includes('Doorstromer') && buyer.type !== 'Doorstromer') return false
       if (activeFilters.includes('Investor') && buyer.type !== 'Investor') return false
       return true
     })
-  }, [activeFilters])
+  }, [activeFilters, buyersWithMatch])
 
   const handleReveal = (buyerId) => {
-    // First reveal is free, rest require Pro
     if (reveals.length === 0 || isPro) {
       setRevealLoading(buyerId)
       setTimeout(() => {
@@ -80,8 +173,106 @@ export default function S7Explore() {
   const isRevealed = (buyerId) => reveals.includes(buyerId)
 
   return (
-    <AppShell title="Explore Buyers" step={7} totalSteps={8} flow="sell">
+    <AppShell title="Stille Verkoop" step={7} totalSteps={8} flow="sell">
       <div className="px-4 pt-4 pb-32">
+        {/* Intro section */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-12 h-12 bg-eigen-purple/10 rounded-2xl flex items-center justify-center shrink-0">
+            <EyeOff size={22} className="text-eigen-purple" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-eigen-navy">Silent Sale</h2>
+            <p className="text-xs text-gray-500">Explore buyer interest without going public</p>
+          </div>
+        </div>
+
+        <AIBubble className="mb-4">
+          Not ready to list yet? Set your conditions and see which buyers match — without going public.
+          Your property details stay private until you choose to reveal them.
+        </AIBubble>
+
+        {/* Condition Setting */}
+        <button
+          onClick={() => setShowConditions(!showConditions)}
+          className="flex items-center gap-2 w-full mb-3"
+        >
+          <SlidersHorizontal size={14} className="text-gray-500" />
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Your Conditions</h3>
+          <span className="text-xs text-gray-400 ml-auto">{showConditions ? 'Hide' : 'Show'}</span>
+        </button>
+
+        <AnimatePresence>
+          {showConditions && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <Card className="mb-4">
+                {/* Minimum price */}
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-gray-700 block mb-1.5">Minimum Price</label>
+                  <input
+                    type="text"
+                    value={formatCurrency(conditions.minPrice)}
+                    onChange={(e) => {
+                      const num = parseInt(e.target.value.replace(/\D/g, ''), 10)
+                      if (!isNaN(num)) setConditions((prev) => ({ ...prev, minPrice: num }))
+                    }}
+                    className="w-full h-12 px-4 rounded-lg border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-eigen-purple"
+                  />
+                </div>
+
+                {/* Closing timeline */}
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-gray-700 block mb-1.5">Preferred Closing Timeline</label>
+                  <div className="flex flex-wrap gap-2">
+                    {CLOSING_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setConditions((prev) => ({ ...prev, closingWeeks: opt.value }))}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          conditions.closingWeeks === opt.value
+                            ? 'bg-eigen-purple text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Must-have conditions */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1.5">Must-Have Conditions</label>
+                  <div className="space-y-2">
+                    {CONDITION_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        onClick={() => toggleMustHave(opt.id)}
+                        className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm transition-colors text-left ${
+                          conditions.mustHave.includes(opt.id)
+                            ? 'bg-eigen-purple/10 text-eigen-purple font-medium border border-eigen-purple/30'
+                            : 'bg-gray-50 text-gray-600 border border-transparent hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${
+                          conditions.mustHave.includes(opt.id) ? 'bg-eigen-purple' : 'bg-gray-200'
+                        }`}>
+                          {conditions.mustHave.includes(opt.id) && <Check size={12} className="text-white" />}
+                        </div>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Filter chips */}
         <div className="flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 mb-4">
           {FILTERS.map((filter) => (
@@ -99,6 +290,7 @@ export default function S7Explore() {
           <AnimatePresence>
             {filteredBuyers.map((buyer) => {
               const revealed = isRevealed(buyer.id)
+              const match = buyer.conditionMatch
               return (
                 <motion.div
                   key={buyer.id}
@@ -110,9 +302,29 @@ export default function S7Explore() {
                   <Card className={revealed ? 'border-eigen-green border-2' : ''}>
                     {/* Top row: score + type */}
                     <div className="flex items-start justify-between mb-3">
-                      <ScoreBadge score={buyer.matchScore} />
+                      <ScoreBadge score={match.score} />
                       <Badge color={TYPE_COLORS[buyer.type]}>{buyer.type}</Badge>
                     </div>
+
+                    {/* Condition match breakdown */}
+                    {match.checks.length > 0 && (
+                      <div className="mb-3 space-y-1">
+                        {match.checks.map((check, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            {check.met ? (
+                              <Check size={12} className="text-eigen-green shrink-0" />
+                            ) : (
+                              <span className="w-3 h-3 rounded-full bg-eigen-red/20 flex items-center justify-center shrink-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-eigen-red" />
+                              </span>
+                            )}
+                            <span className={check.met ? 'text-gray-600' : 'text-gray-400'}>
+                              {check.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Pre-qualification */}
                     <div className="mb-2">
@@ -141,7 +353,9 @@ export default function S7Explore() {
                     )}
 
                     <p className="text-sm text-gray-600 mb-1">{buyer.criteria}</p>
-                    <p className="text-xs text-gray-400 mb-3">Budget: {buyer.budget} · Looking for {buyer.lookingFor}</p>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Budget: {formatCurrency(buyer.budget[0])} — {formatCurrency(buyer.budget[1])} · Looking for {buyer.lookingFor}
+                    </p>
 
                     {/* Reveal / Contact button */}
                     {revealed ? (

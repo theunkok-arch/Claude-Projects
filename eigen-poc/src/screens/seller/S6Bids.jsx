@@ -259,7 +259,7 @@ export default function S6Bids() {
       <BottomCTA>
         <Button variant="outline" fullWidth className="border-eigen-purple text-eigen-purple" onClick={() => navigate('/sell/explore')}>
           <div className="flex items-center justify-center gap-2">
-            <Sparkles size={16} /> Need help deciding? Explore Buyers
+            <Sparkles size={16} /> Not ready to accept? Try Stille Verkoop
           </div>
         </Button>
       </BottomCTA>
