@@ -1,1 +1,47 @@
 @import "tailwindcss";
+
+@theme {
+  /* EIGEN Color Palette */
+  --color-eigen-navy: #1B3A5C;
+  --color-eigen-orange: #FF6B35;
+  --color-eigen-blue: #3B82F6;
+  --color-eigen-purple: #8B5CF6;
+  --color-eigen-green: #22C55E;
+  --color-eigen-amber: #F59E0B;
+  --color-eigen-red: #EF4444;
+
+  /* Lighter variants for backgrounds */
+  --color-eigen-orange-light: #FFF3ED;
+  --color-eigen-blue-light: #EFF6FF;
+  --color-eigen-purple-light: #F3E8FF;
+  --color-eigen-green-light: #F0FDF4;
+
+  /* Font family */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Base styles */
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F9FAFB;
+}
+
+/* Mobile-first app container */
+#root {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background-color: white;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Leaflet map fix */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
