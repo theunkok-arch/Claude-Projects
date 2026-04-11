@@ -1,23 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Zap, Target, TrendingUp, Check, Minus, Sparkles, PartyPopper } from 'lucide-react'
+import { Check, Minus, PartyPopper } from 'lucide-react'
 import AppShell from '../../components/layout/AppShell'
 import BottomCTA from '../../components/layout/BottomCTA'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
-import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import AIBubble from '../../components/ai/AIBubble'
 import useSellerStore from '../../stores/sellerStore'
 import { formatCurrency } from '../../utils/formatCurrency'
 import { PACKAGES, FEATURE_LABELS, MAKELAAR_RATE, BANKS } from '../../data/constants'
-
-const STRATEGIES = [
-  { id: 'quick', label: 'Quick Sale', icon: Zap, desc: 'Price to sell fast, below market' },
-  { id: 'market', label: 'Market Value', icon: Target, desc: 'Price at fair market value' },
-  { id: 'maximum', label: 'Maximum Return', icon: TrendingUp, desc: 'Price above market, wait for the right buyer' },
-]
 
 function SavingsBanner({ askingPrice, packagePrice }) {
   const makelaarCost = Math.round(askingPrice * MAKELAAR_RATE)
@@ -70,23 +63,15 @@ function ConfettiEffect() {
 
 export default function S4Pricing() {
   const navigate = useNavigate()
-  const { address, valuation, listing, strategy, selectedPackage, setStrategy, setSelectedPackage, setPaid, setListing } = useSellerStore()
+  const { address, valuation, listing, selectedPackage, setSelectedPackage, setPaid } = useSellerStore()
 
-  const [askingPrice, setAskingPrice] = useState(listing.askingPrice || valuation?.estimate || 425000)
+  const askingPrice = listing.askingPrice || valuation?.estimate || 425000
   const [showPayment, setShowPayment] = useState(false)
-  const [paymentStep, setPaymentStep] = useState('banks') // banks → processing → success
+  const [paymentStep, setPaymentStep] = useState('banks')
   const [selectedBank, setSelectedBank] = useState(null)
   const [showConfetti, setShowConfetti] = useState(false)
 
   const currentPkg = PACKAGES.find((p) => p.id === selectedPackage) || PACKAGES[1]
-
-  const handlePriceChange = (e) => {
-    const num = parseInt(e.target.value.replace(/\D/g, ''), 10)
-    if (!isNaN(num)) {
-      setAskingPrice(num)
-      setListing({ askingPrice: num })
-    }
-  }
 
   const handleSelectPackage = (pkgId) => {
     setSelectedPackage(pkgId)
@@ -113,72 +98,51 @@ export default function S4Pricing() {
   }
 
   return (
-    <AppShell title="Set Your Price" step={4} totalSteps={8} flow="sell">
+    <AppShell title="EIGEN Package" step={4} totalSteps={8} flow="sell">
       {/* Savings Banner */}
       <SavingsBanner askingPrice={askingPrice} packagePrice={currentPkg.price} />
 
       <div className="px-4 pt-4 pb-32">
-        {/* Pricing Strategy */}
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Pricing Strategy</h3>
-        <div className="grid grid-cols-3 gap-2 mb-6">
-          {STRATEGIES.map((s) => {
-            const Icon = s.icon
-            const active = strategy === s.id
-            return (
-              <motion.button
-                key={s.id}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setStrategy(s.id)}
-                className={`flex flex-col items-center p-3 rounded-xl border-2 transition-colors ${
-                  active
-                    ? 'bg-eigen-orange text-white border-eigen-orange'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <Icon size={20} className={active ? 'text-white' : 'text-gray-400'} />
-                <span className="text-xs font-semibold mt-1.5">{s.label}</span>
-              </motion.button>
-            )
-          })}
-        </div>
-
-        {/* Asking Price Input */}
-        <div className="mb-6">
-          <Input
-            label="Your Asking Price"
-            value={formatCurrency(askingPrice)}
-            onChange={handlePriceChange}
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            AI suggested: {formatCurrency(valuation?.estimate || 425000)}
-          </p>
-        </div>
+        {/* Your selected price summary */}
+        <Card className="mb-4 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide">Your asking price</p>
+              <p className="text-xl font-bold text-eigen-navy">{formatCurrency(askingPrice)}</p>
+            </div>
+            <Button variant="outline" className="text-xs h-8 px-3" onClick={() => navigate('/sell/listing')}>
+              Adjust
+            </Button>
+          </div>
+        </Card>
 
         {/* Package Comparison */}
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Choose Your Package</h3>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Choose Your EIGEN Package</h3>
 
-        {/* Package cards */}
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 mb-4">
+        {/* Package cards — stacked vertically for mobile */}
+        <div className="space-y-3 mb-4">
           {PACKAGES.map((pkg) => {
             const active = selectedPackage === pkg.id
             return (
               <Card
                 key={pkg.id}
-                className={`min-w-[200px] shrink-0 relative ${
+                className={`relative ${
                   active ? 'border-eigen-orange border-2' : ''
                 }`}
               >
                 {pkg.recommended && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-eigen-orange text-white text-[10px] font-bold px-3 py-0.5 rounded-full">
+                  <span className="absolute -top-3 left-4 bg-eigen-orange text-white text-[10px] font-bold px-3 py-0.5 rounded-full">
                     Recommended
                   </span>
                 )}
-                <div className="text-center pt-2">
-                  <p className="font-bold text-eigen-navy text-lg">{pkg.name}</p>
-                  <p className="text-2xl font-bold text-eigen-navy mt-1">{formatCurrency(pkg.price)}</p>
+                <div className="flex items-center justify-between pt-1 mb-3">
+                  <div>
+                    <p className="font-bold text-eigen-navy text-lg">{pkg.name}</p>
+                  </div>
+                  <p className="text-2xl font-bold text-eigen-navy">{formatCurrency(pkg.price)}</p>
                 </div>
 
-                <div className="mt-3 space-y-1.5">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-3">
                   {Object.entries(pkg.features).map(([key, enabled]) => (
                     <div key={key} className="flex items-center gap-2 text-xs">
                       {enabled ? (
@@ -196,7 +160,7 @@ export default function S4Pricing() {
                 <Button
                   variant={active ? 'primary' : 'outline'}
                   fullWidth
-                  className="mt-4 text-sm h-10"
+                  className="text-sm h-10"
                   onClick={() => handleSelectPackage(pkg.id)}
                 >
                   {active ? 'Selected ✓' : 'Select'}

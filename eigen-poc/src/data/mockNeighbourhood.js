@@ -131,3 +131,23 @@ export default mockNeighbourhoods
 export function getNeighbourhood(name) {
   return mockNeighbourhoods[name] || null
 }
+
+// Get neighbourhood data by city, falling back to a sensible default
+export function getNeighbourhoodByCity(city) {
+  const entry = Object.values(mockNeighbourhoods).find((n) => n.city === city)
+  if (entry) return entry
+  // Default neighbourhood data for cities not in the map
+  return {
+    name: 'Centrum',
+    city: city || 'Unknown',
+    avgPrice: 4500,
+    avgPriceUnit: '€/m²',
+    priceChange12m: 5.0,
+    overbidHistory: [
+      { quarter: 'Q1 2024', percentage: 4.0, count: 20 },
+      { quarter: 'Q4 2023', percentage: 3.5, count: 18 },
+      { quarter: 'Q3 2023', percentage: 4.5, count: 22 },
+      { quarter: 'Q2 2023', percentage: 5.0, count: 25 },
+    ],
+  }
+}

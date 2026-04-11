@@ -27,6 +27,10 @@ const useSellerStore = create(
       },
       listingGenerated: false,
 
+      // S3b: AI Price Advisor
+      priceSliderValue: 50, // 0 = Sell Fast, 100 = Maximize Price
+      suggestedPrice: null,
+
       // S4: Pricing
       strategy: 'market',
       selectedPackage: null,
@@ -69,6 +73,10 @@ const useSellerStore = create(
       setListing: (data) =>
         set((s) => ({ listing: { ...s.listing, ...data } })),
       setListingGenerated: (val) => set({ listingGenerated: val }),
+
+      // Actions — S3b: Price Advisor
+      setPriceSliderValue: (val) => set({ priceSliderValue: val }),
+      setSuggestedPrice: (val) => set({ suggestedPrice: val }),
 
       // Actions — S4
       setStrategy: (strategy) => set({ strategy }),
@@ -119,6 +127,8 @@ const useSellerStore = create(
             seoScore: 94,
           },
           listingGenerated: false,
+          priceSliderValue: 50,
+          suggestedPrice: null,
           strategy: 'market',
           selectedPackage: null,
           paid: false,
