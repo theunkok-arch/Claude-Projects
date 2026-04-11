@@ -70,7 +70,7 @@ function ConfettiEffect() {
 
 export default function S4Pricing() {
   const navigate = useNavigate()
-  const { valuation, listing, strategy, selectedPackage, setStrategy, setSelectedPackage, setPaid, setListing } = useSellerStore()
+  const { address, valuation, listing, strategy, selectedPackage, setStrategy, setSelectedPackage, setPaid, setListing } = useSellerStore()
 
   const [askingPrice, setAskingPrice] = useState(listing.askingPrice || valuation?.estimate || 425000)
   const [showPayment, setShowPayment] = useState(false)
