@@ -11,55 +11,129 @@ const useSellerStore = create(
 
       // S2: Photos
       photos: [],
-      photoPreset: 'natural',
 
       // S3: Listing
-      listingDescription: '',
+      listing: {
+        askingPrice: null,
+        m2: null,
+        bedrooms: 2,
+        bathrooms: 1,
+        energyLabel: 'C',
+        buildYear: null,
+        features: '',
+        description: '',
+        selectedVersion: 'default',
+        seoScore: 94,
+      },
       listingGenerated: false,
 
       // S4: Pricing
-      askingPrice: null,
-      pricingStrategy: 'market',
+      strategy: 'market',
+      selectedPackage: null,
+      paid: false,
+      listingStatus: null,
 
       // S5: Dashboard
-      listingLive: false,
+      notificationPrefs: {
+        viewingRequest: true,
+        newOffer: true,
+        milestones: true,
+        weeklySummary: false,
+      },
 
       // S6: Bids
       bids: [],
-      selectedBid: null,
+      acceptedBid: null,
+
+      // S7: Explore
+      reveals: [],
+      isPro: false,
 
       // S8: Closed
-      dealClosed: false,
+      closingProgress: 60,
 
-      // Actions
+      // Actions — S1
       setAddress: (address) => set({ address }),
       setValuation: (valuation) => set({ valuation }),
       setVerified: (verified) => set({ verified }),
+
+      // Actions — S2
       addPhoto: (photo) => set((s) => ({ photos: [...s.photos, photo] })),
       removePhoto: (index) => set((s) => ({ photos: s.photos.filter((_, i) => i !== index) })),
-      setPhotoPreset: (preset) => set({ photoPreset: preset }),
-      setListingDescription: (desc) => set({ listingDescription: desc, listingGenerated: true }),
-      setAskingPrice: (price) => set({ askingPrice: price }),
-      setPricingStrategy: (strategy) => set({ pricingStrategy: strategy }),
-      setListingLive: (live) => set({ listingLive: live }),
-      addBid: (bid) => set((s) => ({ bids: [...s.bids, bid] })),
-      selectBid: (bid) => set({ selectedBid: bid }),
-      closeDeal: () => set({ dealClosed: true }),
+      updatePhoto: (index, data) =>
+        set((s) => ({
+          photos: s.photos.map((p, i) => (i === index ? { ...p, ...data } : p)),
+        })),
+
+      // Actions — S3
+      setListing: (data) =>
+        set((s) => ({ listing: { ...s.listing, ...data } })),
+      setListingGenerated: (val) => set({ listingGenerated: val }),
+
+      // Actions — S4
+      setStrategy: (strategy) => set({ strategy }),
+      setSelectedPackage: (pkg) => set({ selectedPackage: pkg }),
+      setPaid: () => set({ paid: true, listingStatus: 'live' }),
+
+      // Actions — S5
+      setNotificationPref: (key, val) =>
+        set((s) => ({
+          notificationPrefs: { ...s.notificationPrefs, [key]: val },
+        })),
+
+      // Actions — S6
+      setBids: (bids) => set({ bids }),
+      updateBidStatus: (bidId, status) =>
+        set((s) => ({
+          bids: s.bids.map((b) =>
+            b.id === bidId ? { ...b, status } : b
+          ),
+        })),
+      setAcceptedBid: (bid) => set({ acceptedBid: bid }),
+
+      // Actions — S7
+      addReveal: (buyerId) =>
+        set((s) => ({ reveals: [...s.reveals, buyerId] })),
+      setIsPro: (val) => set({ isPro: val }),
+
+      // Actions — S8
+      setClosingProgress: (val) => set({ closingProgress: val }),
+
+      // Reset
       reset: () =>
         set({
           address: null,
           valuation: null,
           verified: false,
           photos: [],
-          photoPreset: 'natural',
-          listingDescription: '',
+          listing: {
+            askingPrice: null,
+            m2: null,
+            bedrooms: 2,
+            bathrooms: 1,
+            energyLabel: 'C',
+            buildYear: null,
+            features: '',
+            description: '',
+            selectedVersion: 'default',
+            seoScore: 94,
+          },
           listingGenerated: false,
-          askingPrice: null,
-          pricingStrategy: 'market',
-          listingLive: false,
+          strategy: 'market',
+          selectedPackage: null,
+          paid: false,
+          listingStatus: null,
+          notificationPrefs: {
+            viewingRequest: true,
+            newOffer: true,
+            milestones: true,
+            weeklySummary: false,
+          },
           bids: [],
-          selectedBid: null,
-          dealClosed: false,
+          acceptedBid: null,
+          reveals: [],
+          isPro: false,
+          closingProgress: 60,
         }),
     }),
     { name: 'eigen-seller' }
