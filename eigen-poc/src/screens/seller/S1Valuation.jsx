@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MapPin, Shield, CheckCircle, Sparkles, Home, Calendar, Ruler, Banknote, ChevronDown } from 'lucide-react'
+import { MapPin, Shield, CheckCircle, Sparkles, Home, Calendar, Ruler, Banknote, ChevronDown, RotateCcw } from 'lucide-react'
 import AppShell from '../../components/layout/AppShell'
 import BottomCTA from '../../components/layout/BottomCTA'
 import Card from '../../components/ui/Card'
@@ -86,17 +86,24 @@ function AddressEntry({ onSelect }) {
                 <button
                   key={addr.id}
                   onClick={() => handleSelect(addr)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0"
+                  className="w-full flex items-start justify-between px-4 py-3 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0"
                 >
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-eigen-navy">
                       {addr.street} {addr.number}
                     </p>
                     <p className="text-xs text-gray-500">
                       {addr.postcode} {addr.city}
                     </p>
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+                      <span>{addr.type}</span>
+                      <span>·</span>
+                      <span>{addr.m2Living} m²</span>
+                      <span>·</span>
+                      <span>{addr.buildYear}</span>
+                    </div>
                   </div>
-                  <Badge color="green">Kadaster ✓</Badge>
+                  <Badge color="green" className="shrink-0 ml-2">Kadaster ✓</Badge>
                 </button>
               ))}
             </motion.div>
@@ -370,13 +377,28 @@ function AnalysisLoading() {
 }
 
 // ---------- State 4: Valuation Results ----------
-function ValuationResults({ address, valuation }) {
+function ValuationResults({ address, valuation, onChangeAddress }) {
   const navigate = useNavigate()
   const animatedEstimate = useAnimateNumber(valuation.estimate, 1200)
   const animatedConfidence = useAnimateNumber(valuation.confidence, 800)
 
   return (
     <motion.div className="px-4 pt-4 pb-32" {...slideUp}>
+      {/* Selected address summary with change button */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <MapPin size={14} className="text-eigen-green" />
+          <span className="font-medium">{address.street} {address.number}, {address.city}</span>
+        </div>
+        <button
+          onClick={onChangeAddress}
+          className="flex items-center gap-1 text-xs text-eigen-blue font-medium hover:underline"
+        >
+          <RotateCcw size={12} />
+          Change address
+        </button>
+      </div>
+
       {/* Valuation card — navy gradient */}
       <div className="bg-gradient-to-br from-eigen-navy to-[#1E4D7B] rounded-2xl p-6 text-white mb-4">
         <div className="flex items-center gap-2 mb-4">
@@ -397,12 +419,29 @@ function ValuationResults({ address, valuation }) {
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Comparable Sales</h3>
         <div className="space-y-3">
           {valuation.comparables.map((comp, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-              <div>
-                <p className="text-sm font-medium text-eigen-navy">{comp.address}</p>
-                <p className="text-xs text-gray-400">{comp.m2} m² · {comp.date}</p>
+            <div key={i} className="py-3 border-b border-gray-100 last:border-0">
+              <div className="flex items-start justify-between mb-1.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-eigen-navy">{comp.address}</p>
+                </div>
+                <div className={`ml-2 shrink-0 px-2 py-0.5 rounded-full text-xs font-bold text-white ${
+                  comp.matchScore >= 85 ? 'bg-eigen-green' : comp.matchScore >= 75 ? 'bg-eigen-amber' : 'bg-gray-400'
+                }`}>
+                  {comp.matchScore}% match
+                </div>
               </div>
-              <p className="text-sm font-semibold text-eigen-navy">{formatCurrency(comp.price)}</p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-gray-400 flex-wrap">
+                  <span>{comp.m2} m²</span>
+                  <span>·</span>
+                  <span>Sold {comp.soldDate || comp.date}</span>
+                  <span>·</span>
+                  <span>{formatCurrency(comp.pricePerM2 || Math.round(comp.price / comp.m2))}/m²</span>
+                  <span>·</span>
+                  <span>{comp.distance || '—'}m away</span>
+                </div>
+                <p className="text-sm font-semibold text-eigen-navy ml-2 shrink-0">{formatCurrency(comp.price)}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -459,6 +498,13 @@ export default function S1Valuation() {
     setScreenState('verified')
   }
 
+  const handleChangeAddress = () => {
+    setAddress(null)
+    setValuation(null)
+    setVerified(false)
+    setScreenState('address')
+  }
+
   const handleAnalyse = () => {
     setScreenState('loading')
     // Simulate 3-second analysis
@@ -496,7 +542,7 @@ export default function S1Valuation() {
           <AnalysisLoading key="loading" />
         )}
         {screenState === 'results' && valuation && (
-          <ValuationResults key="results" address={address} valuation={valuation} />
+          <ValuationResults key="results" address={address} valuation={valuation} onChangeAddress={handleChangeAddress} />
         )}
       </AnimatePresence>
     </AppShell>

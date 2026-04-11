@@ -36,18 +36,32 @@ function enrichAddress(addr) {
   const estimate = Math.round(wozValue * (1.0 + r() * 0.12))
   const confidence = 82 + Math.floor(r() * 13)
   const nearby = [`${addr.street.slice(0, 12)} ${100 + Math.floor(r() * 200)}`, `${addr.street.slice(0, 12)} ${10 + Math.floor(r() * 90)}`, `Nearby street ${Math.floor(r() * 300)}`]
+  const priceM2 = CITY_PRICE[addr.city] || 4000
 
   const valuation = {
     estimate,
     rangeLow: Math.round(estimate * 0.95),
     rangeHigh: Math.round(estimate * 1.05),
     confidence,
-    comparables: nearby.map((a, i) => ({
-      address: a,
-      price: Math.round(estimate * (0.9 + r() * 0.2)),
-      m2: m2Living + Math.floor((r() - 0.5) * 20),
-      date: `202${5 + Math.floor(r() * 2)}-${String(1 + Math.floor(r() * 12)).padStart(2, '0')}`,
-    })),
+    comparables: nearby.map((a, i) => {
+      const compM2 = m2Living + Math.floor((r() - 0.5) * 20)
+      const compPrice = Math.round(estimate * (0.9 + r() * 0.2))
+      const compPricePerM2 = Math.round(compPrice / compM2)
+      const distance = Math.round(50 + r() * 450)
+      const matchScore = Math.max(65, Math.min(98, Math.round(95 - Math.abs(compM2 - m2Living) * 0.5 - Math.abs(compPrice - estimate) / estimate * 30 - r() * 8)))
+      const soldMonth = 1 + Math.floor(r() * 12)
+      const soldYear = 2025 + Math.floor(r() * 2)
+      return {
+        address: a,
+        price: compPrice,
+        m2: compM2,
+        date: `${soldYear}-${String(soldMonth).padStart(2, '0')}`,
+        soldDate: `${String(soldMonth).padStart(2, '0')}-${soldYear}`,
+        pricePerM2: compPricePerM2,
+        distance,
+        matchScore,
+      }
+    }),
     aiInsight: generateInsight(addr, type, m2Living, buildYear, estimate),
   }
 
