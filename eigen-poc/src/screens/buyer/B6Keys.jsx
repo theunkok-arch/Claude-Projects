@@ -1,71 +1,25 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Key, CheckCircle, Circle, FileText, Building2, Home, PartyPopper, Calendar, Clock, Sparkles } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Key, CheckCircle, FileText, Building2, Home, Clock } from 'lucide-react'
 import AppShell from '../../components/layout/AppShell'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import AIBubble from '../../components/ai/AIBubble'
+import { useTranslation } from '../../i18n'
 
-const CLOSING_STEPS = [
-  {
-    id: 1,
-    title: 'Bid Accepted',
-    desc: 'Seller accepted your offer',
-    date: '11 Apr 2026',
-    status: 'completed',
-    icon: CheckCircle,
-  },
-  {
-    id: 2,
-    title: '3-Day Cooling Off',
-    desc: 'Legal reflection period (bedenktijd)',
-    date: '11–14 Apr 2026',
-    status: 'completed',
-    icon: Clock,
-  },
-  {
-    id: 3,
-    title: 'Building Inspection',
-    desc: 'Professional structural assessment',
-    date: '16 Apr 2026',
-    status: 'completed',
-    icon: Building2,
-  },
-  {
-    id: 4,
-    title: 'Mortgage Finalization',
-    desc: 'Final mortgage offer from your bank',
-    date: '22 Apr 2026',
-    status: 'active',
-    icon: FileText,
-  },
-  {
-    id: 5,
-    title: 'Notary Appointment',
-    desc: 'Sign the koopakte (purchase deed)',
-    date: '28 Apr 2026',
-    status: 'upcoming',
-    icon: FileText,
-  },
-  {
-    id: 6,
-    title: 'Key Handover',
-    desc: 'Receive the keys to your new home!',
-    date: '15 May 2026',
-    status: 'upcoming',
-    icon: Key,
-  },
-]
+const STEP_ICONS = [CheckCircle, Clock, Building2, FileText, FileText, Key]
+const STEP_DATES = ['11 Apr 2026', '11–14 Apr 2026', '16 Apr 2026', '22 Apr 2026', '28 Apr 2026', '15 May 2026']
+const STEP_STATUS = ['completed', 'completed', 'completed', 'active', 'upcoming', 'upcoming']
 
-const DOCUMENTS = [
-  { name: 'Purchase Agreement (Koopakte)', status: 'ready', date: '14 Apr' },
-  { name: 'Building Inspection Report', status: 'ready', date: '16 Apr' },
-  { name: 'Mortgage Offer', status: 'pending', date: 'Expected 22 Apr' },
-  { name: 'Notary Transfer Deed', status: 'pending', date: 'Expected 28 Apr' },
-  { name: 'Energy Label Certificate', status: 'ready', date: '11 Apr' },
-  { name: 'VvE Documentation', status: 'ready', date: '12 Apr' },
+const DOC_STATUS = [
+  { status: 'ready', date: '14 Apr' },
+  { status: 'ready', date: '16 Apr' },
+  { status: 'pending', date: '22 Apr' },
+  { status: 'pending', date: '28 Apr' },
+  { status: 'ready', date: '11 Apr' },
+  { status: 'ready', date: '12 Apr' },
 ]
 
 function ConfettiEffect() {
@@ -88,23 +42,35 @@ function ConfettiEffect() {
 
 export default function B6Keys() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [showCelebration, setShowCelebration] = useState(false)
 
-  const completedSteps = CLOSING_STEPS.filter((s) => s.status === 'completed').length
-  const totalSteps = CLOSING_STEPS.length
-  const progress = (completedSteps / totalSteps) * 100
+  const stepsText = t('b6.steps') // array of {title, desc}
+  const docsText = t('b6.docs') // array of strings
 
-  // Days until key handover
+  const steps = Array.isArray(stepsText)
+    ? stepsText.map((s, i) => ({
+        id: i + 1,
+        title: s.title,
+        desc: s.desc,
+        date: STEP_DATES[i],
+        status: STEP_STATUS[i],
+        icon: STEP_ICONS[i],
+      }))
+    : []
+
+  const completedSteps = steps.filter((s) => s.status === 'completed').length
+  const totalSteps = steps.length
+  const progress = totalSteps ? (completedSteps / totalSteps) * 100 : 0
+
   const keyDate = new Date('2026-05-15')
   const today = new Date()
   const daysUntilKeys = Math.max(0, Math.ceil((keyDate - today) / (1000 * 60 * 60 * 24)))
 
-  const handleSimulateComplete = () => {
-    setShowCelebration(true)
-  }
+  const handleSimulateComplete = () => setShowCelebration(true)
 
   return (
-    <AppShell title="Closing Process" flow="buy">
+    <AppShell title={t('b6.title')} flow="buy">
       <div className="px-4 pt-4 pb-32">
         {showCelebration ? (
           <>
@@ -121,9 +87,9 @@ export default function B6Keys() {
               >
                 <Key size={64} className="text-eigen-orange mx-auto mb-4" />
               </motion.div>
-              <h2 className="text-3xl font-bold text-eigen-navy mb-2">Congratulations!</h2>
-              <p className="text-lg text-gray-600 mb-1">The keys are yours!</p>
-              <p className="text-sm text-gray-400 mb-6">Welcome to your new home at Prinsengracht 263</p>
+              <h2 className="text-3xl font-bold text-eigen-navy mb-2">{t('b6.congrats')}</h2>
+              <p className="text-lg text-gray-600 mb-1">{t('b6.keysYours')}</p>
+              <p className="text-sm text-gray-400 mb-6">{t('b6.welcome')}</p>
 
               <Card className="bg-gradient-to-br from-eigen-navy to-[#1E4D7B] text-white text-left mb-4">
                 <div className="flex items-center gap-3 mb-3">
@@ -131,15 +97,15 @@ export default function B6Keys() {
                   <p className="font-bold text-lg">Prinsengracht 263</p>
                 </div>
                 <p className="text-sm text-white/70">1016 GV Amsterdam</p>
-                <p className="text-sm text-white/70 mt-1">Your EIGEN journey is complete. No makelaar needed.</p>
+                <p className="text-sm text-white/70 mt-1">{t('b6.journeyComplete')}</p>
                 <div className="mt-3 pt-3 border-t border-white/20">
-                  <p className="text-xs text-white/50">Saved vs traditional makelaar</p>
+                  <p className="text-xs text-white/50">{t('b6.savedVs')}</p>
                   <p className="text-2xl font-bold text-eigen-orange">€8.680</p>
                 </div>
               </Card>
 
               <Button variant="primary" fullWidth onClick={() => navigate('/')}>
-                Back to Home
+                {t('b6.backHome')}
               </Button>
             </motion.div>
           </>
@@ -149,9 +115,9 @@ export default function B6Keys() {
             <Card className="bg-gradient-to-r from-eigen-blue to-blue-600 text-white mb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-white/60">Keys in</p>
+                  <p className="text-xs uppercase tracking-wider text-white/60">{t('b6.keysIn')}</p>
                   <p className="text-4xl font-bold">{daysUntilKeys}</p>
-                  <p className="text-sm text-white/70">days</p>
+                  <p className="text-sm text-white/70">{t('b6.days')}</p>
                 </div>
                 <div className="text-right">
                   <Key size={32} className="text-white/30 ml-auto mb-2" />
@@ -163,7 +129,7 @@ export default function B6Keys() {
             {/* Progress bar */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold text-eigen-navy">Closing Progress</p>
+                <p className="text-sm font-semibold text-eigen-navy">{t('b6.progress')}</p>
                 <p className="text-sm font-bold text-eigen-blue">{completedSteps}/{totalSteps}</p>
               </div>
               <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -177,17 +143,16 @@ export default function B6Keys() {
             </div>
 
             {/* Timeline */}
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Timeline</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('b6.timeline')}</h3>
             <div className="relative mb-6">
               {/* Vertical connector */}
               <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-gray-200" />
 
               <div className="space-y-1">
-                {CLOSING_STEPS.map((step, i) => {
+                {steps.map((step) => {
                   const Icon = step.icon
                   const isCompleted = step.status === 'completed'
                   const isActive = step.status === 'active'
-                  const isUpcoming = step.status === 'upcoming'
                   return (
                     <div key={step.id} className="relative flex items-start gap-3 py-3">
                       {/* Status dot */}
@@ -209,8 +174,8 @@ export default function B6Keys() {
                           <p className={`text-sm font-semibold ${isCompleted || isActive ? 'text-eigen-navy' : 'text-gray-400'}`}>
                             {step.title}
                           </p>
-                          {isActive && <Badge color="blue">In Progress</Badge>}
-                          {isCompleted && <Badge color="green">Done</Badge>}
+                          {isActive && <Badge color="blue">{t('b6.inProgress')}</Badge>}
+                          {isCompleted && <Badge color="green">{t('b6.done')}</Badge>}
                         </div>
                         <p className={`text-xs ${isCompleted || isActive ? 'text-gray-500' : 'text-gray-400'}`}>
                           {step.desc}
@@ -224,32 +189,33 @@ export default function B6Keys() {
             </div>
 
             {/* AI Insight */}
-            <AIBubble title="Status Update" className="mb-4">
-              Your mortgage finalization is in progress. Based on typical timelines, you should receive
-              your final offer by April 22nd. Everything is on track for your May 15th key handover.
-              I'll notify you when documents are ready for signing.
+            <AIBubble title={t('b6.statusUpdate')} className="mb-4">
+              {t('b6.statusMessage')}
             </AIBubble>
 
             {/* Documents */}
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Documents</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('b6.documents')}</h3>
             <Card className="mb-6">
               <div className="space-y-3">
-                {DOCUMENTS.map((doc, i) => (
-                  <div key={i} className="flex items-center justify-between py-1">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <FileText size={14} className={doc.status === 'ready' ? 'text-eigen-green' : 'text-gray-300'} />
-                      <div className="min-w-0">
-                        <p className="text-sm text-gray-700 truncate">{doc.name}</p>
-                        <p className="text-[10px] text-gray-400">{doc.date}</p>
+                {Array.isArray(docsText) && docsText.map((name, i) => {
+                  const meta = DOC_STATUS[i] || { status: 'pending', date: '' }
+                  return (
+                    <div key={i} className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <FileText size={14} className={meta.status === 'ready' ? 'text-eigen-green' : 'text-gray-300'} />
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-700 truncate">{name}</p>
+                          <p className="text-[10px] text-gray-400">{meta.status === 'ready' ? meta.date : t('b6.docExpected', { date: meta.date })}</p>
+                        </div>
                       </div>
+                      {meta.status === 'ready' ? (
+                        <Badge color="green">{t('b6.ready')}</Badge>
+                      ) : (
+                        <Badge color="amber">{t('b6.pending')}</Badge>
+                      )}
                     </div>
-                    {doc.status === 'ready' ? (
-                      <Badge color="green">Ready</Badge>
-                    ) : (
-                      <Badge color="amber">Pending</Badge>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </Card>
 
@@ -262,7 +228,7 @@ export default function B6Keys() {
             >
               <div className="flex items-center justify-center gap-2">
                 <Key size={16} />
-                Simulate Key Handover (Demo)
+                {t('b6.simulateBtn')}
               </div>
             </Button>
           </>

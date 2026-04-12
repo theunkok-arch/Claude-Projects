@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { TrendingUp, AlertTriangle, Check, Send, PartyPopper } from 'lucide-react'
 import AppShell from '../../components/layout/AppShell'
 import BottomCTA from '../../components/layout/BottomCTA'
@@ -13,22 +13,23 @@ import AIBubble from '../../components/ai/AIBubble'
 import useBuyerStore from '../../stores/buyerStore'
 import { getPropertyById } from '../../data/mockProperties'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { useTranslation } from '../../i18n'
 
-const CONDITIONS = [
-  { id: 'financing', label: 'Financing clause', desc: '3 weeks to secure mortgage', risk: 'medium' },
-  { id: 'inspection', label: 'Building inspection', desc: 'Professional structural check', risk: 'medium' },
-  { id: 'nhg', label: 'NHG guarantee', desc: 'National Mortgage Guarantee', risk: 'low' },
-  { id: 'sale', label: 'Sale of current home', desc: 'Must sell before buying', risk: 'high' },
-]
+const RISK_COLORS = { financing: 'amber', inspection: 'amber', nhg: 'green', sale: 'red' }
+const RISK_LEVELS = { financing: 'medium', inspection: 'medium', nhg: 'low', sale: 'high' }
 
-const RISK_COLORS = { low: 'green', medium: 'amber', high: 'red' }
+function interpolate(str, vars) {
+  return str.replace(/\{(\w+)\}/g, (_, k) => vars[k] != null ? String(vars[k]) : `{${k}}`)
+}
 
 export default function B5Bid() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { placeBid } = useBuyerStore()
 
   const property = useMemo(() => getPropertyById(id), [id])
+  const conditionList = t('b5.conditionList')
 
   const [bidAmount, setBidAmount] = useState('')
   const [selectedConditions, setSelectedConditions] = useState(['financing'])
@@ -40,10 +41,10 @@ export default function B5Bid() {
 
   if (!property) {
     return (
-      <AppShell title="Make a Bid" flow="buy">
+      <AppShell title={t('b5.title')} flow="buy">
         <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
-          <p className="text-gray-500">Property not found</p>
-          <Button variant="outline" className="mt-4" onClick={() => navigate('/buy/results')}>Back to Results</Button>
+          <p className="text-gray-500">{t('b4.notFound')}</p>
+          <Button variant="outline" className="mt-4" onClick={() => navigate('/buy/results')}>{t('b2.backToSearch')}</Button>
         </div>
       </AppShell>
     )
@@ -52,7 +53,6 @@ export default function B5Bid() {
   const parsedBid = parseInt(String(bidAmount).replace(/\D/g, ''), 10) || 0
   const suggestedBid = Math.round(property.askingPrice * (1 + property.overbidPercentage / 100) / 5000) * 5000
   const bidDiffPercent = parsedBid > 0 ? (((parsedBid - property.askingPrice) / property.askingPrice) * 100).toFixed(1) : null
-  const isOverAsk = parsedBid > property.askingPrice
   const isUnconditional = selectedConditions.length === 0
 
   const toggleCondition = (condId) => {
@@ -67,7 +67,7 @@ export default function B5Bid() {
       placeBid({
         propertyId: property.id,
         amount: parsedBid,
-        conditions: selectedConditions.map((c) => CONDITIONS.find((x) => x.id === c)?.label).filter(Boolean),
+        conditions: selectedConditions.map((c) => conditionList.find((x) => x.id === c)?.label).filter(Boolean),
         message,
         timestamp: new Date().toISOString(),
       })
@@ -82,45 +82,55 @@ export default function B5Bid() {
   const getBidStrength = () => {
     if (parsedBid <= 0) return null
     const pct = (parsedBid / property.askingPrice) * 100
-    if (pct >= 105 && isUnconditional) return { label: 'Very Strong', color: 'green', desc: 'Unconditional and above asking — highly competitive.' }
-    if (pct >= 103) return { label: 'Strong', color: 'green', desc: 'Above market expectations for this area.' }
-    if (pct >= 100) return { label: 'Competitive', color: 'amber', desc: 'At asking price — decent, but may face stronger bids.' }
-    if (pct >= 95) return { label: 'Below Ask', color: 'amber', desc: 'Below asking — may need negotiation.' }
-    return { label: 'Low', color: 'red', desc: 'Significantly below asking — unlikely to succeed without seller motivation.' }
+    if (pct >= 105 && isUnconditional) return { ...t('b5.strengths.veryStrong'), color: 'green' }
+    if (pct >= 103) return { ...t('b5.strengths.strong'), color: 'green' }
+    if (pct >= 100) return { ...t('b5.strengths.competitive'), color: 'amber' }
+    if (pct >= 95) return { ...t('b5.strengths.belowAsk'), color: 'amber' }
+    return { ...t('b5.strengths.low'), color: 'red' }
   }
 
   const strength = getBidStrength()
+  const riskLabelFor = (risk) => risk === 'low' ? t('b5.riskLow') : risk === 'medium' ? t('b5.riskMedium') : t('b5.riskHigh')
+
+  const advisorBody = interpolate(t('b5.bidAdvisorBody'), {
+    pct: property.overbidPercentage,
+    area: property.neighbourhood || property.city,
+    suggested: formatCurrency(suggestedBid),
+  })
+  const advisorContext = property.daysOnMarket > 20
+    ? interpolate(t('b5.bidAdvisorStale'), { days: property.daysOnMarket })
+    : interpolate(t('b5.bidAdvisorFresh'), { days: property.daysOnMarket })
 
   return (
-    <AppShell title="Make a Bid" flow="buy">
+    <AppShell title={t('b5.title')} flow="buy">
       <div className="px-4 pt-4 pb-32">
         {submitted ? (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
               <PartyPopper size={56} className="text-eigen-green mx-auto mb-4" />
             </motion.div>
-            <h2 className="text-2xl font-bold text-eigen-navy mb-2">Bid Submitted!</h2>
-            <p className="text-gray-500 mb-1">{formatCurrency(parsedBid)} on {property.street} {property.number}</p>
-            <p className="text-sm text-gray-400 mb-6">The seller will review your bid and respond within 48 hours.</p>
+            <h2 className="text-2xl font-bold text-eigen-navy mb-2">{t('b5.bidSubmitted')}</h2>
+            <p className="text-gray-500 mb-1">{t('b5.bidOn', { amount: formatCurrency(parsedBid), address: `${property.street} ${property.number}` })}</p>
+            <p className="text-sm text-gray-400 mb-6">{t('b5.sellerResponse')}</p>
 
             <Card className="mb-4 bg-purple-50 border-eigen-purple/20 text-left">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 rounded-full bg-eigen-purple animate-pulse" />
-                <span className="text-xs font-semibold text-eigen-purple uppercase">What Happens Next</span>
+                <span className="text-xs font-semibold text-eigen-purple uppercase">{t('b5.nextStepsLabel')}</span>
               </div>
               <div className="space-y-2 text-sm text-gray-600">
-                <p>1. The seller receives your bid with all conditions</p>
-                <p>2. They can accept, counter, or decline</p>
-                <p>3. You'll get an instant notification with their response</p>
-                <p>4. If accepted, you'll move to the closing process</p>
+                <p>{t('b5.nextStep1')}</p>
+                <p>{t('b5.nextStep2')}</p>
+                <p>{t('b5.nextStep3')}</p>
+                <p>{t('b5.nextStep4')}</p>
               </div>
             </Card>
 
             <Button variant="buyer" fullWidth onClick={() => navigate('/buy/results')}>
-              Browse More Properties
+              {t('b5.browseMore')}
             </Button>
             <button className="w-full text-center text-sm text-gray-400 mt-3 py-2" onClick={() => navigate(`/buy/property/${property.id}`)}>
-              Back to Property
+              {t('b5.backToProperty')}
             </button>
           </motion.div>
         ) : (
@@ -130,29 +140,25 @@ export default function B5Bid() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-eigen-navy">{property.street} {property.number}, {property.city}</p>
-                  <p className="text-sm text-gray-500">{property.type} · {property.area}m² · {property.bedrooms} bed</p>
+                  <p className="text-sm text-gray-500">{property.type} · {property.area}m² · {property.bedrooms} {t('b1.bed')}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-400">Asking</p>
+                  <p className="text-xs text-gray-400">{t('b5.asking')}</p>
                   <p className="font-bold text-eigen-navy">{formatCurrency(property.askingPrice)}</p>
                 </div>
               </div>
             </Card>
 
             {/* AI Suggestion */}
-            <AIBubble title="Bid Advisor" className="mb-4">
-              Based on {property.overbidPercentage}% average overbidding in {property.neighbourhood || property.city},
-              I suggest bidding around <strong>{formatCurrency(suggestedBid)}</strong> to be competitive.
-              {property.daysOnMarket > 20
-                ? ` This property has been on market for ${property.daysOnMarket} days — you may have more negotiation room.`
-                : ` This is a fresh listing (${property.daysOnMarket} days) — expect competition.`}
+            <AIBubble title={t('b5.bidAdvisor')} className="mb-4">
+              <span dangerouslySetInnerHTML={{ __html: advisorBody + advisorContext }} />
             </AIBubble>
 
             {/* Bid Amount */}
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Your Bid</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">{t('b5.yourBid')}</h3>
             <div className="mb-2">
               <Input
-                label="Bid Amount"
+                label={t('b5.bidAmount')}
                 value={parsedBid > 0 ? formatCurrency(parsedBid) : ''}
                 onChange={(e) => setBidAmount(e.target.value.replace(/\D/g, ''))}
                 placeholder={formatCurrency(suggestedBid)}
@@ -183,7 +189,7 @@ export default function B5Bid() {
                   'border-eigen-red bg-red-50'
                 }`}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold text-eigen-navy">Bid Strength: {strength.label}</span>
+                    <span className="text-sm font-semibold text-eigen-navy">{t('b5.strengthLabel')}: {strength.label}</span>
                     <Badge color={strength.color}>
                       {bidDiffPercent > 0 ? '+' : ''}{bidDiffPercent}%
                     </Badge>
@@ -194,10 +200,12 @@ export default function B5Bid() {
             )}
 
             {/* Conditions */}
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Conditions</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">{t('b5.conditions')}</h3>
             <div className="space-y-2 mb-4">
-              {CONDITIONS.map((cond) => {
+              {conditionList.map((cond) => {
                 const isActive = selectedConditions.includes(cond.id)
+                const riskLevel = RISK_LEVELS[cond.id] || 'medium'
+                const color = RISK_COLORS[cond.id] || 'amber'
                 return (
                   <button
                     key={cond.id}
@@ -217,7 +225,7 @@ export default function B5Bid() {
                       <p className="text-sm font-medium text-gray-700">{cond.label}</p>
                       <p className="text-xs text-gray-400">{cond.desc}</p>
                     </div>
-                    <Badge color={RISK_COLORS[cond.risk]} className="shrink-0">{cond.risk} risk</Badge>
+                    <Badge color={color} className="shrink-0">{riskLabelFor(riskLevel)}</Badge>
                   </button>
                 )
               })}
@@ -228,19 +236,19 @@ export default function B5Bid() {
                 <div className="flex items-center gap-2">
                   <TrendingUp size={16} className="text-eigen-green" />
                   <div>
-                    <p className="text-sm font-semibold text-eigen-green">Unconditional Bid</p>
-                    <p className="text-xs text-gray-600">No conditions — strongest position for the seller.</p>
+                    <p className="text-sm font-semibold text-eigen-green">{t('b5.unconditional')}</p>
+                    <p className="text-xs text-gray-600">{t('b5.unconditionalDesc')}</p>
                   </div>
                 </div>
               </Card>
             )}
 
             {/* Message */}
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Message to Seller</h3>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">{t('b5.messageTitle')}</h3>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value.slice(0, 500))}
-              placeholder="Tell the seller why you love this property..."
+              placeholder={t('b5.messagePlaceholder')}
               rows={3}
               maxLength={500}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-eigen-blue mb-1"
@@ -251,33 +259,33 @@ export default function B5Bid() {
       </div>
 
       {/* Review Modal */}
-      <Modal open={showReview} onClose={() => !submitting && setShowReview(false)} title="Review Your Bid">
+      <Modal open={showReview} onClose={() => !submitting && setShowReview(false)} title={t('b5.reviewTitle')}>
         <div className="space-y-3 mb-4">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Property</span>
+            <span className="text-gray-500">{t('b5.property')}</span>
             <span className="font-medium text-eigen-navy">{property.street} {property.number}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Asking Price</span>
+            <span className="text-gray-500">{t('b5.askingPrice')}</span>
             <span className="text-gray-700">{formatCurrency(property.askingPrice)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Your Bid</span>
+            <span className="text-gray-500">{t('b5.yourBidLabel')}</span>
             <span className="font-bold text-eigen-navy text-lg">{formatCurrency(parsedBid)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Conditions</span>
+            <span className="text-gray-500">{t('b5.conditionsLabel')}</span>
             <span className="text-gray-700 text-right">
               {selectedConditions.length === 0
-                ? 'None (unconditional)'
-                : selectedConditions.map((c) => CONDITIONS.find((x) => x.id === c)?.label).join(', ')}
+                ? t('b5.none')
+                : selectedConditions.map((c) => conditionList.find((x) => x.id === c)?.label).join(', ')}
             </span>
           </div>
         </div>
 
         {message && (
           <Card className="bg-gray-50 mb-4">
-            <p className="text-xs text-gray-400 mb-1">Your message</p>
+            <p className="text-xs text-gray-400 mb-1">{t('b5.yourMessage')}</p>
             <p className="text-sm text-gray-700">{message}</p>
           </Card>
         )}
@@ -286,25 +294,24 @@ export default function B5Bid() {
           <div className="flex items-start gap-2">
             <AlertTriangle size={16} className="text-eigen-amber shrink-0 mt-0.5" />
             <p className="text-xs text-gray-600">
-              By submitting this bid, you're making a legal offer. Once accepted by the seller,
-              you'll have 3 days cooling-off period as per Dutch law.
+              {t('b5.disclaimer')}
             </p>
           </div>
         </div>
 
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={() => setShowReview(false)} disabled={submitting}>
-            Go Back
+            {t('b5.goBack')}
           </Button>
           <Button variant="primary" className="flex-1" onClick={handleSubmit} disabled={submitting}>
             {submitting ? (
               <div className="flex items-center justify-center gap-2">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Submitting...
+                {t('b5.submitting')}
               </div>
             ) : (
               <div className="flex items-center justify-center gap-1">
-                <Send size={14} /> Submit Bid
+                <Send size={14} /> {t('b5.submitBid')}
               </div>
             )}
           </Button>
@@ -339,7 +346,7 @@ export default function B5Bid() {
             disabled={parsedBid <= 0}
             onClick={() => setShowReview(true)}
           >
-            {parsedBid > 0 ? `Review Bid: ${formatCurrency(parsedBid)}` : 'Enter a bid amount'}
+            {parsedBid > 0 ? t('b5.reviewBid', { amount: formatCurrency(parsedBid) }) : t('b5.enterBid')}
           </Button>
         </BottomCTA>
       )}

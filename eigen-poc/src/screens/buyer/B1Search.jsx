@@ -1,40 +1,35 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Sparkles, MapPin, Home, Banknote, BedDouble, Send, ArrowRight } from 'lucide-react'
+import { Search, Sparkles, MapPin, Home, Banknote, BedDouble, Send, ArrowRight, RotateCcw } from 'lucide-react'
 import AppShell from '../../components/layout/AppShell'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Chip from '../../components/ui/Chip'
 import useBuyerStore from '../../stores/buyerStore'
+import mockProperties from '../../data/mockProperties'
+import { applyFiltersWithFallback } from '../../utils/filterProperties'
+import { useTranslation } from '../../i18n'
+import { formatCurrency } from '../../utils/formatCurrency'
 
-const QUICK_SEARCHES = [
-  'Apartment in Amsterdam under €500k',
-  'Urban family home near Utrecht',
-  '3-bedroom house in Rotterdam',
-  'Family home with garden in Den Haag',
-  'Starter apartment in Groningen',
-]
-
-const CITY_OPTIONS = ['Amsterdam', 'Rotterdam', 'Utrecht', 'Den Haag', 'Maastricht', 'Groningen']
+const CITY_OPTIONS = ['Amsterdam', 'Rotterdam', 'Utrecht', 'Den Haag', 'Maastricht', 'Groningen', 'Bilthoven']
 const TYPE_OPTIONS = ['Appartement', 'Tussenwoning', 'Herenhuis', 'Villa', 'Twee-onder-een-kap']
-const PRICE_RANGES = [
-  { label: '< €300k', max: 300000 },
-  { label: '€300–500k', min: 300000, max: 500000 },
-  { label: '€500–750k', min: 500000, max: 750000 },
-  { label: '€750k–1M', min: 750000, max: 1000000 },
-  { label: '> €1M', min: 1000000 },
-]
+const PRICE_STOPS = [null, 200000, 300000, 400000, 500000, 600000, 750000, 900000, 1100000, 1300000, 1500000, 2000000]
 const BEDROOM_OPTIONS = [1, 2, 3, 4, 5]
 
 function parseSearchQuery(query) {
   const q = query.toLowerCase()
-  const filters = {}
-  const cities = { amsterdam: 'Amsterdam', rotterdam: 'Rotterdam', utrecht: 'Utrecht', bilthoven: 'Utrecht', 'de bilt': 'Utrecht', zeist: 'Utrecht', 'den haag': 'Den Haag', hague: 'Den Haag', maastricht: 'Maastricht', groningen: 'Groningen' }
-  for (const [key, val] of Object.entries(cities)) {
-    if (q.includes(key)) { filters.city = val; break }
+  const filters = { cities: [], propertyTypes: [] }
+  const cityMap = {
+    amsterdam: 'Amsterdam', rotterdam: 'Rotterdam', utrecht: 'Utrecht',
+    bilthoven: 'Bilthoven', 'de bilt': 'Bilthoven', zeist: 'Utrecht',
+    'den haag': 'Den Haag', hague: 'Den Haag',
+    maastricht: 'Maastricht', groningen: 'Groningen',
   }
-  const priceMatch = q.match(/(?:under|below|max|tot|€)\s*€?\s*(\d[\d.,]*)\s*(k|m|000)?/i)
+  for (const [key, val] of Object.entries(cityMap)) {
+    if (q.includes(key) && !filters.cities.includes(val)) filters.cities.push(val)
+  }
+  const priceMatch = q.match(/(?:under|below|max|tot|onder|€)\s*€?\s*(\d[\d.,]*)\s*(k|m|000)?/i)
   if (priceMatch) {
     let price = parseFloat(priceMatch[1].replace(/[.,]/g, ''))
     if (priceMatch[2] === 'k' || priceMatch[2] === '000') price *= 1000
@@ -44,10 +39,25 @@ function parseSearchQuery(query) {
   }
   const brMatch = q.match(/(\d)\s*(?:-|\s)?(?:bedroom|bed|kamer|slaapkamer|br)/i)
   if (brMatch) filters.minBedrooms = parseInt(brMatch[1])
-  const types = { apartment: 'Appartement', appartement: 'Appartement', house: 'Tussenwoning', huis: 'Tussenwoning', villa: 'Villa', herenhuis: 'Herenhuis', starter: 'Appartement' }
-  for (const [key, val] of Object.entries(types)) {
-    if (q.includes(key)) { filters.propertyType = val; break }
+  const typeMap = {
+    apartment: 'Appartement', appartement: 'Appartement',
+    villa: 'Villa',
+    herenhuis: 'Herenhuis',
+    'twee-onder-een-kap': 'Twee-onder-een-kap',
+    tussenwoning: 'Tussenwoning',
   }
+  for (const [key, val] of Object.entries(typeMap)) {
+    if (q.includes(key) && !filters.propertyTypes.includes(val)) filters.propertyTypes.push(val)
+  }
+  // "house" and "huis" (but not "family home") → Tussenwoning
+  if (filters.propertyTypes.length === 0 && /\b(house|huis)\b/.test(q) && !q.includes('family home')) {
+    filters.propertyTypes.push('Tussenwoning')
+  }
+  // "starter" → Appartement
+  if (filters.propertyTypes.length === 0 && q.includes('starter')) {
+    filters.propertyTypes.push('Appartement')
+  }
+  // "family home" / "gezinswoning" intentionally does NOT set a type — lets all family-sized homes through
   return filters
 }
 
@@ -73,9 +83,18 @@ function ChatMessage({ role, children }) {
   )
 }
 
+function toggleInArray(arr, val) {
+  return arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]
+}
+
+function priceLabel(value, fallback) {
+  return value == null ? fallback : formatCurrency(value)
+}
+
 export default function B1Search() {
   const navigate = useNavigate()
-  const { searchQuery, searchFilters, setSearchQuery, setSearchFilters } = useBuyerStore()
+  const { t } = useTranslation()
+  const { searchQuery, searchFilters, setSearchQuery, setSearchFilters, resetFilters } = useBuyerStore()
   const [query, setQuery] = useState('')
   const [messages, setMessages] = useState([])
   const [processing, setProcessing] = useState(false)
@@ -84,22 +103,28 @@ export default function B1Search() {
   const inputRef = useRef(null)
   const scrollRef = useRef(null)
   const [localFilters, setLocalFilters] = useState({
-    city: searchFilters.city || null,
-    maxPrice: searchFilters.maxPrice || null,
-    minPrice: searchFilters.minPrice || null,
-    minBedrooms: searchFilters.minBedrooms || null,
-    propertyType: searchFilters.propertyType || null,
+    cities: searchFilters.cities || [],
+    minPrice: searchFilters.minPrice ?? null,
+    maxPrice: searchFilters.maxPrice ?? null,
+    minBedrooms: searchFilters.minBedrooms ?? null,
+    propertyTypes: searchFilters.propertyTypes || [],
   })
 
+  const quickSearches = t('b1.quickSearches')
+
   useEffect(() => {
-    setMessages([
-      { role: 'ai', text: "Hi! I'm your EIGEN AI home finder. Tell me what you're looking for — describe your dream home, budget, and preferred area." },
-    ])
-  }, [])
+    setMessages([{ role: 'ai', text: t('b1.greeting') }])
+  }, [t])
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Live hit count against current local filters (with fallback so it never says 0)
+  const previewCount = useMemo(() => {
+    const { results } = applyFiltersWithFallback(mockProperties, localFilters)
+    return results.length
+  }, [localFilters])
 
   const handleSubmit = (text) => {
     const searchText = text || query
@@ -108,32 +133,63 @@ export default function B1Search() {
     setQuery('')
     setProcessing(true)
     const parsed = parseSearchQuery(searchText)
-    const newFilters = { ...localFilters, ...parsed }
+    // Merge: add parsed cities/types to existing, overwrite price/bedrooms if specified
+    const newFilters = {
+      ...localFilters,
+      cities: parsed.cities.length ? Array.from(new Set([...localFilters.cities, ...parsed.cities])) : localFilters.cities,
+      propertyTypes: parsed.propertyTypes.length ? Array.from(new Set([...localFilters.propertyTypes, ...parsed.propertyTypes])) : localFilters.propertyTypes,
+      maxPrice: parsed.maxPrice ?? localFilters.maxPrice,
+      minBedrooms: parsed.minBedrooms ?? localFilters.minBedrooms,
+    }
     setLocalFilters(newFilters)
 
     setTimeout(() => {
       const parts = []
-      if (parsed.city) parts.push(`in **${parsed.city}**`)
-      if (parsed.maxPrice) parts.push(`under €${(parsed.maxPrice / 1000).toFixed(0)}k`)
-      if (parsed.minBedrooms) parts.push(`with ${parsed.minBedrooms}+ bedrooms`)
-      if (parsed.propertyType) parts.push(`(${parsed.propertyType})`)
+      if (parsed.cities.length) parts.push(`in **${parsed.cities.join(', ')}**`)
+      if (parsed.maxPrice) parts.push(`under ${formatCurrency(parsed.maxPrice)}`)
+      if (parsed.minBedrooms) parts.push(`${parsed.minBedrooms}+ ${t('b1.bed')}`)
+      if (parsed.propertyTypes.length) parts.push(`(${parsed.propertyTypes.join(', ')})`)
 
-      const responseText = parts.length > 0
-        ? `Great choice! I'm searching for properties ${parts.join(' ')}. I found several matches for you. Refine the filters below or tap "Show Results" to browse them.`
-        : `I'd love to help! Could you be more specific? Try mentioning a city (e.g. Amsterdam), budget (e.g. under €500k), or number of bedrooms.`
+      const hasAny = parts.length > 0
+      const { results } = applyFiltersWithFallback(mockProperties, newFilters)
+      const responseText = hasAny
+        ? t('b1.aiParseSuccess', { parts: parts.join(' '), count: results.length })
+        : t('b1.aiParseEmpty')
 
       setMessages((prev) => [...prev, { role: 'ai', text: responseText }])
       setProcessing(false)
-      if (parts.length > 0) {
+      if (hasAny) {
         setFiltersReady(true)
         setShowFilters(true)
       }
-    }, 1500)
+    }, 1200)
   }
 
-  const updateFilter = (key, value) => {
-    setLocalFilters((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }))
-    if (!filtersReady) setFiltersReady(true)
+  const toggleCity = (city) => {
+    setLocalFilters((p) => ({ ...p, cities: toggleInArray(p.cities, city) }))
+    setFiltersReady(true)
+  }
+  const toggleType = (type) => {
+    setLocalFilters((p) => ({ ...p, propertyTypes: toggleInArray(p.propertyTypes, type) }))
+    setFiltersReady(true)
+  }
+  const setBedrooms = (n) => {
+    setLocalFilters((p) => ({ ...p, minBedrooms: p.minBedrooms === n ? null : n }))
+    setFiltersReady(true)
+  }
+  const setMinPrice = (v) => {
+    setLocalFilters((p) => ({ ...p, minPrice: v, maxPrice: p.maxPrice != null && v != null && p.maxPrice < v ? null : p.maxPrice }))
+    setFiltersReady(true)
+  }
+  const setMaxPrice = (v) => {
+    setLocalFilters((p) => ({ ...p, maxPrice: v, minPrice: p.minPrice != null && v != null && p.minPrice > v ? null : p.minPrice }))
+    setFiltersReady(true)
+  }
+
+  const handleClearFilters = () => {
+    const cleared = { cities: [], minPrice: null, maxPrice: null, minBedrooms: null, propertyTypes: [] }
+    setLocalFilters(cleared)
+    resetFilters()
   }
 
   const handleFindHomes = () => {
@@ -142,10 +198,15 @@ export default function B1Search() {
     navigate('/buy/results')
   }
 
-  const activeFilterCount = Object.values(localFilters).filter(Boolean).length
+  const activeFilterCount =
+    localFilters.cities.length +
+    localFilters.propertyTypes.length +
+    (localFilters.minPrice != null ? 1 : 0) +
+    (localFilters.maxPrice != null ? 1 : 0) +
+    (localFilters.minBedrooms != null ? 1 : 0)
 
   return (
-    <AppShell title="AI Search" flow="buy">
+    <AppShell title={t('b1.title')} flow="buy">
       <div className="flex flex-col min-h-[calc(100dvh-120px)]">
         <div className="flex-1 px-4 pt-4 pb-4 overflow-y-auto">
           {messages.length <= 1 && (
@@ -153,8 +214,8 @@ export default function B1Search() {
               <div className="w-16 h-16 bg-eigen-blue/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Search size={28} className="text-eigen-blue" />
               </div>
-              <h2 className="text-2xl font-bold text-eigen-navy mb-2">Find your new home</h2>
-              <p className="text-gray-500 text-sm">Describe what you're looking for in your own words</p>
+              <h2 className="text-2xl font-bold text-eigen-navy mb-2">{t('b1.heroTitle')}</h2>
+              <p className="text-gray-500 text-sm">{t('b1.heroSubtitle')}</p>
             </motion.div>
           )}
 
@@ -181,11 +242,11 @@ export default function B1Search() {
             )}
           </AnimatePresence>
 
-          {messages.length <= 1 && !processing && (
+          {messages.length <= 1 && !processing && Array.isArray(quickSearches) && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-2">Try these</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-2">{t('b1.tryThese')}</p>
               <div className="space-y-2">
-                {QUICK_SEARCHES.map((qs) => (
+                {quickSearches.map((qs) => (
                   <button key={qs} onClick={() => handleSubmit(qs)} className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 hover:border-eigen-blue transition-colors">
                     <Search size={14} className="inline text-gray-400 mr-2" />{qs}
                   </button>
@@ -198,39 +259,87 @@ export default function B1Search() {
             {showFilters && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
                 <Card className="mb-3">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Refine Your Search</h4>
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><MapPin size={11} /> City</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('b1.refineTitle')}</h4>
+                    {activeFilterCount > 0 && (
+                      <button onClick={handleClearFilters} className="flex items-center gap-1 text-xs text-gray-500 hover:text-eigen-red">
+                        <RotateCcw size={11} />
+                        {t('b1.resetFilters')}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Cities — multi-select */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><MapPin size={11} /> {t('b1.cities')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {CITY_OPTIONS.map((city) => (
-                        <Chip key={city} label={city} active={localFilters.city === city} onClick={() => updateFilter('city', city)} className="text-xs px-3 py-1.5" />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><Banknote size={11} /> Budget</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {PRICE_RANGES.map((range) => (
-                        <Chip key={range.label} label={range.label}
-                          active={localFilters.maxPrice === range.max && localFilters.minPrice === (range.min || null)}
-                          onClick={() => { setLocalFilters((p) => ({ ...p, minPrice: range.min || null, maxPrice: range.max || null })); if (!filtersReady) setFiltersReady(true) }}
+                        <Chip key={city} label={city}
+                          active={localFilters.cities.includes(city)}
+                          onClick={() => toggleCity(city)}
                           className="text-xs px-3 py-1.5" />
                       ))}
                     </div>
                   </div>
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><BedDouble size={11} /> Bedrooms</p>
-                    <div className="flex gap-1.5">
+
+                  {/* Budget — min/max range */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><Banknote size={11} /> {t('b1.budget')}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 block mb-1">{t('b1.minPrice')}</label>
+                        <select
+                          value={localFilters.minPrice == null ? '' : String(localFilters.minPrice)}
+                          onChange={(e) => setMinPrice(e.target.value === '' ? null : Number(e.target.value))}
+                          className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-eigen-blue"
+                        >
+                          {PRICE_STOPS.map((v) => (
+                            <option key={`min-${v}`} value={v == null ? '' : v}>
+                              {priceLabel(v, t('b1.noMin'))}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="text-gray-400 pt-5">—</span>
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 block mb-1">{t('b1.maxPrice')}</label>
+                        <select
+                          value={localFilters.maxPrice == null ? '' : String(localFilters.maxPrice)}
+                          onChange={(e) => setMaxPrice(e.target.value === '' ? null : Number(e.target.value))}
+                          className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-eigen-blue"
+                        >
+                          {PRICE_STOPS.map((v) => (
+                            <option key={`max-${v}`} value={v == null ? '' : v}>
+                              {priceLabel(v, t('b1.noMax'))}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bedrooms — single select */}
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><BedDouble size={11} /> {t('b1.bedrooms')}</p>
+                    <div className="flex gap-1.5 flex-wrap">
                       {BEDROOM_OPTIONS.map((n) => (
-                        <Chip key={n} label={`${n}+`} active={localFilters.minBedrooms === n} onClick={() => updateFilter('minBedrooms', n)} className="text-xs px-3 py-1.5" />
+                        <Chip key={n} label={`${n}+`}
+                          active={localFilters.minBedrooms === n}
+                          onClick={() => setBedrooms(n)}
+                          className="text-xs px-3 py-1.5" />
                       ))}
                     </div>
                   </div>
+
+                  {/* Type — multi-select */}
                   <div>
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><Home size={11} /> Type</p>
+                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><Home size={11} /> {t('b1.type')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {TYPE_OPTIONS.map((type) => (
-                        <Chip key={type} label={type} active={localFilters.propertyType === type} onClick={() => updateFilter('propertyType', type)} className="text-xs px-3 py-1.5" />
+                        <Chip key={type} label={type}
+                          active={localFilters.propertyTypes.includes(type)}
+                          onClick={() => toggleType(type)}
+                          className="text-xs px-3 py-1.5" />
                       ))}
                     </div>
                   </div>
@@ -245,10 +354,8 @@ export default function B1Search() {
           {filtersReady ? (
             <Button variant="buyer" fullWidth onClick={handleFindHomes}>
               <div className="flex items-center justify-center gap-2">
-                Show Results
-                {activeFilterCount > 0 && (
-                  <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">{activeFilterCount} filters</span>
-                )}
+                <span>{t('b1.showResults')}</span>
+                <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">{previewCount} {t('b2.results')}</span>
                 <ArrowRight size={16} />
               </div>
             </Button>
@@ -256,10 +363,11 @@ export default function B1Search() {
             <div className="flex items-center gap-2">
               <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                placeholder="Describe your dream home..."
+                placeholder={t('b1.placeholder')}
                 className="flex-1 h-12 px-4 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-eigen-blue bg-white" />
               <button onClick={() => handleSubmit()} disabled={!query.trim() || processing}
-                className="w-12 h-12 bg-eigen-blue text-white rounded-xl flex items-center justify-center shrink-0 disabled:opacity-50 transition-opacity">
+                className="w-12 h-12 bg-eigen-blue text-white rounded-xl flex items-center justify-center shrink-0 disabled:opacity-50 transition-opacity"
+                aria-label={t('common.submit')}>
                 <Send size={18} />
               </button>
             </div>

@@ -1,18 +1,20 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+const DEFAULT_FILTERS = {
+  cities: [],            // multi-select
+  propertyTypes: [],     // multi-select
+  minPrice: null,        // numeric
+  maxPrice: null,        // numeric
+  minBedrooms: null,     // single "X+" filter
+}
+
 const useBuyerStore = create(
   persist(
     (set) => ({
       // B1: Search
       searchQuery: '',
-      searchFilters: {
-        minPrice: null,
-        maxPrice: null,
-        minBedrooms: null,
-        propertyType: null,
-        city: null,
-      },
+      searchFilters: { ...DEFAULT_FILTERS },
 
       // B2: Results
       savedProperties: [],
@@ -33,6 +35,7 @@ const useBuyerStore = create(
       setSearchQuery: (query) => set({ searchQuery: query }),
       setSearchFilters: (filters) =>
         set((s) => ({ searchFilters: { ...s.searchFilters, ...filters } })),
+      resetFilters: () => set({ searchFilters: { ...DEFAULT_FILTERS } }),
       saveProperty: (id) =>
         set((s) => ({
           savedProperties: s.savedProperties.includes(id)
@@ -58,13 +61,7 @@ const useBuyerStore = create(
       reset: () =>
         set({
           searchQuery: '',
-          searchFilters: {
-            minPrice: null,
-            maxPrice: null,
-            minBedrooms: null,
-            propertyType: null,
-            city: null,
-          },
+          searchFilters: { ...DEFAULT_FILTERS },
           savedProperties: [],
           viewedProperties: [],
           scheduledViewings: [],
@@ -72,7 +69,23 @@ const useBuyerStore = create(
           closedDeals: [],
         }),
     }),
-    { name: 'eigen-buyer' }
+    {
+      name: 'eigen-buyer',
+      version: 2,
+      migrate: (persistedState) => {
+        // Legacy state used singular `city` and `propertyType` — normalize to arrays
+        if (!persistedState) return persistedState
+        const sf = persistedState.searchFilters || {}
+        persistedState.searchFilters = {
+          cities: Array.isArray(sf.cities) ? sf.cities : (sf.city ? [sf.city] : []),
+          propertyTypes: Array.isArray(sf.propertyTypes) ? sf.propertyTypes : (sf.propertyType ? [sf.propertyType] : []),
+          minPrice: sf.minPrice ?? null,
+          maxPrice: sf.maxPrice ?? null,
+          minBedrooms: sf.minBedrooms ?? null,
+        }
+        return persistedState
+      },
+    }
   )
 )
 
