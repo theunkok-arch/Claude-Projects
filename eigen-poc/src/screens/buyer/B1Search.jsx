@@ -1,379 +1,439 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Sparkles, MapPin, Home, Banknote, BedDouble, Send, ArrowRight, RotateCcw } from 'lucide-react'
+import { Send, Sparkles, Search, Home, RotateCcw, Bed, Bath, Ruler, Zap, ArrowRight } from 'lucide-react'
 import AppShell from '../../components/layout/AppShell'
-import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
-import Chip from '../../components/ui/Chip'
+import AIBubble from '../../components/ai/AIBubble'
+import AITyping from '../../components/ai/AITyping'
+import Badge from '../../components/ui/Badge'
 import useBuyerStore from '../../stores/buyerStore'
 import mockProperties from '../../data/mockProperties'
-import { applyFiltersWithFallback } from '../../utils/filterProperties'
-import { useTranslation } from '../../i18n'
-import { formatCurrency } from '../../utils/formatCurrency'
+import { formatPrice } from '../../data/mockProperties'
+import {
+  parseNaturalQuery,
+  filterAndScore,
+  generateSmartFilters,
+  determineClarification,
+  generateMatchReason,
+} from '../../utils/filterProperties'
 
-const CITY_OPTIONS = ['Amsterdam', 'Rotterdam', 'Utrecht', 'Den Haag', 'Maastricht', 'Groningen', 'Bilthoven']
-const TYPE_OPTIONS = ['Appartement', 'Tussenwoning', 'Herenhuis', 'Villa', 'Twee-onder-een-kap']
-const PRICE_STOPS = [null, 200000, 300000, 400000, 500000, 600000, 750000, 900000, 1100000, 1300000, 1500000, 2000000]
-const BEDROOM_OPTIONS = [1, 2, 3, 4, 5]
-
-function parseSearchQuery(query) {
-  const q = query.toLowerCase()
-  const filters = { cities: [], propertyTypes: [] }
-  const cityMap = {
-    amsterdam: 'Amsterdam', rotterdam: 'Rotterdam', utrecht: 'Utrecht',
-    bilthoven: 'Bilthoven', 'de bilt': 'Bilthoven', zeist: 'Utrecht',
-    'den haag': 'Den Haag', hague: 'Den Haag',
-    maastricht: 'Maastricht', groningen: 'Groningen',
-  }
-  for (const [key, val] of Object.entries(cityMap)) {
-    if (q.includes(key) && !filters.cities.includes(val)) filters.cities.push(val)
-  }
-  const priceMatch = q.match(/(?:under|below|max|tot|onder|€)\s*€?\s*(\d[\d.,]*)\s*(k|m|000)?/i)
-  if (priceMatch) {
-    let price = parseFloat(priceMatch[1].replace(/[.,]/g, ''))
-    if (priceMatch[2] === 'k' || priceMatch[2] === '000') price *= 1000
-    if (priceMatch[2] === 'm') price *= 1000000
-    if (price < 10000) price *= 1000
-    filters.maxPrice = price
-  }
-  const brMatch = q.match(/(\d)\s*(?:-|\s)?(?:bedroom|bed|kamer|slaapkamer|br)/i)
-  if (brMatch) filters.minBedrooms = parseInt(brMatch[1])
-  const typeMap = {
-    apartment: 'Appartement', appartement: 'Appartement',
-    villa: 'Villa',
-    herenhuis: 'Herenhuis',
-    'twee-onder-een-kap': 'Twee-onder-een-kap',
-    tussenwoning: 'Tussenwoning',
-  }
-  for (const [key, val] of Object.entries(typeMap)) {
-    if (q.includes(key) && !filters.propertyTypes.includes(val)) filters.propertyTypes.push(val)
-  }
-  // "house" and "huis" (but not "family home") → Tussenwoning
-  if (filters.propertyTypes.length === 0 && /\b(house|huis)\b/.test(q) && !q.includes('family home')) {
-    filters.propertyTypes.push('Tussenwoning')
-  }
-  // "starter" → Appartement
-  if (filters.propertyTypes.length === 0 && q.includes('starter')) {
-    filters.propertyTypes.push('Appartement')
-  }
-  // "family home" / "gezinswoning" intentionally does NOT set a type — lets all family-sized homes through
-  return filters
+// ---- Animation variants ----
+const msgEnter = {
+  initial: { opacity: 0, y: 16, scale: 0.97 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -8 },
 }
 
-function ChatMessage({ role, children }) {
-  if (role === 'ai') {
-    return (
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 mb-3">
-        <div className="w-8 h-8 bg-eigen-purple/10 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-          <Sparkles size={14} className="text-eigen-purple" />
-        </div>
-        <div className="flex-1 bg-purple-50 border border-eigen-purple/20 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed">
-          {children}
-        </div>
-      </motion.div>
-    )
-  }
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end mb-3">
-      <div className="bg-eigen-blue text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[80%]">
-        {children}
-      </div>
-    </motion.div>
-  )
+// ---- Deterministic placeholder colors ----
+const PLACEHOLDER_COLORS = [
+  'from-blue-400 to-blue-600',
+  'from-emerald-400 to-emerald-600',
+  'from-violet-400 to-violet-600',
+  'from-amber-400 to-amber-600',
+  'from-rose-400 to-rose-600',
+  'from-cyan-400 to-cyan-600',
+  'from-indigo-400 to-indigo-600',
+  'from-orange-400 to-orange-600',
+]
+
+function getPlaceholderColor(id) {
+  return PLACEHOLDER_COLORS[(id - 1) % PLACEHOLDER_COLORS.length]
 }
 
-function toggleInArray(arr, val) {
-  return arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]
+// ---- Suggestion chips ----
+const SUGGESTIONS = [
+  'Family home in Utrecht',
+  'Apartment in Amsterdam',
+  'House with garden under 500k',
+]
+
+const AI_GREETING =
+  "Hi! I'm your EIGEN home-finder. Tell me what you're looking for — city, budget, size, must-haves — and I'll instantly score every listing for you. Or tap a suggestion below to get started."
+
+// ---- Unique ID generator ----
+let msgCounter = 0
+function nextId() {
+  return `msg-${Date.now()}-${++msgCounter}`
 }
 
-function priceLabel(value, fallback) {
-  return value == null ? fallback : formatCurrency(value)
-}
-
+// ============================================================
+// B1Search — Conversational AI Search
+// ============================================================
 export default function B1Search() {
   const navigate = useNavigate()
-  const { t } = useTranslation()
-  const { searchQuery, searchFilters, setSearchQuery, setSearchFilters, resetFilters } = useBuyerStore()
-  const [query, setQuery] = useState('')
-  const [messages, setMessages] = useState([])
-  const [processing, setProcessing] = useState(false)
-  const [filtersReady, setFiltersReady] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
+  const {
+    chatMessages,
+    parsedCriteria,
+    addChatMessage,
+    clearChat,
+    setParsedCriteria,
+    setScoredResults,
+    setSmartFilters,
+  } = useBuyerStore()
+
+  const [input, setInput] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
+  const [typingMsgId, setTypingMsgId] = useState(null)
+  const chatEndRef = useRef(null)
   const inputRef = useRef(null)
-  const scrollRef = useRef(null)
-  const [localFilters, setLocalFilters] = useState({
-    cities: searchFilters.cities || [],
-    minPrice: searchFilters.minPrice ?? null,
-    maxPrice: searchFilters.maxPrice ?? null,
-    minBedrooms: searchFilters.minBedrooms ?? null,
-    propertyTypes: searchFilters.propertyTypes || [],
-  })
 
-  const quickSearches = t('b1.quickSearches')
-
+  // Auto-scroll on new messages
   useEffect(() => {
-    setMessages([{ role: 'ai', text: t('b1.greeting') }])
-  }, [t])
-
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  // Live hit count against current local filters (with fallback so it never says 0)
-  const previewCount = useMemo(() => {
-    const { results } = applyFiltersWithFallback(mockProperties, localFilters)
-    return results.length
-  }, [localFilters])
-
-  const handleSubmit = (text) => {
-    const searchText = text || query
-    if (!searchText.trim()) return
-    setMessages((prev) => [...prev, { role: 'user', text: searchText }])
-    setQuery('')
-    setProcessing(true)
-    const parsed = parseSearchQuery(searchText)
-    // Merge: add parsed cities/types to existing, overwrite price/bedrooms if specified
-    const newFilters = {
-      ...localFilters,
-      cities: parsed.cities.length ? Array.from(new Set([...localFilters.cities, ...parsed.cities])) : localFilters.cities,
-      propertyTypes: parsed.propertyTypes.length ? Array.from(new Set([...localFilters.propertyTypes, ...parsed.propertyTypes])) : localFilters.propertyTypes,
-      maxPrice: parsed.maxPrice ?? localFilters.maxPrice,
-      minBedrooms: parsed.minBedrooms ?? localFilters.minBedrooms,
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }
-    setLocalFilters(newFilters)
+  }, [chatMessages.length, isSearching])
 
-    setTimeout(() => {
-      const parts = []
-      if (parsed.cities.length) parts.push(`in **${parsed.cities.join(', ')}**`)
-      if (parsed.maxPrice) parts.push(`under ${formatCurrency(parsed.maxPrice)}`)
-      if (parsed.minBedrooms) parts.push(`${parsed.minBedrooms}+ ${t('b1.bed')}`)
-      if (parsed.propertyTypes.length) parts.push(`(${parsed.propertyTypes.join(', ')})`)
+  // ---- Handle user input ----
+  const handleSubmit = useCallback(
+    (text) => {
+      const trimmed = (text || input).trim()
+      if (!trimmed || isSearching) return
+      setInput('')
 
-      const hasAny = parts.length > 0
-      const { results } = applyFiltersWithFallback(mockProperties, newFilters)
-      const responseText = hasAny
-        ? t('b1.aiParseSuccess', { parts: parts.join(' '), count: results.length })
-        : t('b1.aiParseEmpty')
+      // Add user message
+      addChatMessage({
+        id: nextId(),
+        role: 'user',
+        text: trimmed,
+        timestamp: Date.now(),
+      })
 
-      setMessages((prev) => [...prev, { role: 'ai', text: responseText }])
-      setProcessing(false)
-      if (hasAny) {
-        setFiltersReady(true)
-        setShowFilters(true)
+      // Parse and merge criteria
+      const newCriteria = parseNaturalQuery(trimmed)
+
+      // Handle "Show all cities" / "Surprise me" — skip city filter
+      const isShowAll = /show all|surprise|all cities|everywhere|heel nederland/i.test(trimmed)
+
+      const merged = {
+        ...parsedCriteria,
+        ...newCriteria,
+        city: isShowAll ? null : newCriteria.city || parsedCriteria.city,
+        propertyType: newCriteria.propertyType || parsedCriteria.propertyType,
+        minPrice: newCriteria.minPrice || parsedCriteria.minPrice,
+        maxPrice: newCriteria.maxPrice || parsedCriteria.maxPrice,
+        minBedrooms: newCriteria.minBedrooms || parsedCriteria.minBedrooms,
+        features:
+          newCriteria.features.length > 0
+            ? [...new Set([...(parsedCriteria.features || []), ...newCriteria.features])]
+            : parsedCriteria.features || [],
+        energyLabel: newCriteria.energyLabel || parsedCriteria.energyLabel,
+        minArea: newCriteria.minArea || parsedCriteria.minArea,
       }
-    }, 1200)
+      setParsedCriteria(merged)
+
+      // Check if we need clarification
+      const clarification = determineClarification(merged)
+
+      if (clarification && !isShowAll) {
+        const aiMsg = {
+          id: nextId(),
+          role: 'ai',
+          text: clarification.text,
+          timestamp: Date.now(),
+          clarifyOptions: clarification.options,
+        }
+        setTypingMsgId(aiMsg.id)
+        setTimeout(() => {
+          addChatMessage(aiMsg)
+          setTypingMsgId(null)
+        }, 600)
+        return
+      }
+
+      // Sufficient criteria — run search
+      setIsSearching(true)
+      setTimeout(() => {
+        const scored = filterAndScore(mockProperties, merged)
+        const filters = generateSmartFilters(scored)
+
+        setScoredResults(scored)
+        setSmartFilters(filters)
+
+        const topMatch = scored[0]
+        const count = scored.length
+        let responseText
+        if (count === 0) {
+          responseText = "I couldn't find exact matches, but let me broaden the search for you."
+        } else if (count === 1) {
+          responseText = `I found 1 property that matches — a ${topMatch.type.toLowerCase()} in ${topMatch.city}'s ${topMatch.neighbourhood} at ${topMatch.matchScore}% match.`
+        } else {
+          responseText = `I found ${count} properties for you! Your best match is ${topMatch.matchScore}% — a ${topMatch.type.toLowerCase()} in ${topMatch.city}'s ${topMatch.neighbourhood}. Here are the top results:`
+        }
+
+        const aiMsg = {
+          id: nextId(),
+          role: 'ai',
+          text: responseText,
+          timestamp: Date.now(),
+          results: scored.slice(0, 3),
+        }
+        setTypingMsgId(aiMsg.id)
+        addChatMessage(aiMsg)
+        setIsSearching(false)
+      }, 1500)
+    },
+    [input, isSearching, parsedCriteria, addChatMessage, setParsedCriteria, setScoredResults, setSmartFilters]
+  )
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
   }
 
-  const toggleCity = (city) => {
-    setLocalFilters((p) => ({ ...p, cities: toggleInArray(p.cities, city) }))
-    setFiltersReady(true)
-  }
-  const toggleType = (type) => {
-    setLocalFilters((p) => ({ ...p, propertyTypes: toggleInArray(p.propertyTypes, type) }))
-    setFiltersReady(true)
-  }
-  const setBedrooms = (n) => {
-    setLocalFilters((p) => ({ ...p, minBedrooms: p.minBedrooms === n ? null : n }))
-    setFiltersReady(true)
-  }
-  const setMinPrice = (v) => {
-    setLocalFilters((p) => ({ ...p, minPrice: v, maxPrice: p.maxPrice != null && v != null && p.maxPrice < v ? null : p.maxPrice }))
-    setFiltersReady(true)
-  }
-  const setMaxPrice = (v) => {
-    setLocalFilters((p) => ({ ...p, maxPrice: v, minPrice: p.minPrice != null && v != null && p.minPrice > v ? null : p.minPrice }))
-    setFiltersReady(true)
+  const handleSeeAll = () => navigate('/buy/results')
+
+  const handleNewSearch = () => {
+    clearChat()
+    setInput('')
+    setIsSearching(false)
+    setTypingMsgId(null)
   }
 
-  const handleClearFilters = () => {
-    const cleared = { cities: [], minPrice: null, maxPrice: null, minBedrooms: null, propertyTypes: [] }
-    setLocalFilters(cleared)
-    resetFilters()
-  }
-
-  const handleFindHomes = () => {
-    setSearchQuery(query)
-    setSearchFilters(localFilters)
-    navigate('/buy/results')
-  }
-
-  const activeFilterCount =
-    localFilters.cities.length +
-    localFilters.propertyTypes.length +
-    (localFilters.minPrice != null ? 1 : 0) +
-    (localFilters.maxPrice != null ? 1 : 0) +
-    (localFilters.minBedrooms != null ? 1 : 0)
+  const isConversationEmpty = chatMessages.length === 0
 
   return (
-    <AppShell title={t('b1.title')} flow="buy">
-      <div className="flex flex-col min-h-[calc(100dvh-120px)]">
-        <div className="flex-1 px-4 pt-4 pb-4 overflow-y-auto">
-          {messages.length <= 1 && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
-              <div className="w-16 h-16 bg-eigen-blue/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Search size={28} className="text-eigen-blue" />
-              </div>
-              <h2 className="text-2xl font-bold text-eigen-navy mb-2">{t('b1.heroTitle')}</h2>
-              <p className="text-gray-500 text-sm">{t('b1.heroSubtitle')}</p>
+    <AppShell title="AI Search" step={1} totalSteps={6} flow="buy">
+      <div className="flex flex-col h-[calc(100dvh-56px)]">
+        {/* Chat area */}
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-3">
+          {!isConversationEmpty && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={handleNewSearch}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-eigen-blue mx-auto mb-2"
+            >
+              <RotateCcw size={12} />
+              New search
+            </motion.button>
+          )}
+
+          {isConversationEmpty && (
+            <motion.div {...msgEnter} transition={{ duration: 0.3 }}>
+              <WelcomeMessage onSuggestionTap={(text) => handleSubmit(text)} />
             </motion.div>
           )}
 
-          <div className="space-y-1">
-            {messages.map((msg, i) => (
-              <ChatMessage key={i} role={msg.role}>{msg.text}</ChatMessage>
+          <AnimatePresence initial={false}>
+            {chatMessages.map((msg) => (
+              <motion.div
+                key={msg.id}
+                {...msgEnter}
+                transition={{ duration: 0.25, delay: 0.05 }}
+              >
+                {msg.role === 'user' ? (
+                  <UserMessage text={msg.text} />
+                ) : (
+                  <AIMessage
+                    msg={msg}
+                    isTyping={msg.id === typingMsgId}
+                    onTypingComplete={() => setTypingMsgId(null)}
+                    onOptionTap={(text) => handleSubmit(text)}
+                    onPropertyTap={(id) => navigate(`/buy/property/${id}`)}
+                    onSeeAll={handleSeeAll}
+                    totalResults={useBuyerStore.getState().scoredResults.length}
+                  />
+                )}
+              </motion.div>
             ))}
-          </div>
-
-          <AnimatePresence>
-            {processing && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex gap-2 mb-3">
-                <div className="w-8 h-8 bg-eigen-purple/10 rounded-full flex items-center justify-center shrink-0">
-                  <Sparkles size={14} className="text-eigen-purple" />
-                </div>
-                <div className="bg-purple-50 border border-eigen-purple/20 rounded-2xl rounded-tl-sm px-4 py-3">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-eigen-purple/40 rounded-full animate-bounce" />
-                    <span className="w-2 h-2 bg-eigen-purple/40 rounded-full animate-bounce [animation-delay:0.15s]" />
-                    <span className="w-2 h-2 bg-eigen-purple/40 rounded-full animate-bounce [animation-delay:0.3s]" />
-                  </div>
-                </div>
-              </motion.div>
-            )}
           </AnimatePresence>
 
-          {messages.length <= 1 && !processing && Array.isArray(quickSearches) && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-2">{t('b1.tryThese')}</p>
-              <div className="space-y-2">
-                {quickSearches.map((qs) => (
-                  <button key={qs} onClick={() => handleSubmit(qs)} className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 hover:border-eigen-blue transition-colors">
-                    <Search size={14} className="inline text-gray-400 mr-2" />{qs}
-                  </button>
-                ))}
-              </div>
+          {isSearching && (
+            <motion.div {...msgEnter} transition={{ duration: 0.2 }}>
+              <SearchingIndicator />
             </motion.div>
           )}
 
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
-                <Card className="mb-3">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('b1.refineTitle')}</h4>
-                    {activeFilterCount > 0 && (
-                      <button onClick={handleClearFilters} className="flex items-center gap-1 text-xs text-gray-500 hover:text-eigen-red">
-                        <RotateCcw size={11} />
-                        {t('b1.resetFilters')}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Cities — multi-select */}
-                  <div className="mb-4">
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><MapPin size={11} /> {t('b1.cities')}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {CITY_OPTIONS.map((city) => (
-                        <Chip key={city} label={city}
-                          active={localFilters.cities.includes(city)}
-                          onClick={() => toggleCity(city)}
-                          className="text-xs px-3 py-1.5" />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Budget — min/max range */}
-                  <div className="mb-4">
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><Banknote size={11} /> {t('b1.budget')}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <label className="text-[10px] text-gray-400 block mb-1">{t('b1.minPrice')}</label>
-                        <select
-                          value={localFilters.minPrice == null ? '' : String(localFilters.minPrice)}
-                          onChange={(e) => setMinPrice(e.target.value === '' ? null : Number(e.target.value))}
-                          className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-eigen-blue"
-                        >
-                          {PRICE_STOPS.map((v) => (
-                            <option key={`min-${v}`} value={v == null ? '' : v}>
-                              {priceLabel(v, t('b1.noMin'))}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <span className="text-gray-400 pt-5">—</span>
-                      <div className="flex-1">
-                        <label className="text-[10px] text-gray-400 block mb-1">{t('b1.maxPrice')}</label>
-                        <select
-                          value={localFilters.maxPrice == null ? '' : String(localFilters.maxPrice)}
-                          onChange={(e) => setMaxPrice(e.target.value === '' ? null : Number(e.target.value))}
-                          className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-eigen-blue"
-                        >
-                          {PRICE_STOPS.map((v) => (
-                            <option key={`max-${v}`} value={v == null ? '' : v}>
-                              {priceLabel(v, t('b1.noMax'))}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bedrooms — single select */}
-                  <div className="mb-4">
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><BedDouble size={11} /> {t('b1.bedrooms')}</p>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {BEDROOM_OPTIONS.map((n) => (
-                        <Chip key={n} label={`${n}+`}
-                          active={localFilters.minBedrooms === n}
-                          onClick={() => setBedrooms(n)}
-                          className="text-xs px-3 py-1.5" />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Type — multi-select */}
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1.5 flex items-center gap-1"><Home size={11} /> {t('b1.type')}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {TYPE_OPTIONS.map((type) => (
-                        <Chip key={type} label={type}
-                          active={localFilters.propertyTypes.includes(type)}
-                          onClick={() => toggleType(type)}
-                          className="text-xs px-3 py-1.5" />
-                      ))}
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <div ref={scrollRef} />
+          <div ref={chatEndRef} />
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3">
-          {filtersReady ? (
-            <Button variant="buyer" fullWidth onClick={handleFindHomes}>
-              <div className="flex items-center justify-center gap-2">
-                <span>{t('b1.showResults')}</span>
-                <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">{previewCount} {t('b2.results')}</span>
-                <ArrowRight size={16} />
-              </div>
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                placeholder={t('b1.placeholder')}
-                className="flex-1 h-12 px-4 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-eigen-blue bg-white" />
-              <button onClick={() => handleSubmit()} disabled={!query.trim() || processing}
-                className="w-12 h-12 bg-eigen-blue text-white rounded-xl flex items-center justify-center shrink-0 disabled:opacity-50 transition-opacity"
-                aria-label={t('common.submit')}>
-                <Send size={18} />
-              </button>
-            </div>
-          )}
+        {/* Input bar */}
+        <div className="border-t border-gray-200 bg-white px-4 py-3">
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe your ideal home..."
+              disabled={isSearching}
+              className="flex-1 h-12 px-4 rounded-full border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-eigen-blue focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
+            />
+            <button
+              onClick={() => handleSubmit()}
+              disabled={!input.trim() || isSearching}
+              className="w-12 h-12 flex items-center justify-center rounded-full bg-eigen-blue text-white disabled:opacity-40 active:scale-95 transition-transform"
+            >
+              <Send size={18} />
+            </button>
+          </div>
         </div>
       </div>
     </AppShell>
+  )
+}
+
+// ============================================================
+// Sub-components
+// ============================================================
+
+function WelcomeMessage({ onSuggestionTap }) {
+  return (
+    <div className="space-y-3">
+      <AIBubble>
+        <p className="text-sm text-gray-700 leading-relaxed">{AI_GREETING}</p>
+      </AIBubble>
+      <div className="flex flex-wrap gap-2 pl-1">
+        {SUGGESTIONS.map((s) => (
+          <button
+            key={s}
+            onClick={() => onSuggestionTap(s)}
+            className="px-3 py-2 rounded-full text-xs font-medium bg-eigen-blue-light text-eigen-blue border border-eigen-blue/20 hover:bg-eigen-blue hover:text-white transition-colors active:scale-95"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function UserMessage({ text }) {
+  return (
+    <div className="flex justify-end">
+      <div className="ml-auto bg-eigen-blue text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%] text-sm leading-relaxed">
+        {text}
+      </div>
+    </div>
+  )
+}
+
+function AIMessage({ msg, isTyping, onTypingComplete, onOptionTap, onPropertyTap, onSeeAll, totalResults }) {
+  return (
+    <div className="space-y-3">
+      {isTyping ? (
+        <AIBubble>
+          <AITyping text={msg.text} speed={50} onComplete={onTypingComplete} />
+        </AIBubble>
+      ) : (
+        <AIBubble>
+          <p className="text-sm text-gray-700 leading-relaxed">{msg.text}</p>
+        </AIBubble>
+      )}
+
+      {msg.clarifyOptions && !isTyping && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex flex-wrap gap-2 pl-1"
+        >
+          {msg.clarifyOptions.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => onOptionTap(opt)}
+              className="px-3 py-2 rounded-full text-xs font-medium bg-gray-100 text-gray-700 hover:bg-eigen-blue hover:text-white transition-colors active:scale-95"
+            >
+              {opt}
+            </button>
+          ))}
+        </motion.div>
+      )}
+
+      {msg.results && msg.results.length > 0 && !isTyping && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="space-y-2 pl-1"
+        >
+          {msg.results.map((property, i) => (
+            <motion.div
+              key={property.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 + i * 0.1 }}
+            >
+              <PropertyMiniCard property={property} onTap={() => onPropertyTap(property.id)} />
+            </motion.div>
+          ))}
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            onClick={onSeeAll}
+            className="flex items-center gap-2 w-full justify-center py-3 rounded-xl bg-eigen-blue text-white text-sm font-semibold active:scale-[0.98] transition-transform"
+          >
+            {totalResults > 3 ? `See all ${totalResults} matches` : 'View results with AI filters'}
+            <ArrowRight size={16} />
+          </motion.button>
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
+function PropertyMiniCard({ property, onTap }) {
+  const colorClass = getPlaceholderColor(property.id)
+  const reason = generateMatchReason(property, property.matchBreakdown || {})
+
+  return (
+    <button
+      onClick={onTap}
+      className="w-full flex gap-3 p-3 rounded-2xl border border-gray-200 bg-white hover:shadow-md transition-shadow text-left active:scale-[0.98]"
+    >
+      <div className={`w-20 h-20 rounded-xl bg-gradient-to-br ${colorClass} flex items-center justify-center flex-shrink-0`}>
+        <Home size={24} className="text-white/80" />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-eigen-navy truncate">
+              {property.street} {property.number}
+            </p>
+            <p className="text-xs text-gray-500">{property.city} &middot; {property.neighbourhood}</p>
+          </div>
+          <Badge color="purple" className="flex-shrink-0">{property.matchScore}%</Badge>
+        </div>
+        <p className="text-sm font-bold text-eigen-navy mt-1">{formatPrice(property.price)}</p>
+        <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
+          <span className="flex items-center gap-0.5"><Bed size={11} /> {property.bedrooms}</span>
+          <span className="flex items-center gap-0.5"><Ruler size={11} /> {property.area}m&sup2;</span>
+          <span className="flex items-center gap-0.5"><Zap size={11} /> {property.energyLabel}</span>
+        </div>
+        <p className="text-xs text-gray-400 mt-1 truncate">{reason}</p>
+      </div>
+    </button>
+  )
+}
+
+function SearchingIndicator() {
+  return (
+    <div className="border-l-4 border-eigen-purple bg-purple-50 rounded-r-2xl p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <motion.div
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+        >
+          <Sparkles size={14} className="text-eigen-purple" />
+        </motion.div>
+        <span className="text-xs font-semibold text-eigen-purple uppercase">AI</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <p className="text-sm text-gray-500">Analyzing {mockProperties.length} properties</p>
+        <motion.span
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="text-gray-400"
+        >
+          ...
+        </motion.span>
+      </div>
+    </div>
   )
 }

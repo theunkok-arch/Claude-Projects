@@ -39,6 +39,10 @@ body {
   overflow-x: hidden;
 }
 
+/* Hide scrollbar for horizontal filter bars */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Leaflet map fix */
 .leaflet-container {
   width: 100%;
