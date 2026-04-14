@@ -1,0 +1,33 @@
+name: Daily Huurbot
+
+on:
+  schedule:
+    # 07:30 CET = 06:30 UTC (winter), 05:30 UTC (zomer). 06:30 UTC werkt voor beide redelijk.
+    - cron: "30 6 * * *"
+  workflow_dispatch:  # Handmatig triggeren mogelijk
+
+jobs:
+  scrape-and-score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run huurbot
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python main.py
