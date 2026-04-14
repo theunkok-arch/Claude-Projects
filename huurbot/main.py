@@ -1,7 +1,7 @@
 """Main orchestrator. Wordt gerund door GitHub Actions cron."""
 from scrapers import pararius, funda, huurwoningen, vesteda, lokaal
 from ai_filter import score_listing
-from sheets import get_existing_urls, append_listings
+from store import get_existing_urls, append_listings
 from config import CRITERIA, ALLE_PLAATSEN
 
 
