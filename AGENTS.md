@@ -1,0 +1,42 @@
+# claude-projects — agent briefing
+
+**You are working in the `claude-projects` monorepo.** Before doing anything substantive, read:
+
+1. **`OPERATIONS.md`** (repo-root) — the operating manual: where files live, how the Netlify deploy pipeline works, account ownership, recovery scenarios, and the default permission posture. Single source of truth for managing this repo.
+2. **`eigen-poc/CLAUDE.md`** — project-specific conventions for the EIGEN app (design system, routes, i18n, mock strategy). Treat as authoritative for code style.
+
+## What lives here (monorepo)
+
+| Onderdeel | Wat | Deploy |
+|---|---|---|
+| **`eigen-poc/`** | EIGEN — AI real-estate PoC (React 19 + Vite 8 + Tailwind v4, SPA) | **Netlify** → https://eigenpoc.netlify.app, branch `main`, config in root `netlify.toml` (`base = "eigen-poc"`) |
+| **Root `index.html` / `app.js` / ...** | Losse "BTC EMA26 Alerts" PWA | **GitHub Pages** via `.github/workflows/deploy.yml`, branch `claude/bitcoin-ema-alerts-b9BPw` |
+
+**Netlify bouwt alleen `eigen-poc/`.** Een push naar `main` triggert de EIGEN-deploy (~1-2 min). The BTC app is independent — don't touch it for EIGEN work.
+
+## Project gotchas
+
+- **Two clones on this Mac.** Work in `~/claude-projects` (canonical). `~/Desktop/claude-projects` is a stale clone — ignore it.
+- **`netlify.toml` (repo-root) is the source of truth for build config** — edit it and push, never the Netlify UI. `base = "eigen-poc"`, `publish = "dist"` (relative to base), Node 20, SPA-fallback redirect.
+- **EIGEN is a SPA** — every route serves `index.html` via the redirect rule. Client-side routing only; no backend, all integrations mocked.
+- **i18n**: user-facing strings go in `eigen-poc/src/i18n/{en,nl}.js` (per-screen namespaces), used via `t('key', {vars})`. Add to both languages.
+- **State shape changes**: version-bump the relevant Zustand store in `eigen-poc/src/stores/` and write a `migrate` fn (existing localStorage users).
+- **AI-generated UI** follows a visual language: 4px purple left border, `bg-purple-50`, sparkle icon, purple header label — use `AIBubble`/`AITyping` in `src/components/ai/`.
+- **Mobile-first, max-width 430px**; respect the EIGEN palette in `tailwind.config.js`.
+- **Scope discipline**: no speculative abstractions, no unrelated refactors, no backwards-compat shims for non-shipped code.
+
+## Default permission posture for this repo
+
+The owner (Theun) has standing approval for routine work:
+- File edits, creates, deletes within the repo.
+- `npm install`, `npm run build`, `npm run dev`, `npm run lint` (run inside `eigen-poc/`).
+- `git add`, `git commit`, `git push origin main`.
+- Routine `netlify` CLI commands: reading deploy logs, `netlify deploy`.
+
+Always pause and confirm before:
+- Destructive git operations on shared history (`reset --hard`, `push --force`, branch deletes).
+- DNS changes at mijndomeinhosting.nl.
+- Netlify settings that affect production before a feature is ready (env-var changes, site delete, unlink).
+- Sending real emails or any external communication.
+
+If unsure whether something is "routine", err toward asking once and proceeding.

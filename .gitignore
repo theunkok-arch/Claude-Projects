@@ -7,3 +7,6 @@
 # dosolutions-website is its own separate git repo cloned alongside this one;
 # never commit it into claude-projects.
 dosolutions-website/
+
+# Local Netlify folder
+.netlify
