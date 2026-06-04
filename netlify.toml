@@ -1,0 +1,21 @@
+# Netlify build config — single source of truth for the EIGEN deploy.
+# The claude-projects repo is a monorepo; only eigen-poc/ is published here.
+# (The root BTC EMA26 Alerts app deploys separately via GitHub Pages.)
+#
+# Netlify reads this file from the repo root, cd's into `base`, runs `command`
+# there, and serves `publish` (relative to base). Branch watched: main.
+
+[build]
+  base    = "eigen-poc"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback: React Router handles client-side routing, so every path
+# must serve index.html instead of 404'ing.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

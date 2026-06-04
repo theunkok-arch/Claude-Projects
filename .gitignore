@@ -1,0 +1,9 @@
+# OS / editor noise
+.DS_Store
+
+# Large binary that shouldn't live in git
+*.potx
+
+# dosolutions-website is its own separate git repo cloned alongside this one;
+# never commit it into claude-projects.
+dosolutions-website/
