@@ -1,0 +1,51 @@
+name: Daily Huurbot
+
+on:
+  schedule:
+    # 07:30 CET = 06:30 UTC (winter), 05:30 UTC (zomer). 06:30 UTC werkt voor beide redelijk.
+    - cron: "30 6 * * *"
+  workflow_dispatch:  # Handmatig triggeren mogelijk
+
+permissions:
+  contents: write  # Nodig om listings.xlsx en digest/ terug te committen
+
+jobs:
+  scrape-and-score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: huurbot
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: huurbot/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run huurbot
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python main.py
+
+      - name: Commit listings and digest
+        working-directory: ${{ github.workspace }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add huurbot/listings.xlsx huurbot/digest/ || true
+          if git diff --staged --quiet; then
+            echo "Geen wijzigingen om te committen"
+          else
+            git commit -m "Huurbot daily run $(date -u +%Y-%m-%d)"
+            git push
+          fi
