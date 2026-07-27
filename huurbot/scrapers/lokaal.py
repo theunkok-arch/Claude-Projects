@@ -4,9 +4,9 @@ Begin met deze 3, breid uit naar wens."""
 
 import time, re
 from urllib.parse import urljoin
-import requests
 from bs4 import BeautifulSoup
 from config import USER_AGENT, REQUEST_DELAY_SEC
+from proxy import proxy_get
 
 
 LOKAAL_SITES = [
@@ -30,7 +30,7 @@ def fetch():
 
     for site in LOKAAL_SITES:
         try:
-            r = requests.get(site["url"], headers=headers, timeout=15)
+            r = proxy_get(site["url"], headers=headers, timeout=30)
             if r.status_code != 200:
                 print(f"[{site['naam']}] returned {r.status_code}")
                 continue

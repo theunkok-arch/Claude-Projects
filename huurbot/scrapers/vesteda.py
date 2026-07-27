@@ -1,9 +1,9 @@
 """Vesteda en Bouwinvest portals. Beide hebben aparte search-pagina's."""
 import time, re
 from urllib.parse import urljoin
-import requests
 from bs4 import BeautifulSoup
 from config import USER_AGENT, REQUEST_DELAY_SEC
+from proxy import proxy_get
 
 
 def fetch():
@@ -17,7 +17,7 @@ def _fetch_vesteda():
     url = "https://www.vesteda.com/nl/woning-zoeken?placeOrAreaInput=Utrecht&radius=15"
 
     try:
-        r = requests.get(url, headers=headers, timeout=15)
+        r = proxy_get(url, headers=headers, timeout=30)
         if r.status_code != 200:
             print(f"[Vesteda] returned {r.status_code}")
             return []
@@ -60,7 +60,7 @@ def _fetch_bouwinvest():
     url = "https://www.wonenbijbouwinvest.nl/woningaanbod?location=utrecht"
 
     try:
-        r = requests.get(url, headers=headers, timeout=15)
+        r = proxy_get(url, headers=headers, timeout=30)
         if r.status_code != 200:
             print(f"[Bouwinvest] returned {r.status_code}")
             return []

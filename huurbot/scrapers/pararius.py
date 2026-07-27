@@ -2,9 +2,9 @@
 import time
 import re
 from urllib.parse import urljoin
-import requests
 from bs4 import BeautifulSoup
 from config import USER_AGENT, REQUEST_DELAY_SEC
+from proxy import proxy_get
 
 BASE = "https://www.pararius.nl"
 
@@ -26,7 +26,7 @@ def fetch():
 
     for search_url in SEARCH_URLS:
         try:
-            r = requests.get(search_url, headers=headers, timeout=15)
+            r = proxy_get(search_url, headers=headers, timeout=30)
             if r.status_code != 200:
                 print(f"[Pararius] {search_url} returned {r.status_code}")
                 time.sleep(REQUEST_DELAY_SEC)
