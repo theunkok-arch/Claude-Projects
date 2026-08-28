@@ -32,7 +32,7 @@ export default function App() {
 }
 
 function InterneApp() {
-  const { ingelogd, data, laden, fout } = useAts()
+  const { ingelogd, data, laden, fout, verbergFout } = useAts()
 
   if (!ingelogd) return <LoginGate />
 
@@ -46,7 +46,7 @@ function InterneApp() {
 
   return (
     <AppShell>
-      {fout && <p className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{fout}</p>}
+      {fout && <Foutbanner tekst={fout} onSluit={verbergFout} />}
       <Routes>
         <Route path="/" element={<Maandag />} />
         <Route path="/vacatures" element={<Vacatures />} />
@@ -58,5 +58,32 @@ function InterneApp() {
         <Route path="*" element={<p className="text-navy-400">Pagina niet gevonden.</p>} />
       </Routes>
     </AppShell>
+  )
+}
+
+/**
+ * De banner stond bovenaan de inhoud en scrolde dus weg: op een lijst van
+ * zestig kaarten zag je nooit dat er iets was misgegaan. Hij zweeft nu vlak
+ * boven de tabbalk — altijd in beeld, en met de duim te bereiken om hem weg te
+ * tikken.
+ */
+function Foutbanner({ tekst, onSluit }: { tekst: string; onSluit: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+3.75rem)] z-40 px-4"
+    >
+      <div className="mx-auto flex max-w-2xl items-center gap-2 rounded-xl border border-red-200 bg-red-50 py-2 pr-1 pl-3 shadow-lg">
+        <p className="min-w-0 flex-1 text-sm text-red-700">{tekst}</p>
+        <button
+          type="button"
+          onClick={onSluit}
+          aria-label="Melding sluiten"
+          className="tik shrink-0 rounded-lg text-lg leading-none text-red-700"
+        >
+          ×
+        </button>
+      </div>
+    </div>
   )
 }
