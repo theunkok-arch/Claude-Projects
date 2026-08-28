@@ -5,6 +5,7 @@ import { datum, dagen } from '../lib/format'
 import StageBadge from '../components/StageBadge'
 import StageSheet from '../components/StageSheet'
 import KandidaatFormulier, { aantalLeeg } from '../components/KandidaatFormulier'
+import AanmeldingFormulier, { aantalLeeg as aantalLeegAanmelding } from '../components/AanmeldingFormulier'
 import type { Regel } from '../lib/types'
 
 const ACTIVITEIT_TYPES = ['InMail', 'Reminder', 'Telefoon', 'Teams', 'E-mail', 'Notitie']
@@ -12,9 +13,11 @@ const ACTIVITEIT_TYPES = ['InMail', 'Reminder', 'Telefoon', 'Teams', 'E-mail', '
 export default function KandidaatDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { data, regels, wijzigStage, wijzigKandidaat, logActiviteit, verwijderKandidaat } = useAts()
+  const { data, regels, wijzigStage, wijzigAanmelding, wijzigKandidaat, logActiviteit, verwijderKandidaat } =
+    useAts()
 
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
+  const [bewerkteAanmelding, setBewerkteAanmelding] = useState<string | null>(null)
   const [type, setType] = useState(ACTIVITEIT_TYPES[0])
   const [samenvatting, setSamenvatting] = useState('')
   const [bezig, setBezig] = useState(false)
@@ -157,30 +160,61 @@ export default function KandidaatDetail() {
       <section className="mt-6">
         <h2 className="mb-2 font-semibold">Aanmeldingen ({eigen.length})</h2>
         <div className="flex flex-col gap-2">
-          {eigen.map((regel) => (
-            <div key={regel.aanmelding.id} className="rounded-2xl border border-lijn bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <Link to={`/vacature/${regel.vacature?.id ?? ''}`} className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{regel.vacature?.Titel ?? 'Geen vacature'}</p>
-                  <p className="truncate text-sm text-navy-400">{regel.opdrachtgever?.Naam ?? '—'}</p>
-                </Link>
-                <StageBadge
-                  stage={regel.aanmelding.Stage}
-                  klein
-                  onClick={() => setSheetVoor(regel)}
-                />
+          {eigen.map((regel) => {
+            const aanmelding = regel.aanmelding
+            const open = bewerkteAanmelding === aanmelding.id
+            const leegOpAanmelding = aantalLeegAanmelding(aanmelding)
+            return (
+              <div key={aanmelding.id} className="rounded-2xl border border-lijn bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <Link to={`/vacature/${regel.vacature?.id ?? ''}`} className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{regel.vacature?.Titel ?? 'Geen vacature'}</p>
+                    <p className="truncate text-sm text-navy-400">{regel.opdrachtgever?.Naam ?? '—'}</p>
+                  </Link>
+                  <StageBadge stage={aanmelding.Stage} klein onClick={() => setSheetVoor(regel)} />
+                </div>
+                <div className="mt-2 flex items-baseline justify-between gap-3">
+                  <p className="text-sm text-navy-400">
+                    {dagen(regel.dagenInStage)} in stage
+                    {aanmelding['Reden afvallen'] ? ` · ${aanmelding['Reden afvallen']}` : ''}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setBewerkteAanmelding(open ? null : aanmelding.id)}
+                    className="tik shrink-0 text-sm text-navy-400 underline"
+                  >
+                    {open
+                      ? 'Sluiten'
+                      : leegOpAanmelding > 0
+                        ? `${leegOpAanmelding} leeg · aanvullen`
+                        : 'Bewerken'}
+                  </button>
+                </div>
+
+                {open ? (
+                  <AanmeldingFormulier
+                    aanmelding={aanmelding}
+                    onBewaar={(velden) => wijzigAanmelding(aanmelding.id, velden)}
+                    onSluit={() => setBewerkteAanmelding(null)}
+                  />
+                ) : (
+                  <>
+                    {aanmelding['Volgende actie'] && (
+                      <p className="mt-2 text-sm">
+                        <span className="text-navy-400">Volgende actie: </span>
+                        {aanmelding['Volgende actie']}
+                      </p>
+                    )}
+                    {aanmelding['Score-onderbouwing'] && (
+                      <p className="mt-2 border-t border-lijn pt-2 text-sm whitespace-pre-line">
+                        {aanmelding['Score-onderbouwing']}
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
-              <p className="mt-2 text-sm text-navy-400">
-                {dagen(regel.dagenInStage)} in stage
-                {regel.aanmelding['Reden afvallen'] ? ` · ${regel.aanmelding['Reden afvallen']}` : ''}
-              </p>
-              {regel.aanmelding['Score-onderbouwing'] && (
-                <p className="mt-2 border-t border-lijn pt-2 text-sm whitespace-pre-line">
-                  {regel.aanmelding['Score-onderbouwing']}
-                </p>
-              )}
-            </div>
-          ))}
+            )
+          })}
           {eigen.length === 0 && <p className="text-navy-400">Nog geen aanmeldingen.</p>}
         </div>
       </section>
