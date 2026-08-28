@@ -220,6 +220,35 @@ netlify dev               # frontend plus functions op één poort
 
 `npm run dev` alleen werkt ook, maar dan draaien de functions niet.
 
+### "Op mijn computer zie ik het wel, op mijn telefoon niet"
+
+Dat is bijna nooit een fout in de code en bijna altijd de browsercache. De
+telefoon houdt de oude `index.html` vast, en die wijst naar de bundel van
+vorige week. De code zelf rendert bij 360, 390 en 1280 pixels breed identiek;
+dat is gemeten, niet aangenomen.
+
+Drie dingen vangen dat op, in deze volgorde:
+
+1. **Onderaan elk scherm staat het versiestempel** — de commit en het
+   bouwmoment. Wijkt dat af tussen twee apparaten, dan is het de cache en niet
+   de app. Zonder dat stempel zien "de knop is er nog niet" en "de knop werkt
+   niet" er voor de gebruiker precies hetzelfde uit.
+2. **De app kijkt zelf of er nieuw werk uitstaat** bij het openen en zodra het
+   tabblad weer op de voorgrond komt (`src/lib/versie.ts`). Staat er in de
+   `index.html` op de server een andere bundelnaam dan de draaiende, dan
+   verschijnt er een strook onder de kopbalk. Die vervangt zichzelf niet
+   automatisch: wie midden in een formulier zit, verliest anders wat er nog
+   niet bewaard is.
+3. **`netlify.toml` legt de caching expliciet vast.** `/assets/*` heeft een
+   hash in de bestandsnaam en mag een jaar blijven staan; `/index.html` is het
+   enige bestand met een vaste naam en moet elke keer opnieuw worden
+   nagevraagd. Verander die tweede regel nooit zonder de eerste erbij te
+   bedenken — dan wijst de browser naar een bundel die niet meer bestaat.
+
+Zit een toestel er nog steeds op vast, dan helpt één keer verversen met de
+cache leeg: op iOS de app sluiten en het tabblad opnieuw openen, op Android
+lang drukken op de verversknop.
+
 ---
 
 ## Airtable-limiet
