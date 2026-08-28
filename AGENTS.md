@@ -52,11 +52,16 @@ The owner (Theun) has standing approval for routine work:
 - `npm install`, `npm run build`, `npm run dev`, `npm run lint` (run inside `eigen-poc/`).
 - `git add`, `git commit`, `git push origin main`.
 - Routine `netlify` CLI commands: reading deploy logs, `netlify deploy`.
+- **Doorpakken tot en met live.** Werk op een branch is pas af als het op
+  `main` staat. Open de PR, wacht tot de checks groen zijn en merge hem dan
+  zelf — niet eerst vragen. Vastgelegd door Theun op 28-08-2026, nadat vijf
+  commits een halve dag op een conceptbranch bleven staan terwijl hij in de
+  app zocht naar een functie die er al was.
 
 Always pause and confirm before:
 - Destructive git operations on shared history (`reset --hard`, `push --force`, branch deletes).
 - DNS changes at mijndomeinhosting.nl.
-- Netlify settings that affect production before a feature is ready (env-var changes, site delete, unlink).
+- Netlify settings that affect production before a feature is ready (env-var changes, site delete, unlink). Een merge naar `main` valt hier niet onder; die hoort bij het normale werk hierboven.
 - Sending real emails or any external communication.
 
 If unsure whether something is "routine", err toward asking once and proceeding.
