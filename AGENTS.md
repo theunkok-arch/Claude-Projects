@@ -4,15 +4,20 @@
 
 1. **`OPERATIONS.md`** (repo-root) — the operating manual: where files live, how the Netlify deploy pipeline works, account ownership, recovery scenarios, and the default permission posture. Single source of truth for managing this repo.
 2. **`eigen-poc/CLAUDE.md`** — project-specific conventions for the EIGEN app (design system, routes, i18n, mock strategy). Treat as authoritative for code style.
+3. **`ds-ats/README.md`** — the ATS: Airtable base-id en schema, de pipeline-stages, deploy-instellingen, en het privacy-model. Lees dit voordat je iets aan `ds-ats/` of aan de Airtable-base verandert.
 
 ## What lives here (monorepo)
 
 | Onderdeel | Wat | Deploy |
 |---|---|---|
 | **`eigen-poc/`** | EIGEN — AI real-estate PoC (React 19 + Vite 8 + Tailwind v4, SPA) | **Netlify** → https://eigenpoc.netlify.app, branch `main`, config in root `netlify.toml` (`base = "eigen-poc"`) |
+| **`ds-ats/`** | Do Solutions ATS — recruitment-pipeline op Airtable (React 19 + Vite 8 + Tailwind v4 + TS, Netlify Functions) | **Netlify**, eigen site met base directory `ds-ats`, config in `ds-ats/netlify.toml`, branch `main` |
 | **Root `index.html` / `app.js` / ...** | Losse "BTC EMA26 Alerts" PWA | **GitHub Pages** via `.github/workflows/deploy.yml`, branch `claude/bitcoin-ema-alerts-b9BPw` |
 
-**Netlify bouwt alleen `eigen-poc/`.** Een push naar `main` triggert de EIGEN-deploy (~1-2 min). The BTC app is independent — don't touch it for EIGEN work.
+**De root `netlify.toml` bouwt alleen `eigen-poc/`.** De ATS is een *tweede*
+Netlify-site vanaf dezelfde repo, met base directory `ds-ats`; die leest
+`ds-ats/netlify.toml`. Een push naar `main` triggert beide deploys (~1-2 min);
+ze raken elkaar niet. The BTC app is independent — don't touch it for EIGEN work.
 
 ## Project gotchas
 
@@ -24,6 +29,21 @@
 - **AI-generated UI** follows a visual language: 4px purple left border, `bg-purple-50`, sparkle icon, purple header label — use `AIBubble`/`AITyping` in `src/components/ai/`.
 - **Mobile-first, max-width 430px**; respect the EIGEN palette in `tailwind.config.js`.
 - **Scope discipline**: no speculative abstractions, no unrelated refactors, no backwards-compat shims for non-shipped code.
+
+## ATS-gotchas (`ds-ats/`)
+
+- **Airtable-base `appSAz5sjFyPm4e0g`** ("Do Solutions ATS"). Niet te verwarren met
+  `appMLC8Zv6wqnYUdu` ("Do Solutions Kandidaten"), de inzendingen van het
+  contactformulier op dosolutions.info.
+- **`ds-ats/shared/stages.mjs` is de enige bron** voor stages, servicenormen en
+  afvalredenen. Frontend, Netlify Functions en importscript importeren alle drie
+  dat bestand; wijzig het nooit op één plek na. Types staan in `stages.d.mts`.
+- **De stage hoort bij de aanmelding, nooit bij de kandidaat.** Dat is de hele
+  reden dat het datamodel zo is; zet nooit een statusveld op `Kandidaten`.
+- **`netlify/functions/rapport.mjs` filtert server-side.** Voeg daar nooit een veld
+  toe zonder te controleren of de klant het mag zien (README, "Toegang en privacy").
+- **De Airtable-key hoort uitsluitend in de Netlify-omgevingsvariabelen.** De
+  frontend praat alleen met `/api/*`.
 
 ## Default permission posture for this repo
 

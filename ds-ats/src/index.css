@@ -1,0 +1,32 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-navy: #1a1a2e;
+  --color-navy-700: #262640;
+  --color-navy-400: #5b5b7a;
+  --color-oranje: #e8722a;
+  --color-oranje-100: #fbe3d3;
+  --color-oranje-50: #fdf3ec;
+  --color-cream: #fcf5ee;
+  --color-lijn: #e9ded2;
+
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-navy);
+  font-family: var(--font-sans);
+  /* Geen hover-afhankelijke interactie: dit is een telefoon-app. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Raakvlakken zijn minimaal 44px. */
+@utility tik {
+  min-height: 44px;
+  min-width: 44px;
+}

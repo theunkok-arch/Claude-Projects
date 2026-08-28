@@ -1,0 +1,32 @@
+# Netlify build config voor de Do Solutions ATS.
+#
+# Deze repo is een monorepo met meerdere sites. De root netlify.toml bouwt
+# eigen-poc. Deze app hoort bij een TWEEDE Netlify-site waarvan de
+# base directory op "ds-ats" staat; Netlify leest dan dit bestand.
+#
+# Vereiste omgevingsvariabelen op die site:
+#   AIRTABLE_API_KEY   personal access token met data.records:read/write op de ATS-base
+#   AIRTABLE_BASE_ID   appSAz5sjFyPm4e0g
+#   ATS_APP_PASSWORD   gedeeld wachtwoord voor de interne app (niet voor /rapport)
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+
+# SPA-fallback. /api/* wordt door de functions afgevangen voordat deze regel geldt.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
