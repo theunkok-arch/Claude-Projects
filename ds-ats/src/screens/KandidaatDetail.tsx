@@ -196,7 +196,11 @@ export default function KandidaatDetail() {
       <section className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-4">
         <h2 className="font-semibold text-red-800">AVG</h2>
         <p className="mt-1 text-sm text-red-800">
-          Verwijdert deze kandidaat en al zijn aanmeldingen, activiteiten en stagelog. Onherstelbaar.
+          Verwijdert deze kandidaat en al zijn aanmeldingen, activiteiten en stagelog. Onherstelbaar.{' '}
+          <a href="/privacy" target="_blank" rel="noreferrer noopener" className="underline">
+            Privacyverklaring
+          </a>
+          .
         </p>
         {bevestigWissen ? (
           <div className="mt-3 flex gap-2">

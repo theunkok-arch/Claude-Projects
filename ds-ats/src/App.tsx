@@ -8,12 +8,15 @@ import VacatureDetail from './screens/VacatureDetail'
 import KandidaatDetail from './screens/KandidaatDetail'
 import Bronnen from './screens/Bronnen'
 import Rapport from './screens/Rapport'
+import Privacy from './screens/Privacy'
 
 export default function App() {
   return (
     <Routes>
       {/* Het klantrapport staat bewust buiten de provider: geen sleutel, geen app-data. */}
       <Route path="/rapport/:token" element={<Rapport />} />
+      {/* Publiek: kandidaten moeten dit kunnen lezen zonder inlog. */}
+      <Route path="/privacy" element={<Privacy />} />
       <Route
         path="*"
         element={

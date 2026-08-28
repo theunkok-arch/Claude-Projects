@@ -4,7 +4,14 @@
 import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
 import { ALLE_AFVAL_REDENEN, STAGE_IDS } from '../../shared/stages.mjs'
-import { KOLOM_SYNONIEMEN, normaliseer, vertaalStatus } from './status-map.mjs'
+import {
+  KOLOM_SYNONIEMEN,
+  isIdentificerendeUrl,
+  normaliseer,
+  vertaalBron,
+  vertaalReden,
+  vertaalStatus,
+} from './status-map.mjs'
 
 /** Leest xlsx of csv en geeft een array objecten met de kolomkoppen als sleutel. */
 export async function leesRijen(pad, tabnaam) {
@@ -68,10 +75,17 @@ const waarde = (rij, index, veld) => {
   return tekst.length > 0 ? tekst : undefined
 }
 
-export const dedupeSleutel = (kandidaat) =>
-  (kandidaat['LinkedIn-URL'] ?? `${kandidaat.Naam ?? ''}|${kandidaat.Woonplaats ?? ''}`)
-    .trim()
-    .toLowerCase()
+/**
+ * Dedupe op LinkedIn-URL, anders op genormaliseerde naam plus woonplaats.
+ * Een URL telt alleen mee als hij een persoon aanwijst: de Brand Manager-lijst
+ * staat vol Sales Navigator-links, en een kale /sales/ zonder lead-id zou
+ * anders tientallen kandidaten tot één record samenvouwen.
+ */
+export const dedupeSleutel = (kandidaat) => {
+  const url = kandidaat['LinkedIn-URL']
+  if (url && isIdentificerendeUrl(url)) return url.trim().toLowerCase()
+  return normaliseer(`${kandidaat.Naam ?? ''}|${kandidaat.Woonplaats ?? ''}`)
+}
 
 const WAAR = ['ja', 'x', 'waar', 'true', '1']
 
@@ -79,11 +93,14 @@ const WAAR = ['ja', 'x', 'waar', 'true', '1']
  * Zet de ruwe rijen om in kandidaten en aanmeldingen. Schrijft niets; geeft
  * terug wat er zou gebeuren, inclusief wat het niet kon plaatsen.
  */
-export function bouwPlan(rijen, { vacatureTitel, bron, vandaag }) {
+export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
   const { index, genegeerd } = bouwKolomIndex(rijen)
   const kandidaten = new Map()
   const aanmeldingen = []
   const onbekendeStatus = new Map()
+  const onbekendeReden = new Map()
+  const bronVertaling = new Map()
+  const onbeslist = []
   const overgeslagen = []
 
   for (const [nummer, rij] of rijen.entries()) {
@@ -104,16 +121,9 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag }) {
       'Huidige werkgever': waarde(rij, index, 'Huidige werkgever'),
       Opleiding: waarde(rij, index, 'Opleiding'),
       Talen: waarde(rij, index, 'Talen'),
-      Bron: waarde(rij, index, 'Bron') ?? bron,
+      Bron: bronVan(rij, index, bron, bronVertaling),
       'Laatste contact': waarde(rij, index, '__datum'),
     })
-
-    const sleutel = dedupeSleutel(kandidaat)
-    if (kandidaten.has(sleutel)) {
-      overgeslagen.push({ rij: nummer + 2, reden: `dubbel in het bestand: ${naam}` })
-      continue
-    }
-    kandidaten.set(sleutel, kandidaat)
 
     const ruweStatus = waarde(rij, index, '__status')
     const vertaald = vertaalStatus(ruweStatus)
@@ -121,11 +131,39 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag }) {
       onbekendeStatus.set(ruweStatus, (onbekendeStatus.get(ruweStatus) ?? 0) + 1)
     }
 
-    // Onbekend valt terug op Gescoord: liever een kandidaat die je nog moet
-    // beoordelen dan een verkeerde stage die de klok verkeerd zet.
-    const stage = vertaald?.stage ?? 'Gescoord'
-    const reden = vertaald?.reden
+    // In gesprek dekt zowel Gereageerd als Gesproken. Raden zou juist het
+    // conversiecijfer bederven waar de splitsing voor bedoeld is, dus dat
+    // vraagt om een expliciete keuze via --in-gesprek.
+    let stage
+    if (vertaald?.onbeslist) {
+      onbeslist.push({ rij: nummer + 2, naam })
+      if (!inGesprek) continue
+      stage = inGesprek
+    } else {
+      // Onbekend valt terug op Gescoord: liever een kandidaat die je nog moet
+      // beoordelen dan een verkeerde stage die de klok verkeerd zet.
+      stage = vertaald?.stage ?? 'Gescoord'
+    }
     if (!STAGE_IDS.includes(stage)) throw new Error(`Vertaling leverde onbekende stage ${stage}.`)
+
+    // Pas registreren als vaststaat dat deze rij een aanmelding oplevert;
+    // anders houd je een kandidaat zonder aanmelding over.
+    const sleutel = dedupeSleutel(kandidaat)
+    if (kandidaten.has(sleutel)) {
+      overgeslagen.push({ rij: nummer + 2, reden: `dubbel in het bestand: ${naam}` })
+      continue
+    }
+    kandidaten.set(sleutel, kandidaat)
+
+    // De sheets hebben een eigen kolom Reden afvallen; die wint van de reden
+    // die uit de statusvertaling zou rollen.
+    const ruweReden = waarde(rij, index, '__reden')
+    let reden = vertaalReden(ruweReden, ALLE_AFVAL_REDENEN) ?? vertaald?.reden ?? null
+    if (ruweReden && !vertaalReden(ruweReden, ALLE_AFVAL_REDENEN)) {
+      onbekendeReden.set(ruweReden, (onbekendeReden.get(ruweReden) ?? 0) + 1)
+    }
+    // Een reden hoort alleen bij een afvaller.
+    if (stage !== 'Afgevallen') reden = null
     if (reden && !ALLE_AFVAL_REDENEN.includes(reden)) {
       throw new Error(`Vertaling leverde onbekende afvalreden ${reden}.`)
     }
@@ -146,14 +184,51 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag }) {
         'Score totaal': Number.isFinite(score) ? score : undefined,
         'Reistijd minuten': Number.isFinite(reistijd) ? reistijd : undefined,
         'Score-onderbouwing': waarde(rij, index, '__onderbouwing'),
-        Opmerkingen: waarde(rij, index, '__opmerkingen'),
+        Opmerkingen: [waarde(rij, index, '__signaal'), waarde(rij, index, '__opmerkingen')]
+          .filter(Boolean)
+          .join('\n\n') || undefined,
         'Outreach-concept': waarde(rij, index, '__outreach'),
         Concurrent: WAAR.includes(normaliseer(waarde(rij, index, '__concurrent'))) || undefined,
       }),
     })
   }
 
-  return { index, genegeerd, kandidaten, aanmeldingen, onbekendeStatus, overgeslagen }
+  return {
+    index,
+    genegeerd,
+    kandidaten,
+    aanmeldingen,
+    onbekendeStatus,
+    onbekendeReden,
+    bronVertaling,
+    onbeslist,
+    overgeslagen,
+    naamBotsingen: naamBotsingen(kandidaten),
+  }
+}
+
+function bronVan(rij, index, terugval, logboek) {
+  const ruw = waarde(rij, index, 'Bron')
+  const vertaald = vertaalBron(ruw) ?? terugval
+  if (ruw) logboek.set(ruw, vertaald)
+  return vertaald
+}
+
+/**
+ * Twee kandidaten met dezelfde naam maar een andere URL worden niet
+ * samengevoegd — dat zou stil de verkeerde mensen samentrekken. Ze worden wel
+ * gemeld, zodat je zelf kunt kijken.
+ */
+function naamBotsingen(kandidaten) {
+  const perNaam = new Map()
+  for (const kandidaat of kandidaten.values()) {
+    const naam = normaliseer(kandidaat.Naam)
+    if (!perNaam.has(naam)) perNaam.set(naam, [])
+    perNaam.get(naam).push(kandidaat)
+  }
+  return [...perNaam.entries()]
+    .filter(([, groep]) => groep.length > 1)
+    .map(([naam, groep]) => ({ naam, aantal: groep.length }))
 }
 
 function schoon(object) {

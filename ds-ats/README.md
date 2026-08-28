@@ -16,7 +16,7 @@ opdracht. Dat lost de dubbelingen in de acht RA-lijsten definitief op.
 |---|---|---|
 | 1 | Airtable-base, keuzelijsten, formules, validaties | ✅ live |
 | 1 | Importscript met statusvertaling en dedupe | ✅ klaar, nog niet gedraaid |
-| 1 | AVG: bewaartermijn, verwijderfunctie | ✅ |
+| 1 | AVG: bewaartermijn, verwijderfunctie, privacyverklaring | ✅ |
 | 2 | Maandagoverzicht, vacatures, vacature-detail, kandidaat-detail | ✅ |
 | 2 | Stagewijziging vanaf mobiel (twee taps) | ✅ |
 | 3 | Klantrapport met funnel, reden-analyse, doorlooptijd, PDF | ✅ |
@@ -110,6 +110,7 @@ Vite + React 19 + TypeScript + Tailwind v4. Ontworpen op 375px.
 | `/kandidaat/:id` | Gegevens, alle aanmeldingen, historie, contact loggen, AVG-verwijderen |
 | `/bronnen` | Bron-effectiviteit: van gescoord naar voorgesteld naar geplaatst |
 | `/rapport/:token` | Klantrapport, geen login |
+| `/privacy` | Privacyverklaring voor kandidaten, publiek |
 
 Interactieregels uit de spec die in code zitten:
 
@@ -149,8 +150,11 @@ Dat is volgens 12 de grootste juridische blootstelling, dus:
 - **Tokens in de rapport-URL**: wie de link heeft, ziet het rapport. Acceptabel
   voor funnelcijfers, niet voor cv's. Zet daar dus nooit cv's achter.
 
-Wat er nog niet is: een privacyverklaring. Die hoort volgens 12 in fase 1 en is
-geen code — schrijf hem en zet er een link naar in de app.
+- **De privacyverklaring** staat op `/privacy`, buiten de inlog, want kandidaten
+  moeten hem kunnen lezen. Het is een ingevulde concepttekst met een handvol
+  `[...]`-plaatsen die Do Solutions zelf moet aanvullen (KvK, adres, e-mail,
+  verwerkersovereenkomsten). Laat hem nakijken voordat je er vanuit outreach
+  naar linkt.
 
 ---
 
@@ -187,7 +191,8 @@ netlify dev               # frontend plus functions op één poort
 
 ## Airtable-limiet
 
-Het gratis plan stopt bij 1.000 records per base. Met de Brand Manager-lijst
-(272 rijen) en de acht RA-lijsten zit je daar bij de eerste import al overheen —
-elke kandidaat kost je een record in `Kandidaten` én een in `Aanmeldingen` én een
-in `Stagelog`. Reken op het Team-plan voordat je importeert.
+Het gratis plan stopt bij 1.000 records per base. Geteld op de echte sheets:
+Brand Manager 143 rijen en RA Officer 143 rijen, en elke rij kost drie records
+(`Kandidaten`, `Aanmeldingen`, `Stagelog`). Dat is **855 records** voor die twee
+lijsten samen — ze passen er net in, en Formulation Technologist past er niet
+meer bij. Regel het Team-plan vóór de import.

@@ -24,6 +24,7 @@ const { values: opties } = parseArgs({
     opdrachtgever: { type: 'string' },
     tab: { type: 'string' },
     bron: { type: 'string' },
+    'in-gesprek': { type: 'string' },
     echt: { type: 'boolean', default: false },
   },
 })
@@ -33,8 +34,15 @@ const API_KEY = process.env.AIRTABLE_API_KEY
 
 if (!opties.bestand || !opties.vacature || !opties.opdrachtgever) {
   console.error(
-    'Gebruik: --bestand <pad> --vacature "<titel>" --opdrachtgever "<naam>" [--tab <blad>] [--bron <bron>] [--echt]',
+    'Gebruik: --bestand <pad> --vacature "<titel>" --opdrachtgever "<naam>"\n' +
+      '         [--tab <blad>] [--bron <bron>] [--in-gesprek Gereageerd|Gesproken] [--echt]',
   )
+  process.exit(1)
+}
+
+const IN_GESPREK = opties['in-gesprek']
+if (IN_GESPREK && !['Gereageerd', 'Gesproken'].includes(IN_GESPREK)) {
+  console.error('--in-gesprek accepteert alleen Gereageerd of Gesproken.')
   process.exit(1)
 }
 if (!BASE_ID || !API_KEY) {
@@ -115,13 +123,28 @@ async function main() {
   )
   if (!vacature) throw new Error(`Vacature "${opties.vacature}" bestaat niet bij deze opdrachtgever.`)
 
-  const plan = bouwPlan(rijen, { vacatureTitel: vacature.fields.Titel, bron: opties.bron, vandaag })
+  const plan = bouwPlan(rijen, {
+    vacatureTitel: vacature.fields.Titel,
+    bron: opties.bron,
+    vandaag,
+    inGesprek: IN_GESPREK,
+  })
   const bekend = new Map(
     bestaandeKandidaten.map((k) => [(k.fields['Dedupe-sleutel'] ?? '').trim().toLowerCase(), k.id]),
   )
   const nieuw = [...plan.kandidaten].filter(([sleutel]) => !bekend.has(sleutel))
 
   rapporteer(plan, nieuw.length)
+
+  if (plan.onbeslist.length > 0 && !IN_GESPREK) {
+    console.log(
+      `\nGestopt: ${plan.onbeslist.length} rijen staan op "In gesprek" en zijn hierboven overgeslagen.`,
+    )
+    console.log('Bepaal per kandidaat of dat Gereageerd of Gesproken is en werk de sheet bij,')
+    console.log('of draai opnieuw met --in-gesprek Gereageerd (of Gesproken) voor alle rijen tegelijk.\n')
+    if (opties.echt) process.exit(1)
+    return
+  }
 
   if (!opties.echt) {
     console.log('\nDroge run. Voeg --echt toe om daadwerkelijk te schrijven.\n')
@@ -184,6 +207,38 @@ function rapporteer(plan, aantalNieuw) {
       console.log(`  ${status.padEnd(28)} ${aantal}`)
     }
     console.log('  → vul ze aan in scripts/import/status-map.mjs voordat je met --echt draait.')
+  }
+
+  if (plan.bronVertaling.size > 0) {
+    console.log('\nBron-vertaling (vrije tekst → keuzelijst):')
+    const perDoel = new Map()
+    for (const [ruw, doel] of plan.bronVertaling) {
+      if (!perDoel.has(doel)) perDoel.set(doel, [])
+      perDoel.get(doel).push(ruw)
+    }
+    for (const [doel, ruwe] of [...perDoel].sort((a, b) => b[1].length - a[1].length)) {
+      console.log(`  ${doel.padEnd(26)} ← ${ruwe.length} variant(en), bv. "${ruwe[0].slice(0, 48)}"`)
+    }
+  }
+
+  if (plan.onbekendeReden.size > 0) {
+    console.log('\nOnbekende afvalredenen (worden leeggelaten):')
+    for (const [reden, aantal] of [...plan.onbekendeReden].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${String(reden).slice(0, 50).padEnd(52)} ${aantal}`)
+    }
+  }
+
+  if (plan.onbeslist.length > 0) {
+    console.log(`\nStatus "In gesprek" — ${plan.onbeslist.length} rijen, keuze nodig:`)
+    for (const rij of plan.onbeslist) console.log(`  rij ${rij.rij}: ${rij.naam}`)
+    console.log('  → alleen geantwoord = Gereageerd, echt gesproken = Gesproken.')
+  }
+
+  if (plan.naamBotsingen.length > 0) {
+    console.log('\nZelfde naam, andere sleutel — zelf nakijken, niet samengevoegd:')
+    for (const botsing of plan.naamBotsingen) {
+      console.log(`  ${botsing.naam} (${botsing.aantal}x)`)
+    }
   }
 
   if (plan.overgeslagen.length > 0) {
