@@ -104,7 +104,7 @@ Vite + React 19 + TypeScript + Tailwind v4. Ontworpen op 375px.
 
 | Route | Scherm |
 |---|---|
-| `/` | Maandagoverzicht — de aantallen per stage; `?stage=` toont die kandidaten |
+| `/` | Maandagoverzicht — de aantallen per stage, te filteren op klant en vacature; `?stage=` toont die kandidaten |
 | `/vacatures` | Alle vacatures met funnel en aantallen |
 | `/vacature/:id` | Funnel en reden-analyse; `?stage=` toont de kandidatenlijst |
 | `/opdrachtgevers` | Klantenlijst met wat er per klant loopt |
@@ -241,5 +241,41 @@ Twee regels dragen dat:
   klantmap. `sync.mjs` schrijft daarom geen batch weg zonder
   `--bevestigd-door`, en legt id, naam en wijzigingsdatum van het gelezen
   bestand vast bij het resultaat.
+
+### Eén kolomindeling
+
+Het schema ligt al vast, buiten deze repo: `ds-framework/config/kandidaten-schema.json`,
+versie 1.0 — zestien kolommen A t/m P, met een gesloten statuslijst en de regel
+*"EEN kandidaten.xlsx per vacature. Geen _v2/_v3 bestanden."* Dat bestand is de
+bron; dit project kopieert hem niet, het leest hem.
+
+De importer overbrugt twee verschillen die daaruit volgen:
+
+- **de statuslijst is korter dan de pipeline.** Het xlsx-schema stopt bij
+  `Voorgesteld` / `Afgewezen`; de ATS loopt door tot `Ingewerkt`. Alle tien
+  schemastatussen vertalen nu naar een stage uit `shared/stages.mjs`;
+- **`Score core (60)` en `Score custom (40)` komen niet mee**, alleen
+  `Totaal (100)`. Airtable heeft geen kolommen voor de 60/40-splitsing.
+
+Wat er in de Drive staat wijkt daar op dit moment nog van af — drie
+kolomindelingen naast elkaar, zie `scripts/import/README.md`.
+
+### De app is leidend voor kandidaatgegevens
+
+Op `/kandidaat/:id` staat een formulier waarmee ontbrekende gegevens zijn aan te
+vullen (naam, rol, werkgever, woonplaats, LinkedIn, e-mail, telefoon, Instagram,
+opleiding, talen, bron, notities). Lege velden zijn oranje, en de knop telt ze:
+"5 leeg · aanvullen".
+
+Wat daar wordt ingevuld blijft staan. `sync.mjs` maakt nieuwe kandidaten aan en
+verzet stages, maar raakt de velden van een bestaande kandidaat nooit aan — een
+sheet kan dus niet overschrijven wat iemand met de hand heeft gecorrigeerd. Het
+formulier stuurt bovendien alleen de gewijzigde velden mee, zodat twee mensen
+elkaars werk niet wissen.
+
+Drie velden staan er bewust niet in: `Bewaren tot` en `Bewaartermijn verstreken`
+zijn Airtable-formules, en `Laatste contact` wordt al door de activiteitenlogger
+gezet — twee bronnen voor die datum zou de AVG-bewaartermijn laten afhangen van
+wie het laatst iets aanraakte.
 
 `scripts/import/README.md` beschrijft de werkwijze.

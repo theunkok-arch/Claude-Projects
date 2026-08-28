@@ -177,6 +177,23 @@ export const dedupeSleutel = (kandidaat) => {
 }
 
 const WAAR = ['ja', 'x', 'waar', 'true', '1']
+/** Waarden die "geen concurrent" betekenen. Alles daarbuiten telt wél. */
+const GEEN_CONCURRENT = ['', '-', 'nee', 'n', 'geen', 'false', '0', 'nvt', 'n.v.t.']
+
+/**
+ * De concurrent-kolom is niet overal een vinkje. ds-framework schrijft
+ * `direct` / `adjacent` / `niche` voor (kandidaten-schema.json, kolom I), en
+ * die vielen tegen een ja/nee-lijst allemaal weg — stil, want een lege waarde
+ * ziet er niet uit als een fout. Airtable heeft er een vinkje van gemaakt, dus
+ * de nuance tussen direct en niche gaat alsnog verloren; het onderscheid
+ * concurrent/niet-concurrent blijft nu wel staan. Dat is het onderscheid dat
+ * de outreach-gate gebruikt.
+ */
+function isConcurrent(ruw) {
+  const tekst = normaliseer(ruw)
+  if (GEEN_CONCURRENT.includes(tekst)) return undefined
+  return WAAR.includes(tekst) || tekst.length > 0 || undefined
+}
 
 /**
  * Zet de ruwe rijen om in kandidaten en aanmeldingen. Schrijft niets; geeft
@@ -277,7 +294,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
           .filter(Boolean)
           .join('\n\n') || undefined,
         'Outreach-concept': waarde(rij, index, '__outreach'),
-        Concurrent: WAAR.includes(normaliseer(waarde(rij, index, '__concurrent'))) || undefined,
+        Concurrent: isConcurrent(waarde(rij, index, '__concurrent')),
       }),
     })
   }

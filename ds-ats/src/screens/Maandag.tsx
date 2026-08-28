@@ -25,6 +25,7 @@ export default function Maandag() {
   const [zoek, setZoek] = useSearchParams()
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
 
+  const klantFilter = zoek.get('klant') ?? 'alle'
   const vacatureFilter = zoek.get('vacature') ?? 'alle'
   const stage = zoek.get('stage')
 
@@ -35,13 +36,17 @@ export default function Maandag() {
     setZoek(volgende)
   }
 
-  /** Alles wat op dit scherm hoort: actief, en binnen de gekozen vacature. */
+  /** Alles wat op dit scherm hoort: actief, binnen de gekozen klant en vacature. */
   const inScope = useMemo(() => {
-    const actief = actieveRegels(regels)
-    return vacatureFilter === 'alle'
-      ? actief
-      : actief.filter((r) => r.vacature?.id === vacatureFilter)
-  }, [regels, vacatureFilter])
+    let actief = actieveRegels(regels)
+    if (klantFilter !== 'alle') {
+      actief = actief.filter((r) => r.vacature?.Opdrachtgever?.[0] === klantFilter)
+    }
+    if (vacatureFilter !== 'alle') {
+      actief = actief.filter((r) => r.vacature?.id === vacatureFilter)
+    }
+    return actief
+  }, [regels, klantFilter, vacatureFilter])
 
   const teLang = useMemo(() => inScope.filter((r) => r.overschreden), [inScope])
 
@@ -63,9 +68,21 @@ export default function Maandag() {
     return [...selectie].sort(opUrgentie)
   }, [stage, inScope, teLang])
 
-  const actieveVacatures = (data?.vacatures ?? []).filter(
+  const alleActieveVacatures = (data?.vacatures ?? []).filter(
     (v) => v.Status === 'Actief' || v.Status === 'Intake',
   )
+  const actieveVacatures =
+    klantFilter === 'alle'
+      ? alleActieveVacatures
+      : alleActieveVacatures.filter((v) => v.Opdrachtgever?.[0] === klantFilter)
+
+  // Alleen klanten met werk in de trechter; een lege naam in een keuzelijst
+  // kost een tik en levert een leeg scherm op.
+  const klanten = (data?.opdrachtgevers ?? []).filter((o) =>
+    alleActieveVacatures.some((v) => v.Opdrachtgever?.[0] === o.id),
+  )
+  const klantNaam =
+    klantFilter === 'alle' ? null : (klanten.find((o) => o.id === klantFilter)?.Naam ?? null)
   const vacatureNaam =
     vacatureFilter === 'alle'
       ? null
@@ -97,7 +114,11 @@ export default function Maandag() {
           )}
           <span className="text-2xl font-semibold tabular-nums">{lijst.length}</span>
         </div>
-        {vacatureNaam && <p className="text-sm text-navy-400">{vacatureNaam}</p>}
+        {(klantNaam || vacatureNaam) && (
+          <p className="text-sm text-navy-400">
+            {[klantNaam, vacatureNaam].filter(Boolean).join(' · ')}
+          </p>
+        )}
 
         <div className="mt-4 flex flex-col gap-2">
           {lijst.map((regel) => (
@@ -130,16 +151,38 @@ export default function Maandag() {
       <h1 className="text-2xl font-semibold">Maandagoverzicht</h1>
       <p className="mt-1 text-sm text-navy-400">
         {inScope.length} actief in {tellingen.length} {tellingen.length === 1 ? 'stage' : 'stages'}
+        {klantNaam && ` · ${klantNaam}`}
       </p>
 
-      <div className="sticky top-[57px] z-20 -mx-4 mt-3 border-b border-lijn bg-cream/95 px-4 py-2 backdrop-blur">
+      <div className="sticky top-[57px] z-20 -mx-4 mt-3 flex gap-2 border-b border-lijn bg-cream/95 px-4 py-2 backdrop-blur">
+        <select
+          value={klantFilter}
+          onChange={(event) => {
+            // Een vacature van klant A hoort niet te blijven staan als je naar
+            // klant B springt; dat levert een leeg scherm zonder uitleg op.
+            const volgende = new URLSearchParams(zoek)
+            volgende.delete('vacature')
+            if (event.target.value === 'alle') volgende.delete('klant')
+            else volgende.set('klant', event.target.value)
+            setZoek(volgende)
+          }}
+          aria-label="Filter op opdrachtgever"
+          className="tik min-w-0 flex-1 rounded-xl border border-lijn bg-white px-3 text-sm"
+        >
+          <option value="alle">Alle klanten</option>
+          {klanten.map((klant) => (
+            <option key={klant.id} value={klant.id}>
+              {klant.Naam}
+            </option>
+          ))}
+        </select>
         <select
           value={vacatureFilter}
           onChange={(event) =>
             zetZoek('vacature', event.target.value === 'alle' ? null : event.target.value)
           }
           aria-label="Filter op vacature"
-          className="tik w-full rounded-xl border border-lijn bg-white px-3 text-sm"
+          className="tik min-w-0 flex-1 rounded-xl border border-lijn bg-white px-3 text-sm"
         >
           <option value="alle">Alle vacatures</option>
           {actieveVacatures.map((vacature) => (

@@ -281,3 +281,44 @@ stilzwijgend weg.
 
 Kijk het regeltje **genegeerde kolommen** in het rapport altijd na. Dat is de
 plek waar een kolom die je wél wilde meenemen zichtbaar wordt.
+
+
+## Drie kolomindelingen in de Drive
+
+`ds-framework/config/kandidaten-schema.json` schrijft één indeling voor. De
+sheets in de Drive volgen die nog niet allemaal. Op 28-08-2026 aangetroffen:
+
+| Bron | Kolommen |
+|---|---|
+| Royal Sanders BM + RA (samengevoegd) | `Naam, Bron-URL, Bron, Huidige rol, Werkgever, Tenure, Locatie + reisafstand, Signaal/observatie, Concurrent, Score core (60), Score custom (40), Totaal (100), Onderbouwing, Outreach-concept, Status, Reden afvallen, Opmerkingen` |
+| `kandidaten 1707` (RA-map) | `ID, Naam, LinkedIn URL, E-mail, Telefoon, Huidig bedrijf, Huidige functie, Sector, Regio/Woonplaats, Reistijd Vlijmen (min), Achtergrond legal (J/N), …, Score TOTAAL, Status (lead/warm/gesprek/afgewezen), Bron, Datum gevonden, Notities recruiter` |
+| Verhaeg | `Naam, LinkedIn URL, Instagram/facebook account, Website, Telefoonnummer, Huidige functie, Huidige werkgever, Locatie, Ervaring (jaren), Röntgendiploma (j/n), Regio (j/n), Contactdatum, Kanaal, Status, Score (totaal), Notities` |
+
+De eerste volgt het framework-schema. De andere twee niet, en het verschil is
+niet cosmetisch: `Huidig bedrijf` en `Regio/Woonplaats` worden niet herkend, en
+`Status (lead/warm/gesprek/afgewezen)` bevat waarden als `Actief` en
+`Open to Work` die geen pipelinestatus zijn.
+
+Zolang dat zo is, is "de laatste sheet" niet automatisch bruikbaar. Kijk het
+regeltje **genegeerde kolommen** en de melding **onbekende statussen** in het
+rapport altijd na.
+
+## Welk bestand: `kies-bestand.mjs`
+
+```bash
+node scripts/import/kies-bestand.mjs < maplisting.json
+```
+
+Neemt een maplisting (de ruwe uitvoer van een Drive-listing op `parentId`) en
+geeft de meest recent bewerkte sheet terug, met `_OLD`, `DONTUSE`, `Kopie van`
+en `backup` eruit en met een waarschuwing als de nummer twee binnen een uur van
+de winnaar is bewerkt.
+
+**Neem een maplisting, geen naamzoekopdracht.** Drive's
+`title contains 'kandidaten'` vindt
+`Royal_Sanders_RA_Officer_kandidatenlijst_samengevoegd` niet — underscores
+breken de tokenisatie — en dat is uitgerekend het bestand waarmee deze base is
+gevuld. Een zoekopdracht op naam mist dus bestanden zonder dat je het merkt.
+
+Daarna telt de maplisting alleen als het bestand er ook in staat. Op dit moment
+levert dat voor de RA-vacature het verkeerde bestand op; zie de tabel hierboven.

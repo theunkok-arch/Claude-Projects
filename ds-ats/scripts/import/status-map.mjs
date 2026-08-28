@@ -51,6 +51,9 @@ export const STATUS_MAP = {
   reminder: { stage: 'Opgevolgd' },
 
   reageert: { stage: 'Gereageerd' },
+  // ds-framework schrijft "Reactie"; zonder deze regel viel die terug op
+  // Gescoord en zette hij de kandidaat een halve trechter terug.
+  reactie: { stage: 'Gereageerd' },
 
   gesprek: { stage: 'Gesproken' },
   'gesprek/wachten': { stage: 'Gesproken' },

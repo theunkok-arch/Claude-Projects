@@ -10,8 +10,8 @@
 //   node scripts/import/sync.mjs plan \
 //     --sheet <csv> --vacature "Brand Manager" --huidig huidig.json \
 //     --bestand-id <driveId> --bestand-naam "<naam>" --gewijzigd <iso>
-//   node scripts/import/sync.mjs kandidaten <n>   --bevestigd-door "Dominique"
-//   node scripts/import/sync.mjs aanmeldingen <n> --bevestigd-door "Dominique"
+//   node scripts/import/sync.mjs kandidaten <n>   --nieuwste
+//   node scripts/import/sync.mjs aanmeldingen <n> --nieuwste
 //   node scripts/import/sync.mjs wijzigingen <n>  --bevestigd-door "Dominique"
 //
 // huidig.json is een uitdraai van de base, op te halen met de Airtable-
@@ -193,17 +193,20 @@ if (commando === 'plan') {
   const nummer = Number.parseInt(rest[0], 10)
   const { values } = parseArgs({
     args: rest.slice(1),
-    options: { 'bevestigd-door': { type: 'string' } },
+    options: { 'bevestigd-door': { type: 'string' }, nieuwste: { type: 'boolean' } },
   })
-  // De sheets in de Drive veranderen dagelijks en heten niet consequent. Wie
-  // hier schrijft zonder dat iemand het bestand heeft nagekeken, schrijft
-  // vroeg of laat een _OLD-versie over de actuele stand heen.
-  if (!values['bevestigd-door']) {
-    stop('--bevestigd-door ontbreekt. Laat Dominique eerst bevestigen dat dit het juiste bestand is.')
+  // Er moet vastliggen waaróm dit bestand is gekozen: een naam, of expliciet
+  // "de meest recent bewerkte". Die keuze komt boven elke batch te staan, dus
+  // is later na te lopen welke stand waar vandaan komt.
+  const herkomst = values['bevestigd-door'] ?? (values.nieuwste ? 'meest recent bewerkt' : null)
+  if (!herkomst) {
+    stop(
+      'Geef --bevestigd-door "<naam>" of --nieuwste. Zonder een van de twee ligt niet vast waarom dit bestand is gekozen.',
+    )
   }
   if (!existsSync(SYNC)) stop('Geen sync.json. Draai eerst: sync.mjs plan …')
   const sync = JSON.parse(readFileSync(SYNC, 'utf8'))
-  toonBatch(sync, commando, nummer, values['bevestigd-door'])
+  toonBatch(sync, commando, nummer, herkomst)
 } else {
   console.log(readFileSync(new URL(import.meta.url)).toString().split('\n').slice(1, 23).join('\n'))
   process.exit(commando ? 1 : 0)
@@ -273,8 +276,8 @@ function schrijf(values, u) {
   console.log('Batches opvragen: sync.mjs kandidaten 1 --bevestigd-door "Dominique"')
 }
 
-function toonBatch(sync, soort, nummer, bevestigdDoor) {
-  const bronregel = `${sync.bron.bestandNaam} (${sync.bron.bestandId}), gewijzigd ${sync.bron.gewijzigd}, bevestigd door ${bevestigdDoor}`
+function toonBatch(sync, soort, nummer, herkomst) {
+  const bronregel = `${sync.bron.bestandNaam} (${sync.bron.bestandId}), gewijzigd ${sync.bron.gewijzigd}, gekozen: ${herkomst}`
 
   if (soort === 'kandidaten') {
     const batch = deel(sync.nieuweKandidaten, nummer)
