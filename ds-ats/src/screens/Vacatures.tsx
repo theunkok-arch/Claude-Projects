@@ -2,11 +2,13 @@ import { Link } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { funnel } from '../lib/metrics'
 import { band, datum } from '../lib/format'
+import { useHerkomst } from '../lib/herkomst'
 import type { StageId } from '../../shared/stages.mjs'
 import Funnel from '../components/Funnel'
 
 export default function Vacatures() {
   const { data, regels } = useAts()
+  const herkomst = useHerkomst()
   if (!data) return null
 
   const opdrachtgevers = new Map(data.opdrachtgevers.map((o) => [o.id, o]))
@@ -30,12 +32,17 @@ export default function Vacatures() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <Link to={`/vacature/${vacature.id}`} className="block truncate font-semibold underline">
+                  <Link
+                    to={`/vacature/${vacature.id}`}
+                    state={herkomst}
+                    className="block truncate font-semibold underline"
+                  >
                     {vacature.Titel}
                   </Link>
                   {opdrachtgever ? (
                     <Link
                       to={`/opdrachtgever/${opdrachtgever.id}`}
+                      state={herkomst}
                       className="block truncate text-sm text-navy-400 underline"
                     >
                       {opdrachtgever.Naam}

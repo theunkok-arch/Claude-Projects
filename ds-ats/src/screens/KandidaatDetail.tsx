@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { datum, dagen } from '../lib/format'
+import { useHerkomst } from '../lib/herkomst'
 import StageBadge from '../components/StageBadge'
+import Terug from '../components/Terug'
 import StageSheet from '../components/StageSheet'
 import KandidaatFormulier, { aantalLeeg } from '../components/KandidaatFormulier'
 import AanmeldingFormulier, { aantalLeeg as aantalLeegAanmelding } from '../components/AanmeldingFormulier'
@@ -13,6 +15,7 @@ const ACTIVITEIT_TYPES = ['InMail', 'Reminder', 'Telefoon', 'Teams', 'E-mail', '
 export default function KandidaatDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const herkomst = useHerkomst()
   const { data, regels, wijzigStage, wijzigAanmelding, wijzigKandidaat, logActiviteit, verwijderKandidaat } =
     useAts()
 
@@ -85,9 +88,7 @@ export default function KandidaatDetail() {
 
   return (
     <div>
-      <button type="button" onClick={() => navigate(-1)} className="text-sm text-navy-400">
-        ← Terug
-      </button>
+      <Terug naar="/" label="Maandagoverzicht" />
       <h1 className="mt-1 text-2xl font-semibold">{kandidaat.Naam}</h1>
       <p className="text-sm text-navy-400">
         {[kandidaat['Huidige rol'], kandidaat['Huidige werkgever']].filter(Boolean).join(' · ') || '—'}
@@ -128,13 +129,19 @@ export default function KandidaatDetail() {
       </dl>
       )}
 
+      {/*
+        LinkedIn, Mail en Bellen dragen `tik`, maar op een <a> doet min-height
+        niets: dat is een inline element. Ze haalden de 44px alleen doordat ze
+        toevallig in een flex-rij staan; `inline-flex` zet dat vast, ook als die
+        rij ooit verdwijnt.
+      */}
       <div className="mt-3 flex flex-wrap gap-2">
         {kandidaat['LinkedIn-URL'] && (
           <a
             href={kandidaat['LinkedIn-URL']}
             target="_blank"
             rel="noreferrer noopener"
-            className="tik rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
+            className="tik inline-flex items-center rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
           >
             LinkedIn
           </a>
@@ -142,7 +149,7 @@ export default function KandidaatDetail() {
         {kandidaat['E-mail'] && (
           <a
             href={`mailto:${kandidaat['E-mail']}`}
-            className="tik rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
+            className="tik inline-flex items-center rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
           >
             Mail
           </a>
@@ -150,7 +157,7 @@ export default function KandidaatDetail() {
         {kandidaat.Telefoon && (
           <a
             href={`tel:${kandidaat.Telefoon}`}
-            className="tik rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
+            className="tik inline-flex items-center rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
           >
             Bellen
           </a>
@@ -167,10 +174,26 @@ export default function KandidaatDetail() {
             return (
               <div key={aanmelding.id} className="rounded-2xl border border-lijn bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <Link to={`/vacature/${regel.vacature?.id ?? ''}`} className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{regel.vacature?.Titel ?? 'Geen vacature'}</p>
-                    <p className="truncate text-sm text-navy-400">{regel.opdrachtgever?.Naam ?? '—'}</p>
-                  </Link>
+                  {/*
+                    Zonder vacature is er niets om heen te linken: `/vacature/`
+                    landde op "Pagina niet gevonden", terwijl er "Geen vacature"
+                    stond. Dan liever geen link.
+                  */}
+                  {regel.vacature ? (
+                    <Link
+                      to={`/vacature/${regel.vacature.id}`}
+                      state={herkomst}
+                      className="min-w-0 flex-1"
+                    >
+                      <p className="truncate font-medium">{regel.vacature.Titel}</p>
+                      <p className="truncate text-sm text-navy-400">{regel.opdrachtgever?.Naam ?? '—'}</p>
+                    </Link>
+                  ) : (
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-navy-400">Geen vacature</p>
+                      <p className="truncate text-sm text-navy-400">—</p>
+                    </div>
+                  )}
                   <StageBadge stage={aanmelding.Stage} klein onClick={() => setSheetVoor(regel)} />
                 </div>
                 <div className="mt-2 flex items-baseline justify-between gap-3">

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import type { StageId } from '../../shared/stages.mjs'
 import type { FunnelTrede } from '../lib/metrics'
+import { useHerkomst } from '../lib/herkomst'
 import StageBadge from './StageBadge'
 
 interface FunnelProps {
@@ -74,6 +75,7 @@ function TredeWrapper({
   leeg: boolean
   children: ReactNode
 }) {
+  const herkomst = useHerkomst()
   const klas = `tik -mx-1 flex w-full items-center gap-2 rounded-lg px-1 text-left ${
     aan ? 'ring-2 ring-oranje' : ''
   }`
@@ -85,7 +87,12 @@ function TredeWrapper({
 
   if (hrefVoor) {
     return (
-      <Link to={hrefVoor(stage)} className={klas} aria-label={`Toon kandidaten in ${stage}`}>
+      <Link
+        to={hrefVoor(stage)}
+        state={herkomst}
+        className={klas}
+        aria-label={`Toon kandidaten in ${stage}`}
+      >
         {children}
       </Link>
     )

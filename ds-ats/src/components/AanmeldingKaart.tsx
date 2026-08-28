@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import type { Regel } from '../lib/types'
 import { dagen } from '../lib/format'
+import { useHerkomst } from '../lib/herkomst'
 import StageBadge from './StageBadge'
 
 /** Boven de tien dagen krijgt de kaart een oranje rand. Dat is het signaal. */
@@ -19,8 +21,28 @@ interface Props {
 export default function AanmeldingKaart({ regel, toonStage = true, onStage }: Props) {
   const { aanmelding, kandidaat, vacature, opdrachtgever, dagenInStage, overschreden, standaardActie } =
     regel
+  const herkomst = useHerkomst()
   const opvallend = (dagenInStage ?? 0) > RANDGRENS_DAGEN
   const score = aanmelding['Score totaal']
+
+  /*
+    Een kaart zonder kandidaat linkte naar `/kandidaat/` en dus naar "Pagina
+    niet gevonden", terwijl er "Onbekende kandidaat" op stond. Zonder doel geen
+    link: dezelfde kaart, maar hij belooft niets meer.
+  */
+  const kop = (inhoud: ReactNode) =>
+    kandidaat ? (
+      <Link
+        to={`/kandidaat/${kandidaat.id}`}
+        state={herkomst}
+        className="min-w-0 flex-1"
+        aria-label={`Open ${kandidaat.Naam ?? 'kandidaat'}`}
+      >
+        {inhoud}
+      </Link>
+    ) : (
+      <div className="min-w-0 flex-1">{inhoud}</div>
+    )
 
   return (
     <article
@@ -29,26 +51,24 @@ export default function AanmeldingKaart({ regel, toonStage = true, onStage }: Pr
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <Link
-          to={`/kandidaat/${kandidaat?.id ?? ''}`}
-          className="min-w-0 flex-1"
-          aria-label={`Open ${kandidaat?.Naam ?? 'kandidaat'}`}
-        >
-          <p className="truncate font-semibold">{kandidaat?.Naam ?? 'Onbekende kandidaat'}</p>
-          <p className="truncate text-sm text-navy-400">
-            {[kandidaat?.['Huidige rol'], kandidaat?.['Huidige werkgever']].filter(Boolean).join(' · ') ||
-              'Rol onbekend'}
-          </p>
-          {/*
-            Waar de aanmelding bij hoort staat er altijd bij, ook in een lijst die
-            al op één vacature filtert: zonder die regel zijn honderd kaarten niet
-            uit elkaar te houden. De klantnaam hangt achter de vacaturetitel in
-            plaats van bovenaan te staan, want hij is context, geen kop.
-          */}
-          <p className="mt-0.5 truncate text-xs text-navy-400">
-            {[vacature?.Titel, opdrachtgever?.Naam].filter(Boolean).join(' · ') || 'Geen vacature'}
-          </p>
-        </Link>
+        {kop(
+          <>
+            <p className="truncate font-semibold">{kandidaat?.Naam ?? 'Onbekende kandidaat'}</p>
+            <p className="truncate text-sm text-navy-400">
+              {[kandidaat?.['Huidige rol'], kandidaat?.['Huidige werkgever']].filter(Boolean).join(' · ') ||
+                'Rol onbekend'}
+            </p>
+            {/*
+              Waar de aanmelding bij hoort staat er altijd bij, ook in een lijst die
+              al op één vacature filtert: zonder die regel zijn honderd kaarten niet
+              uit elkaar te houden. De klantnaam hangt achter de vacaturetitel in
+              plaats van bovenaan te staan, want hij is context, geen kop.
+            */}
+            <p className="mt-0.5 truncate text-xs text-navy-400">
+              {[vacature?.Titel, opdrachtgever?.Naam].filter(Boolean).join(' · ') || 'Geen vacature'}
+            </p>
+          </>,
+        )}
         {toonStage ? (
           <StageBadge stage={aanmelding.Stage} klein onClick={onStage} />
         ) : (

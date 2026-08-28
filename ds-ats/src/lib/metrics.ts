@@ -92,6 +92,18 @@ export function afvalRedenen(regels: Regel[]): Array<{ reden: string; aantal: nu
 }
 
 /**
+ * Onder welke bron een aanmelding wordt geteld. Eén functie, want het
+ * bronscherm telt ermee en het maandagoverzicht filtert ermee: zouden die twee
+ * uiteenlopen, dan klopt het getal op de bron niet meer met de lijst erachter.
+ */
+export function bronVan(regel: Regel): string {
+  return regel.kandidaat?.Bron ?? BRON_ONBEKEND
+}
+
+/** Kandidaten zonder ingevulde bron vallen hieronder, ook in de URL. */
+export const BRON_ONBEKEND = 'Onbekend'
+
+/**
  * Bron-effectiviteit: welk kanaal levert plaatsingen, niet alleen namen.
  * Fout nummer zeven uit het playbook.
  */
@@ -99,7 +111,7 @@ export function bronEffectiviteit(regels: Regel[]) {
   const perBron = new Map<string, { gescoord: number; voorgesteld: number; geplaatst: number }>()
 
   for (const regel of regels) {
-    const bron = regel.kandidaat?.Bron ?? 'Onbekend'
+    const bron = bronVan(regel)
     const rij = perBron.get(bron) ?? { gescoord: 0, voorgesteld: 0, geplaatst: 0 }
     rij.gescoord += 1
     const index = FUNNEL_STAGES.indexOf(regel.aanmelding.Stage as StageId)
