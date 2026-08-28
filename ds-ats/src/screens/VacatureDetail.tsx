@@ -11,8 +11,9 @@ import Funnel from '../components/Funnel'
 import StageBadge from '../components/StageBadge'
 import StageSheet from '../components/StageSheet'
 import Terug, { FilterTerug } from '../components/Terug'
-import VacatureFormulier from '../components/VacatureFormulier'
+import VacatureFormulier, { aantalLeeg as aantalLeegVacature } from '../components/VacatureFormulier'
 import type { Regel } from '../lib/types'
+import BewerkKnop from '../components/BewerkKnop'
 
 export default function VacatureDetail() {
   const { id } = useParams()
@@ -136,13 +137,11 @@ export default function VacatureDetail() {
 
       <div className="mt-4 flex items-baseline justify-between gap-3">
         <h2 className="font-semibold">Gegevens</h2>
-        <button
-          type="button"
+        <BewerkKnop
+          open={bewerken}
+          leeg={aantalLeegVacature(vacature)}
           onClick={() => setBewerken((aan) => !aan)}
-          className="tik text-sm text-navy-400 underline"
-        >
-          {bewerken ? 'Sluiten' : 'Bewerken'}
-        </button>
+        />
       </div>
 
       {bewerken ? (

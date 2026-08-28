@@ -54,6 +54,19 @@ const VELDEN: readonly Veld[] = [
 ]
 
 /**
+ * Hoeveel invulbare velden nog leeg zijn. Titel telt niet mee: die is verplicht
+ * en dus per definitie gevuld. Status evenmin, want die heeft altijd een waarde.
+ */
+export function aantalLeeg(vacature: Vacature): number {
+  return VELDEN.filter(
+    (veld) =>
+      veld.sleutel !== 'Titel' &&
+      veld.sleutel !== 'Status' &&
+      String(vacature[veld.sleutel] ?? '').trim() === '',
+  ).length
+}
+
+/**
  * Airtable geeft een datum soms met tijd terug ("2026-08-28T00:00:00.000Z").
  * Een `input type="date"` toont zo'n waarde helemaal niet, en dan lijkt het veld
  * leeg terwijl er een datum staat — vandaar de eerste tien tekens.

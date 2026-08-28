@@ -11,6 +11,7 @@ import Terug from '../components/Terug'
 import OpdrachtgeverFormulier from '../components/OpdrachtgeverFormulier'
 import ContactpersoonFormulier from '../components/ContactpersoonFormulier'
 import VacatureFormulier from '../components/VacatureFormulier'
+import BewerkKnop from '../components/BewerkKnop'
 
 /** Wat er open staat in de contactpersonenlijst: niets, het aanmaakformulier, of één id. */
 type ContactOpen = { soort: 'geen' } | { soort: 'nieuw' } | { soort: 'bewerk'; id: string }
@@ -57,13 +58,7 @@ export default function OpdrachtgeverDetail() {
 
       <div className="mt-1 flex items-start justify-between gap-3">
         <h1 className="min-w-0 text-2xl font-semibold">{opdrachtgever.Naam}</h1>
-        <button
-          type="button"
-          onClick={() => setBewerken((aan) => !aan)}
-          className="tik shrink-0 text-sm text-navy-400 underline"
-        >
-          {bewerken ? 'Sluiten' : 'Bewerken'}
-        </button>
+        <BewerkKnop open={bewerken} onClick={() => setBewerken((aan) => !aan)} />
       </div>
       <p className="text-sm text-navy-400">
         {opdrachtgever.Status ?? '—'} · {alle.length} aanmeldingen · {actief} actief
@@ -104,13 +99,10 @@ export default function OpdrachtgeverDetail() {
                   <p className="truncate font-semibold">{persoon.Naam ?? 'Naamloos'}</p>
                   <p className="truncate text-sm text-navy-400">{persoon.Rol || '—'}</p>
                 </div>
-                <button
-                  type="button"
+                <BewerkKnop
+                  open={false}
                   onClick={() => setContactOpen({ soort: 'bewerk', id: persoon.id })}
-                  className="tik shrink-0 text-sm text-navy-400 underline"
-                >
-                  Bewerken
-                </button>
+                />
               </div>
 
               {/* Dit is de persoon die beslist; dat hoort op de kaart te staan en

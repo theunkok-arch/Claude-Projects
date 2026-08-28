@@ -9,6 +9,7 @@ import StageSheet from '../components/StageSheet'
 import KandidaatFormulier, { aantalLeeg } from '../components/KandidaatFormulier'
 import AanmeldingFormulier, { aantalLeeg as aantalLeegAanmelding } from '../components/AanmeldingFormulier'
 import type { Regel } from '../lib/types'
+import BewerkKnop from '../components/BewerkKnop'
 
 const ACTIVITEIT_TYPES = ['InMail', 'Reminder', 'Telefoon', 'Teams', 'E-mail', 'Notitie']
 
@@ -96,13 +97,7 @@ export default function KandidaatDetail() {
 
       <div className="mt-4 flex items-baseline justify-between gap-3">
         <h2 className="font-semibold">Gegevens</h2>
-        <button
-          type="button"
-          onClick={() => setBewerken((aan) => !aan)}
-          className="tik text-sm text-navy-400 underline"
-        >
-          {bewerken ? 'Sluiten' : leeg > 0 ? `${leeg} leeg · aanvullen` : 'Bewerken'}
-        </button>
+        <BewerkKnop open={bewerken} leeg={leeg} onClick={() => setBewerken((aan) => !aan)} />
       </div>
 
       {bewerken ? (
@@ -201,17 +196,11 @@ export default function KandidaatDetail() {
                     {dagen(regel.dagenInStage)} in stage
                     {aanmelding['Reden afvallen'] ? ` · ${aanmelding['Reden afvallen']}` : ''}
                   </p>
-                  <button
-                    type="button"
+                  <BewerkKnop
+                    open={open}
+                    leeg={leegOpAanmelding}
                     onClick={() => setBewerkteAanmelding(open ? null : aanmelding.id)}
-                    className="tik shrink-0 text-sm text-navy-400 underline"
-                  >
-                    {open
-                      ? 'Sluiten'
-                      : leegOpAanmelding > 0
-                        ? `${leegOpAanmelding} leeg · aanvullen`
-                        : 'Bewerken'}
-                  </button>
+                  />
                 </div>
 
                 {open ? (
