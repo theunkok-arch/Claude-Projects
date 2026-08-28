@@ -15,7 +15,7 @@ opdracht. Dat lost de dubbelingen in de acht RA-lijsten definitief op.
 | Fase | Onderdeel | Status |
 |---|---|---|
 | 1 | Airtable-base, keuzelijsten, formules, validaties | ✅ live |
-| 1 | Importscript met statusvertaling en dedupe | ✅ klaar, nog niet gedraaid |
+| 1 | Importscript met statusvertaling en dedupe | ✅ gedraaid op 28-08-2026 |
 | 1 | AVG: bewaartermijn, verwijderfunctie, privacyverklaring | ✅ |
 | 2 | Maandagoverzicht, vacatures, vacature-detail, kandidaat-detail | ✅ |
 | 2 | Stagewijziging vanaf mobiel (twee taps) | ✅ |
@@ -107,6 +107,8 @@ Vite + React 19 + TypeScript + Tailwind v4. Ontworpen op 375px.
 | `/` | Maandagoverzicht — per stage de actieve kandidaten, dagen in stage, volgende actie |
 | `/vacatures` | Alle vacatures met funnel en aantallen |
 | `/vacature/:id` | Funnel, reden-analyse, kandidatenlijst met snelle stagewijziging |
+| `/opdrachtgevers` | Klantenlijst met wat er per klant loopt |
+| `/opdrachtgever/:id` | Eén klant: zijn vacatures, elk met eigen funnel |
 | `/kandidaat/:id` | Gegevens, alle aanmeldingen, historie, contact loggen, AVG-verwijderen |
 | `/bronnen` | Bron-effectiviteit: van gescoord naar voorgesteld naar geplaatst |
 | `/rapport/:token` | Klantrapport, geen login |
@@ -121,7 +123,14 @@ Interactieregels uit de spec die in code zitten:
 - raakvlakken minimaal 44px (`tik`-utility), sticky filterbalk, geen
   hover-afhankelijke interactie;
 - kaarten met meer dan tien dagen in stage krijgen een oranje rand, en wie de
-  servicenorm van zijn eigen stage overschrijdt krijgt daarnaast oranje tekst.
+  servicenorm van zijn eigen stage overschrijdt krijgt daarnaast oranje tekst;
+- **de funnel is klikbaar**: tik op "Benaderd 71" en je krijgt die 71
+  kandidaten. Vanuit een overzicht is elke trede een link naar
+  `/vacature/:id?stage=Benaderd`, op de vacature zelf zet hij het filter. De
+  stage staat in de URL, dus zo'n weergave is deelbaar en de terugknop werkt;
+- **filteren kan op elke stage**, niet alleen op "over de norm". Het
+  maandagoverzicht filtert binnen de actieve stages, de vacature ook op
+  Afgevallen. De aantallen in het filter volgen de vacaturekeuze.
 
 Huisstijl: navy `#1A1A2E`, oranje `#E8722A`, cream `#FCF5EE`, Poppins.
 Stage-badges volgen 7. Shortlist stond niet in de kleurenlijst; die kreeg oranje
@@ -192,9 +201,16 @@ netlify dev               # frontend plus functions op één poort
 ## Airtable-limiet
 
 Het gratis plan stopt bij 1.000 records per base. Geteld op de echte
-CSV-export: Brand Manager 272 rijen en RA Officer 159 rijen, en elke rij kost
-drie records (`Kandidaten`, `Aanmeldingen`, `Stagelog`). Dat is **1.297 records**
-voor die twee lijsten samen, 297 meer dan het gratis plan toestaat.
+CSV-export: Brand Manager 272 rijen en RA Officer 159 rijen. Zou elke rij drie
+records kosten (`Kandidaten`, `Aanmeldingen`, `Stagelog`), dan was dat 1.297 —
+bijna 300 te veel.
 
-Regel het Team-plan vóór de import. Formulation Technologist komt daar nog
-bovenop.
+**De import van 28-08-2026 laat de Stagelog daarom leeg.** Die 431 regels
+zouden allemaal "import → X" met de datum van vandaag bevatten en dus niets
+toevoegen aan doorlooptijd of conversie; de eerste échte stagewijziging vult
+hem alsnog. Eindstand: 431 kandidaten + 431 aanmeldingen + 1 opdrachtgever +
+3 vacatures = **866 van de 1.000**.
+
+Wat er nog bij moet, past dus niet zomaar. Formulation Technologist, de
+tweede ronde met score-onderbouwing (dat zijn velden, geen records) en het
+moment dat Stagelog wél gaat vollopen: regel vóór dat alles het Team-plan.

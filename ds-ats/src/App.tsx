@@ -5,6 +5,8 @@ import LoginGate from './components/LoginGate'
 import Maandag from './screens/Maandag'
 import Vacatures from './screens/Vacatures'
 import VacatureDetail from './screens/VacatureDetail'
+import Opdrachtgevers from './screens/Opdrachtgevers'
+import OpdrachtgeverDetail from './screens/OpdrachtgeverDetail'
 import KandidaatDetail from './screens/KandidaatDetail'
 import Bronnen from './screens/Bronnen'
 import Rapport from './screens/Rapport'
@@ -49,6 +51,8 @@ function InterneApp() {
         <Route path="/" element={<Maandag />} />
         <Route path="/vacatures" element={<Vacatures />} />
         <Route path="/vacature/:id" element={<VacatureDetail />} />
+        <Route path="/opdrachtgevers" element={<Opdrachtgevers />} />
+        <Route path="/opdrachtgever/:id" element={<OpdrachtgeverDetail />} />
         <Route path="/kandidaat/:id" element={<KandidaatDetail />} />
         <Route path="/bronnen" element={<Bronnen />} />
         <Route path="*" element={<p className="text-navy-400">Pagina niet gevonden.</p>} />

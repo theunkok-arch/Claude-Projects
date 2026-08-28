@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useAts } from '../store/AtsProvider'
-import { actieveRegels, groepeerPerStage, opUrgentie } from '../lib/metrics'
+import { aantalPerStage, actieveRegels, groepeerPerStage, opUrgentie } from '../lib/metrics'
+import { FUNNEL_STAGES } from '../../shared/stages.mjs'
+import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import StageBadge from '../components/StageBadge'
+import StageFilter from '../components/StageFilter'
 import StageSheet from '../components/StageSheet'
 import type { Regel } from '../lib/types'
 
@@ -14,19 +17,42 @@ import type { Regel } from '../lib/types'
 export default function Maandag() {
   const { regels, data, wijzigStage } = useAts()
   const [vacatureFilter, setVacatureFilter] = useState('alle')
+  const [stageFilter, setStageFilter] = useState<string>('alle')
   const [alleen, setAlleen] = useState(false)
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
 
+  /** Alles wat op dit scherm hoort: actief, en binnen de gekozen vacature. */
+  const inScope = useMemo(() => {
+    const actief = actieveRegels(regels)
+    return vacatureFilter === 'alle'
+      ? actief
+      : actief.filter((r) => r.vacature?.id === vacatureFilter)
+  }, [regels, vacatureFilter])
+
+  // De aantallen in het stagefilter volgen de vacaturekeuze, niet andersom.
+  // Stages zonder kandidaten laten we weg: een leeg filter is een dood spoor.
+  const stageOpties = useMemo(() => {
+    const perStage = aantalPerStage(inScope)
+    return [
+      { waarde: 'alle', label: 'Alle stages', aantal: inScope.length },
+      ...(FUNNEL_STAGES as StageId[])
+        .filter((stage) => (perStage.get(stage) ?? 0) > 0)
+        .map((stage) => ({ waarde: stage, label: stage, aantal: perStage.get(stage) ?? 0 })),
+    ]
+  }, [inScope])
+
   const zichtbaar = useMemo(() => {
-    let selectie = actieveRegels(regels)
-    if (vacatureFilter !== 'alle') selectie = selectie.filter((r) => r.vacature?.id === vacatureFilter)
+    let selectie = inScope
+    if (stageFilter !== 'alle') selectie = selectie.filter((r) => r.aanmelding.Stage === stageFilter)
     if (alleen) selectie = selectie.filter((r) => r.overschreden)
     return selectie
-  }, [regels, vacatureFilter, alleen])
+  }, [inScope, stageFilter, alleen])
 
   const groepen = useMemo(() => groepeerPerStage(zichtbaar), [zichtbaar])
   const teLang = useMemo(() => actieveRegels(regels).filter((r) => r.overschreden), [regels])
   const actieveVacatures = (data?.vacatures ?? []).filter((v) => v.Status === 'Actief' || v.Status === 'Intake')
+
+  const gefilterd = vacatureFilter !== 'alle' || stageFilter !== 'alle' || alleen
 
   return (
     <div>
@@ -40,6 +66,7 @@ export default function Maandag() {
           <select
             value={vacatureFilter}
             onChange={(event) => setVacatureFilter(event.target.value)}
+            aria-label="Filter op vacature"
             className="tik min-w-0 flex-1 rounded-xl border border-lijn bg-white px-3 text-sm"
           >
             <option value="alle">Alle vacatures</option>
@@ -58,6 +85,22 @@ export default function Maandag() {
           >
             Over de norm
           </button>
+        </div>
+        <div className="mt-2 flex gap-2">
+          <StageFilter waarde={stageFilter} onKies={setStageFilter} opties={stageOpties} />
+          {gefilterd && (
+            <button
+              type="button"
+              onClick={() => {
+                setVacatureFilter('alle')
+                setStageFilter('alle')
+                setAlleen(false)
+              }}
+              className="tik shrink-0 rounded-xl border border-lijn bg-white px-3 text-sm text-navy-400"
+            >
+              Wis
+            </button>
+          )}
         </div>
       </div>
 

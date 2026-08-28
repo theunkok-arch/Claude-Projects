@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
-import { afvalRedenen, funnel, opUrgentie } from '../lib/metrics'
+import { aantalPerStage, afvalRedenen, funnel, opUrgentie } from '../lib/metrics'
 import { band, datum } from '../lib/format'
-import { FUNNEL_STAGES } from '../../shared/stages.mjs'
+import { FUNNEL_STAGES, STAGE_IDS } from '../../shared/stages.mjs'
+import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import Funnel from '../components/Funnel'
+import StageFilter from '../components/StageFilter'
 import StageSheet from '../components/StageSheet'
 import type { Regel } from '../lib/types'
 
@@ -13,22 +15,48 @@ export default function VacatureDetail() {
   const { id } = useParams()
   const { data, regels, wijzigStage } = useAts()
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
-  const [toonAfgevallen, setToonAfgevallen] = useState(false)
+
+  // De stagekeuze staat in de URL, zodat een aangeklikte funnel-trede een
+  // deelbare link is en de terugknop van de browser gewoon werkt.
+  const [zoek, setZoek] = useSearchParams()
+  const stageFilter = zoek.get('stage') ?? 'lopend'
+  const kiesStage = (keuze: string) => {
+    const volgende = new URLSearchParams(zoek)
+    if (keuze === 'lopend') volgende.delete('stage')
+    else volgende.set('stage', keuze)
+    setZoek(volgende, { replace: true })
+  }
 
   const vacature = data?.vacatures.find((v) => v.id === id)
   const eigen = useMemo(() => regels.filter((r) => r.vacature?.id === id), [regels, id])
 
+  const stageOpties = useMemo(() => {
+    const perStage = aantalPerStage(eigen)
+    const lopend = eigen.filter((r) => r.aanmelding.Stage !== 'Afgevallen').length
+    return [
+      { waarde: 'lopend', label: 'Lopend', aantal: lopend },
+      { waarde: 'alles', label: 'Alles', aantal: eigen.length },
+      ...(STAGE_IDS as StageId[])
+        .filter((stage) => (perStage.get(stage) ?? 0) > 0)
+        .map((stage) => ({ waarde: stage, label: stage, aantal: perStage.get(stage) ?? 0 })),
+    ]
+  }, [eigen])
+
   const lijst = useMemo(() => {
-    const selectie = toonAfgevallen
-      ? eigen.filter((r) => r.aanmelding.Stage === 'Afgevallen')
-      : eigen.filter((r) => r.aanmelding.Stage !== 'Afgevallen')
+    const selectie =
+      stageFilter === 'lopend'
+        ? eigen.filter((r) => r.aanmelding.Stage !== 'Afgevallen')
+        : stageFilter === 'alles'
+          ? eigen
+          : eigen.filter((r) => r.aanmelding.Stage === stageFilter)
+
     return [...selectie].sort((a, b) => {
       const verschil =
         FUNNEL_STAGES.indexOf(b.aanmelding.Stage as never) -
         FUNNEL_STAGES.indexOf(a.aanmelding.Stage as never)
       return verschil !== 0 ? verschil : opUrgentie(a, b)
     })
-  }, [eigen, toonAfgevallen])
+  }, [eigen, stageFilter])
 
   if (!data) return null
   if (!vacature) return <p className="text-navy-400">Deze vacature bestaat niet (meer).</p>
@@ -42,7 +70,13 @@ export default function VacatureDetail() {
         ← Vacatures
       </Link>
       <h1 className="mt-1 text-2xl font-semibold">{vacature.Titel}</h1>
-      <p className="text-sm text-navy-400">{opdrachtgever?.Naam ?? 'Geen opdrachtgever'}</p>
+      {opdrachtgever ? (
+        <Link to={`/opdrachtgever/${opdrachtgever.id}`} className="text-sm text-navy-400 underline">
+          {opdrachtgever.Naam}
+        </Link>
+      ) : (
+        <p className="text-sm text-navy-400">Geen opdrachtgever</p>
+      )}
 
       {vacature.Validatie && (
         <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{vacature.Validatie}</p>
@@ -63,8 +97,14 @@ export default function VacatureDetail() {
 
       <section className="mt-5 rounded-2xl border border-lijn bg-cream p-4">
         <h2 className="mb-3 font-semibold">Funnel</h2>
-        <Funnel tredes={funnel(eigen)} />
-        <p className="mt-2 text-xs text-navy-400">nu in deze stage / ooit tot hier gekomen</p>
+        <Funnel
+          tredes={funnel(eigen)}
+          onKies={kiesStage}
+          actief={(STAGE_IDS as string[]).includes(stageFilter) ? (stageFilter as StageId) : null}
+        />
+        <p className="mt-2 text-xs text-navy-400">
+          nu in deze stage / ooit tot hier gekomen — tik een trede voor die kandidaten
+        </p>
       </section>
 
       {redenen.length > 0 && (
@@ -81,15 +121,9 @@ export default function VacatureDetail() {
         </section>
       )}
 
-      <div className="mt-6 flex items-center justify-between">
-        <h2 className="font-semibold">Kandidaten ({lijst.length})</h2>
-        <button
-          type="button"
-          onClick={() => setToonAfgevallen((huidig) => !huidig)}
-          className="tik rounded-xl border border-lijn bg-white px-3 text-sm"
-        >
-          {toonAfgevallen ? 'Toon lopend' : 'Toon afgevallen'}
-        </button>
+      <div className="mt-6 flex items-center justify-between gap-2">
+        <h2 className="shrink-0 font-semibold">Kandidaten ({lijst.length})</h2>
+        <StageFilter waarde={stageFilter} onKies={kiesStage} opties={stageOpties} />
       </div>
 
       <div className="mt-2 flex flex-col gap-2">

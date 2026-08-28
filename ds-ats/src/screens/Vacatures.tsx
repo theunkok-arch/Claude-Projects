@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { funnel } from '../lib/metrics'
 import { band, datum } from '../lib/format'
+import type { StageId } from '../../shared/stages.mjs'
 import Funnel from '../components/Funnel'
 
 export default function Vacatures() {
@@ -18,19 +19,30 @@ export default function Vacatures() {
         {data.vacatures.map((vacature) => {
           const eigen = regels.filter((r) => r.vacature?.id === vacature.id)
           const teLang = eigen.filter((r) => r.overschreden).length
+          const opdrachtgever = opdrachtgevers.get(vacature.Opdrachtgever?.[0] ?? '')
 
+          // Geen omhullende link meer: de funnel-tredes zijn zelf links, en een
+          // link in een link is ongeldige HTML.
           return (
-            <Link
+            <section
               key={vacature.id}
-              to={`/vacature/${vacature.id}`}
               className="rounded-2xl border border-lijn bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">{vacature.Titel}</p>
-                  <p className="truncate text-sm text-navy-400">
-                    {opdrachtgevers.get(vacature.Opdrachtgever?.[0] ?? '')?.Naam ?? 'Geen opdrachtgever'}
-                  </p>
+                  <Link to={`/vacature/${vacature.id}`} className="block truncate font-semibold underline">
+                    {vacature.Titel}
+                  </Link>
+                  {opdrachtgever ? (
+                    <Link
+                      to={`/opdrachtgever/${opdrachtgever.id}`}
+                      className="block truncate text-sm text-navy-400 underline"
+                    >
+                      {opdrachtgever.Naam}
+                    </Link>
+                  ) : (
+                    <p className="truncate text-sm text-navy-400">Geen opdrachtgever</p>
+                  )}
                 </div>
                 <span className="shrink-0 rounded-full bg-cream px-2.5 py-1 text-xs font-medium">
                   {vacature.Status ?? '—'}
@@ -53,9 +65,12 @@ export default function Vacatures() {
               </dl>
 
               <div className="mt-3 border-t border-lijn pt-3">
-                <Funnel tredes={funnel(eigen)} />
+                <Funnel
+                  tredes={funnel(eigen)}
+                  hrefVoor={(stage: StageId) => `/vacature/${vacature.id}?stage=${encodeURIComponent(stage)}`}
+                />
               </div>
-            </Link>
+            </section>
           )
         })}
 
