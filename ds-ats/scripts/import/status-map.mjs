@@ -36,10 +36,20 @@ export const STATUS_MAP = {
   'te benaderen': { stage: 'Gescoord' },
   'nog niet benaderd': { stage: 'Gescoord' },
 
-  'te contacten': { stage: 'Shortlist' },
-  warm: { stage: 'Shortlist' },
-  twijfel: { stage: 'Shortlist' },
-  'wacht op akkoord': { stage: 'Shortlist' },
+  // Vier statussen die alle vier vóór de outreach zitten. Ze stonden op
+  // Shortlist, en dat is de trede waarop je iemand aan de klant voordraagt —
+  // vier trappen verderop. De Normec-lijst had er vier op Twijfel staan, de
+  // vier laagste scores van de lijst; die kwamen naast de 80-scoorders in de
+  // kolom "voordragen" terecht. Gescoord is de juiste plek: de servicenorm
+  // vraagt daar binnen vijf dagen "benaderen of afvoeren", en dat is precies
+  // de beslissing die nog openstaat.
+  'te contacten': { stage: 'Gescoord' },
+  warm: { stage: 'Gescoord' },
+  twijfel: { stage: 'Gescoord' },
+  // Wacht op akkoord hoort bij een concurrent-kandidaat: gescoord, nog niet
+  // benaderd, wachtend op Dominique's go. Het vinkje Concurrent draagt de
+  // reden, de stage draagt de stand van zaken.
+  'wacht op akkoord': { stage: 'Gescoord' },
 
   inmail: { stage: 'Benaderd' },
   'bericht gestuurd': { stage: 'Benaderd' },
