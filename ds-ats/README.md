@@ -338,10 +338,17 @@ Twee dingen die daarin vastliggen:
   raadbaar token. De server genereert hem bij het aanmaken: 32 hex-tekens uit de
   systeem-CSPRNG, ruim boven de 24 die `rapport.mjs` minimaal eist. Hij staat
   niet in de veld-whitelist, dus meesturen heeft geen effect.
-- **Een vacature mag pas op Actief met een salarisband.** De base bewaakt dat al
-  via `Validatie`, maar die weigert stil: je vacature blijft dan op Intake staan
-  terwijl er kandidaten op lopen. Dat is met de eerste drie vacatures gebeurd.
-  De server zegt het nu hardop.
+- **Een vacature mag pas op Actief met een salarisband.** Let op waar die regel
+  wél en niet leeft. Het veld `Validatie` in de base is een formule, en formules
+  berekenen een waarde: ze weigeren geen invoer. De base laat een vacature dus
+  gewoon op Actief zetten en zet er "Salarisbandbreedte ontbreekt" naast, in een
+  kolom waar niemand kijkt. De enige echte handhaving staat in `ats.mjs`, via
+  `bewaakSalarisband`, en die geldt zowel bij aanmaken als bij bewerken.
+
+  Bij een wijziging stuurt de app alleen de gewijzigde velden. Wie alleen de
+  status omzet, stuurt geen salarisvelden mee, dus haalt `wijzigVacature` eerst
+  het bestaande record op en toetst de regel op de samengevoegde waarden. Zonder
+  die stap zou een vacature met een band al jaren geleden geweigerd worden.
 
 `Validatie` en de rollups zijn formules en staan daarom in geen enkele
 whitelist.

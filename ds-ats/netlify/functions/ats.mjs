@@ -162,8 +162,7 @@ export default async (req) => {
       case 'PATCH vacature': {
         const id = segments[1]
         if (!id) throw new HttpError(400, 'Vacature-id ontbreekt.')
-        const record = await updateRecord(TABLES.vacatures, id, pick(await req.json(), VACATURE_VELDEN))
-        return json(200, { vacature: record })
+        return json(200, { vacature: await wijzigVacature(id, await req.json()) })
       }
 
       case 'POST contactpersoon':
@@ -208,6 +207,36 @@ async function bootstrap() {
     activiteiten: activiteiten.map(plat),
     contactpersonen: contactpersonen.map(plat),
   }
+}
+
+/**
+ * Een vacature mag pas op Actief met een salarisbandbreedte.
+ *
+ * Dit is de enige plek waar die regel echt wordt afgedwongen. Het veld
+ * `Validatie` in de base is een formule, en formules berekenen een waarde:
+ * ze weigeren geen invoer. Wie erop vertrouwt dat "de base het wel tegenhoudt"
+ * krijgt een vacature op Actief met de tekst "Salarisbandbreedte ontbreekt" in
+ * een kolom waar niemand kijkt.
+ */
+function bewaakSalarisband(effectief) {
+  if (effectief.Status !== 'Actief') return
+  if (effectief['Salaris min'] == null || effectief['Salaris max'] == null) {
+    throw new HttpError(400, 'Een vacature mag pas op Actief met een salarisband.')
+  }
+}
+
+/**
+ * Bij een wijziging stuurt de app alleen wat er veranderd is. Wie alleen de
+ * status op Actief zet, stuurt dus geen salarisvelden mee — en een controle op
+ * dat ene veld zou die vacature weigeren terwijl de band er al jaren in staat.
+ * Daarom eerst het bestaande record ophalen en de regel op de samengevoegde
+ * waarden toepassen.
+ */
+async function wijzigVacature(id, body) {
+  const fields = pick(body, VACATURE_VELDEN)
+  const huidig = await getRecord(TABLES.vacatures, id)
+  bewaakSalarisband({ ...huidig.fields, ...fields })
+  return updateRecord(TABLES.vacatures, id, fields)
 }
 
 const plat = (record) => ({ id: record.id, ...record.fields })
@@ -388,12 +417,7 @@ async function maakVacature(body) {
   const fields = pick(body, VACATURE_VELDEN)
   if (!fields.Titel) throw new HttpError(400, 'Titel is verplicht.')
 
-  // De base weigert Actief zonder salarisband. Dat hier ook zeggen scheelt een
-  // vacature die stilzwijgend op Intake blijft staan terwijl er al kandidaten
-  // op lopen — precies wat er met de eerste drie vacatures is gebeurd.
-  if (fields.Status === 'Actief' && (fields['Salaris min'] == null || fields['Salaris max'] == null)) {
-    throw new HttpError(400, 'Een vacature mag pas op Actief met een salarisband.')
-  }
+  bewaakSalarisband(fields)
 
   const [record] = await createRecords(TABLES.vacatures, [
     { fields: { ...fields, Opdrachtgever: [opdrachtgeverId] } },

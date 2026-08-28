@@ -143,10 +143,10 @@ export default function VacatureFormulier({
       return
     }
 
-    // De base weigert Actief zonder salarisband, en de server geeft daar een 400
-    // op. Dat hier al zeggen scheelt een mislukte opslag waarvan de oorzaak twee
-    // velden hoger staat. De server blijft wél de tweede verdediging: dit
-    // formulier kent alleen wat er op dit moment op het scherm staat.
+    // Dit hier zeggen scheelt een mislukte opslag waarvan de oorzaak twee velden
+    // hoger staat. De server controleert het ook, en dat is geen dubbelop: het
+    // veld Validatie in de base is een formule, en formules berekenen een
+    // waarde in plaats van invoer te weigeren. De base houdt dus niets tegen.
     if (bandOntbreekt) {
       setFout(
         'Een vacature mag pas op Actief met een salarisbandbreedte. Vul Salaris min en Salaris max in, of laat de status voorlopig op Intake staan.',
