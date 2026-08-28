@@ -66,21 +66,66 @@ Beide leveren byte-identieke inhoud; dat is nagerekend.
 
 ## Gebruik
 
-```bash
-cd ds-ats
-export AIRTABLE_BASE_ID=appSAz5sjFyPm4e0g
-export AIRTABLE_API_KEY=pat_xxx
+### Windows (CMD)
 
-# droog
+In CMD bestaat `export` niet en `~` ook niet. Gebruik `set`, en zet elk
+commando op één regel.
+
+```bat
+:: eenmalig: repo ophalen (of `git pull origin main` als je hem al hebt)
+cd /d "%USERPROFILE%\Documents"
+git clone https://github.com/theunkok-arch/Claude-Projects.git
+cd Claude-Projects\ds-ats
+npm install
+
+:: per sessie: variabelen zetten
+set AIRTABLE_BASE_ID=appSAz5sjFyPm4e0g
+set AIRTABLE_API_KEY=pat_jouw_sleutel_hier
+
+:: droge run, alles op één regel
+node scripts/import/import.mjs --bestand "C:\pad\naar\lijst.csv" --vacature "Brand Manager" --opdrachtgever "Royal Sanders" --in-gesprek Gesproken
+
+:: echt wegschrijven: zet --echt er achter
+```
+
+Staat er een spatie in het pad, zet het dan tussen aanhalingstekens. Dat geldt
+ook voor `"Brand Manager"` en `"Royal Sanders"`.
+
+### Windows (PowerShell)
+
+```powershell
+cd "$env:USERPROFILE\Documents\Claude-Projects\ds-ats"
+$env:AIRTABLE_BASE_ID = "appSAz5sjFyPm4e0g"
+$env:AIRTABLE_API_KEY = "pat_jouw_sleutel_hier"
+node scripts/import/import.mjs --bestand "C:\pad\naar\lijst.csv" --vacature "Brand Manager" --opdrachtgever "Royal Sanders" --in-gesprek Gesproken
+```
+
+### macOS en Linux
+
+```bash
+cd ~/claude-projects/ds-ats
+npm install
+
+export AIRTABLE_BASE_ID=appSAz5sjFyPm4e0g
+export AIRTABLE_API_KEY=pat_jouw_sleutel_hier
+
 node scripts/import/import.mjs \
-  --bestand ~/lijsten/brand-manager.xlsx \
+  --bestand ~/Downloads/lijst.csv \
   --vacature "Brand Manager" \
   --opdrachtgever "Royal Sanders" \
-  --bron "LinkedIn Sales Navigator"
-
-# echt
-node scripts/import/import.mjs ... --echt
+  --in-gesprek Gesproken
 ```
+
+### Werkt het niet?
+
+| Melding | Wat er aan de hand is |
+|---|---|
+| `'export' is not recognized` | Je zit in CMD. Gebruik `set NAAM=waarde`. |
+| `'node' is not recognized` | Node.js staat er niet op. Installeer de LTS van nodejs.org en open een nieuwe terminal. |
+| `The system cannot find the path specified` | Het pad klopt niet, of er staat een spatie in zonder aanhalingstekens. |
+| `Zet AIRTABLE_BASE_ID en AIRTABLE_API_KEY in de omgeving.` | De variabelen zijn leeg. In CMD gelden ze alleen in hetzelfde venster waarin je `set` hebt gedaan. |
+| `Opdrachtgever "..." staat niet in de base` | Naam moet exact matchen: `Royal Sanders`. |
+| `403 Host not in allowlist` | Alleen binnen de Claude-omgeving; op je eigen machine krijg je dit niet. |
 
 | Optie | Betekenis |
 |---|---|
