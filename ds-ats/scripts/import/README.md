@@ -196,3 +196,137 @@ limiet aanlopen laat de base in een halve staat achter.
 
 Wil je toch eerst klein beginnen: importeer alleen de RA-lijst (477 records,
 past wel), en doe Brand Manager na de upgrade.
+
+---
+
+# Bijwerken vanuit de Drive (`sync.mjs`)
+
+De import hierboven vult een lege base. Daarna verandert de waarheid op twee
+plekken tegelijk: Dominique werkt in de app, en zij werkt in de kandidatensheets
+in de Drive. `sync.mjs` legt een sheet naast de base en laat het verschil zien.
+
+```bash
+node scripts/import/sync.mjs plan \
+  --sheet ~/Downloads/090826_kandidaten_shortlist_compleet.csv \
+  --vacature "Brand Manager" \
+  --huidig huidig.json \
+  --bestand-id 1AbC… --bestand-naam "090826_kandidaten_shortlist_compleet" \
+  --gewijzigd 2026-08-27T09:12:00Z
+
+node scripts/import/sync.mjs kandidaten 1   --bevestigd-door "Dominique"
+node scripts/import/sync.mjs aanmeldingen 1 --bevestigd-door "Dominique"
+node scripts/import/sync.mjs wijzigingen 1  --bevestigd-door "Dominique"
+```
+
+`huidig.json` is een uitdraai van de base (Airtable-koppeling, of een export):
+
+```json
+{ "kandidaten":   [{ "id": "rec…", "Naam": "…", "LinkedIn-URL": "…", "Woonplaats": "…" }],
+  "aanmeldingen": [{ "id": "rec…", "kandidaatId": "rec…", "vacature": "Brand Manager",
+                     "Stage": "Benaderd", "Reden afvallen": null }] }
+```
+
+## Vooruit wel, terug niet
+
+Dat is de hele regel. Een sheet mag iemand verder in de trechter zetten, nooit
+terug. Staat de app op Gesproken en het blad nog op Benaderd, dan is de app bij
+en het blad achter — dan zou toepassen werk weggooien dat iemand met de hand
+heeft gedaan. Drie categorieën worden daarom **gemeld en niet toegepast**:
+
+| Gemeld als | Wanneer |
+|---|---|
+| Blad wijst terug in de trechter | `Voorgesteld` in de base, `Benaderd` in het blad |
+| Blad haalt een afvaller terug | `Afgevallen` in de base, actief in het blad |
+| Afgevallen zonder geldige reden | de server weigert dat toch, dus dat gebeurt hier al |
+| Blad staat op "In gesprek", base is verder | die status dekt zowel Gereageerd als Gesproken |
+
+Die laatste verdient uitleg. Bij de import moest er over `In gesprek` een knoop
+worden doorgehakt (`--in-gesprek`), want er was verder niets. Bij een sync staat
+er wél iets: een stage die iemand heeft gezet. Een gok laten winnen van een
+beslissing is precies verkeerd om, dus zulke rijen wijzigen niets meer aan een
+bestaande aanmelding. Voor kandidaten die nieuw zijn geldt `--in-gesprek` nog
+gewoon.
+
+Ook gemeld, maar zonder actie: wie wél in de base staat en niet meer in het
+blad. Dat is bijna altijd een blad dat is opgesplitst, geen verdwenen kandidaat,
+dus `sync.mjs` verwijdert nooit iets.
+
+## Welk bestand? `--bevestigd-door` is geen formaliteit
+
+De mappen op de Drive zijn geen archief maar een werkplek, en dat is te zien:
+
+- de mapindeling is niet uniform. Royal Sanders heeft een submap per vacature
+  (`BrandManager`, `RegulatoryAffairs_Agent_Search_Match`,
+  `FormTechRD_Agent_Search_Match`, `Account_Assistente_Sales`), Normec heeft er
+  één (`SNA inspecteur`), en bij Verhaeg staat de sheet los in de klantmap;
+- de namen zijn niet uniform: `090826_kandidaten_shortlist_compleet`,
+  `090726_kandidaten_batch1-4`, `090726 kandidaten batch1`, `kandidaten`,
+  `kandidaten 1707`, `Royal_Sanders_RA_Officer_kandidatenlijst_batch7`,
+  `warm-gesprek-kandidaten`;
+- er staan afleiders tussen: `_OLD`, `_DONTUSE`, `Kopie van …`;
+- **de lijst die deze base gevuld heeft staat niet in de klantmap.**
+  `Royal_Sanders_RA_Officer_kandidatenlijst_samengevoegd` staat in de hoofdmap
+  van de Drive. Een script dat "het nieuwste bestand in de vacaturemap" pakt,
+  had juist die gemist.
+
+Daarom kiest niets hier automatisch. `plan` legt vast wélk bestand is gelezen —
+id, naam en `modifiedTime` — en `kandidaten`, `aanmeldingen` en `wijzigingen`
+weigeren te draaien zonder `--bevestigd-door`. Die naam en de bestandsgegevens
+komen als commentaarregel boven elke batch mee te staan, zodat over een maand
+nog te zien is waar een stand vandaan komt.
+
+De werkwijze is dus: zoek de kandidaten voor deze vacature, laat Dominique
+aanwijzen welke de actuele is, en draai daar `plan` op.
+
+## Andere opdrachtgevers, andere kolommen
+
+Niet elke klant gebruikt hetzelfde blad. Royal Sanders schrijft
+`Totaal (100)` en `Bron-URL`, Verhaeg schrijft `Score (totaal)`, `LinkedIn URL`
+en `Instagram/facebook account`. `bouwKolomIndex` doet daarom twee passes:
+eerst exact, dan nog eens met de toelichting tussen haakjes weggelaten. Zo wint
+`Totaal (100)` nog steeds van `Score core (60)`, en valt `Score (totaal)` niet
+stilzwijgend weg.
+
+Kijk het regeltje **genegeerde kolommen** in het rapport altijd na. Dat is de
+plek waar een kolom die je wél wilde meenemen zichtbaar wordt.
+
+
+## Drie kolomindelingen in de Drive
+
+`ds-framework/config/kandidaten-schema.json` schrijft één indeling voor. De
+sheets in de Drive volgen die nog niet allemaal. Op 28-08-2026 aangetroffen:
+
+| Bron | Kolommen |
+|---|---|
+| Royal Sanders BM + RA (samengevoegd) | `Naam, Bron-URL, Bron, Huidige rol, Werkgever, Tenure, Locatie + reisafstand, Signaal/observatie, Concurrent, Score core (60), Score custom (40), Totaal (100), Onderbouwing, Outreach-concept, Status, Reden afvallen, Opmerkingen` |
+| `kandidaten 1707` (RA-map) | `ID, Naam, LinkedIn URL, E-mail, Telefoon, Huidig bedrijf, Huidige functie, Sector, Regio/Woonplaats, Reistijd Vlijmen (min), Achtergrond legal (J/N), …, Score TOTAAL, Status (lead/warm/gesprek/afgewezen), Bron, Datum gevonden, Notities recruiter` |
+| Verhaeg | `Naam, LinkedIn URL, Instagram/facebook account, Website, Telefoonnummer, Huidige functie, Huidige werkgever, Locatie, Ervaring (jaren), Röntgendiploma (j/n), Regio (j/n), Contactdatum, Kanaal, Status, Score (totaal), Notities` |
+
+De eerste volgt het framework-schema. De andere twee niet, en het verschil is
+niet cosmetisch: `Huidig bedrijf` en `Regio/Woonplaats` worden niet herkend, en
+`Status (lead/warm/gesprek/afgewezen)` bevat waarden als `Actief` en
+`Open to Work` die geen pipelinestatus zijn.
+
+Zolang dat zo is, is "de laatste sheet" niet automatisch bruikbaar. Kijk het
+regeltje **genegeerde kolommen** en de melding **onbekende statussen** in het
+rapport altijd na.
+
+## Welk bestand: `kies-bestand.mjs`
+
+```bash
+node scripts/import/kies-bestand.mjs < maplisting.json
+```
+
+Neemt een maplisting (de ruwe uitvoer van een Drive-listing op `parentId`) en
+geeft de meest recent bewerkte sheet terug, met `_OLD`, `DONTUSE`, `Kopie van`
+en `backup` eruit en met een waarschuwing als de nummer twee binnen een uur van
+de winnaar is bewerkt.
+
+**Neem een maplisting, geen naamzoekopdracht.** Drive's
+`title contains 'kandidaten'` vindt
+`Royal_Sanders_RA_Officer_kandidatenlijst_samengevoegd` niet — underscores
+breken de tokenisatie — en dat is uitgerekend het bestand waarmee deze base is
+gevuld. Een zoekopdracht op naam mist dus bestanden zonder dat je het merkt.
+
+Daarna telt de maplisting alleen als het bestand er ook in staat. Op dit moment
+levert dat voor de RA-vacature het verkeerde bestand op; zie de tabel hierboven.

@@ -15,7 +15,7 @@ opdracht. Dat lost de dubbelingen in de acht RA-lijsten definitief op.
 | Fase | Onderdeel | Status |
 |---|---|---|
 | 1 | Airtable-base, keuzelijsten, formules, validaties | ✅ live |
-| 1 | Importscript met statusvertaling en dedupe | ✅ klaar, nog niet gedraaid |
+| 1 | Importscript met statusvertaling en dedupe | ✅ gedraaid op 28-08-2026 |
 | 1 | AVG: bewaartermijn, verwijderfunctie, privacyverklaring | ✅ |
 | 2 | Maandagoverzicht, vacatures, vacature-detail, kandidaat-detail | ✅ |
 | 2 | Stagewijziging vanaf mobiel (twee taps) | ✅ |
@@ -104,9 +104,11 @@ Vite + React 19 + TypeScript + Tailwind v4. Ontworpen op 375px.
 
 | Route | Scherm |
 |---|---|
-| `/` | Maandagoverzicht — per stage de actieve kandidaten, dagen in stage, volgende actie |
+| `/` | Maandagoverzicht — de aantallen per stage, te filteren op klant en vacature; `?stage=` toont die kandidaten |
 | `/vacatures` | Alle vacatures met funnel en aantallen |
-| `/vacature/:id` | Funnel, reden-analyse, kandidatenlijst met snelle stagewijziging |
+| `/vacature/:id` | Funnel en reden-analyse; `?stage=` toont de kandidatenlijst |
+| `/opdrachtgevers` | Klantenlijst met wat er per klant loopt |
+| `/opdrachtgever/:id` | Eén klant: zijn vacatures, elk met eigen funnel |
 | `/kandidaat/:id` | Gegevens, alle aanmeldingen, historie, contact loggen, AVG-verwijderen |
 | `/bronnen` | Bron-effectiviteit: van gescoord naar voorgesteld naar geplaatst |
 | `/rapport/:token` | Klantrapport, geen login |
@@ -121,7 +123,20 @@ Interactieregels uit de spec die in code zitten:
 - raakvlakken minimaal 44px (`tik`-utility), sticky filterbalk, geen
   hover-afhankelijke interactie;
 - kaarten met meer dan tien dagen in stage krijgen een oranje rand, en wie de
-  servicenorm van zijn eigen stage overschrijdt krijgt daarnaast oranje tekst.
+  servicenorm van zijn eigen stage overschrijdt krijgt daarnaast oranje tekst;
+- **de funnel is klikbaar**: tik op "Benaderd 71" en je krijgt die 71
+  kandidaten. Vanuit een overzicht is elke trede een link naar
+  `/vacature/:id?stage=Benaderd`, op de vacature zelf zet hij het filter. De
+  stage staat in de URL, dus zo'n weergave is deelbaar en de terugknop werkt;
+- **filteren kan op elke stage**, niet alleen op "over de norm". Het
+  maandagoverzicht filtert binnen de actieve stages, de vacature ook op
+  Afgevallen. De aantallen volgen de vacaturekeuze;
+- **beginschermen tonen cijfers, geen namen.** Het maandagoverzicht en het
+  vacaturescherm openen op tellingen per stage; pas na doorklikken verschijnt de
+  lijst. Met 263 actieve aanmeldingen is een scherm dat direct in kaarten opent
+  onbruikbaar: je scrolt langs tweehonderd namen voordat je ziet waar het werk
+  zit. De keuze staat in de URL (`/?stage=Benaderd`), dus terugknop en delen
+  werken zoals verwacht.
 
 Huisstijl: navy `#1A1A2E`, oranje `#E8722A`, cream `#FCF5EE`, Poppins.
 Stage-badges volgen 7. Shortlist stond niet in de kleurenlijst; die kreeg oranje
@@ -192,9 +207,75 @@ netlify dev               # frontend plus functions op één poort
 ## Airtable-limiet
 
 Het gratis plan stopt bij 1.000 records per base. Geteld op de echte
-CSV-export: Brand Manager 272 rijen en RA Officer 159 rijen, en elke rij kost
-drie records (`Kandidaten`, `Aanmeldingen`, `Stagelog`). Dat is **1.297 records**
-voor die twee lijsten samen, 297 meer dan het gratis plan toestaat.
+CSV-export: Brand Manager 272 rijen en RA Officer 159 rijen. Zou elke rij drie
+records kosten (`Kandidaten`, `Aanmeldingen`, `Stagelog`), dan was dat 1.297 —
+bijna 300 te veel.
 
-Regel het Team-plan vóór de import. Formulation Technologist komt daar nog
-bovenop.
+**De import van 28-08-2026 laat de Stagelog daarom leeg.** Die 431 regels
+zouden allemaal "import → X" met de datum van vandaag bevatten en dus niets
+toevoegen aan doorlooptijd of conversie; de eerste échte stagewijziging vult
+hem alsnog. Eindstand: 431 kandidaten + 431 aanmeldingen + 1 opdrachtgever +
+3 vacatures = **866 van de 1.000**.
+
+Wat er nog bij moet, past dus niet zomaar. Formulation Technologist, de
+tweede ronde met score-onderbouwing (dat zijn velden, geen records) en het
+moment dat Stagelog wél gaat vollopen: regel vóór dat alles het Team-plan.
+
+---
+
+## Bijwerken vanuit de Drive
+
+De statussen worden ook buiten de app bijgehouden, in de kandidatensheets in
+de klantmappen op de Drive. `scripts/import/sync.mjs` legt zo'n sheet naast de
+base en laat het verschil zien: wie nieuw is, wiens stage is opgeschoven, en
+waar blad en base elkaar tegenspreken.
+
+Twee regels dragen dat:
+
+- **vooruit wel, terug niet.** Wat in de app al verder staat dan in het blad,
+  blijft staan. Zo'n verschil wordt gemeld, niet toegepast — anders gooi je weg
+  wat iemand met de hand heeft gezet;
+- **geen enkel bestand wordt automatisch gekozen.** De mappen op de Drive zijn
+  een werkplek: de namen lopen uiteen, er staan `_OLD`- en `Kopie van`-varianten
+  tussen, en de RA-lijst waarmee deze base gevuld is stond niet eens in de
+  klantmap. `sync.mjs` schrijft daarom geen batch weg zonder
+  `--bevestigd-door`, en legt id, naam en wijzigingsdatum van het gelezen
+  bestand vast bij het resultaat.
+
+### Eén kolomindeling
+
+Het schema ligt al vast, buiten deze repo: `ds-framework/config/kandidaten-schema.json`,
+versie 1.0 — zestien kolommen A t/m P, met een gesloten statuslijst en de regel
+*"EEN kandidaten.xlsx per vacature. Geen _v2/_v3 bestanden."* Dat bestand is de
+bron; dit project kopieert hem niet, het leest hem.
+
+De importer overbrugt twee verschillen die daaruit volgen:
+
+- **de statuslijst is korter dan de pipeline.** Het xlsx-schema stopt bij
+  `Voorgesteld` / `Afgewezen`; de ATS loopt door tot `Ingewerkt`. Alle tien
+  schemastatussen vertalen nu naar een stage uit `shared/stages.mjs`;
+- **`Score core (60)` en `Score custom (40)` komen niet mee**, alleen
+  `Totaal (100)`. Airtable heeft geen kolommen voor de 60/40-splitsing.
+
+Wat er in de Drive staat wijkt daar op dit moment nog van af — drie
+kolomindelingen naast elkaar, zie `scripts/import/README.md`.
+
+### De app is leidend voor kandidaatgegevens
+
+Op `/kandidaat/:id` staat een formulier waarmee ontbrekende gegevens zijn aan te
+vullen (naam, rol, werkgever, woonplaats, LinkedIn, e-mail, telefoon, Instagram,
+opleiding, talen, bron, notities). Lege velden zijn oranje, en de knop telt ze:
+"5 leeg · aanvullen".
+
+Wat daar wordt ingevuld blijft staan. `sync.mjs` maakt nieuwe kandidaten aan en
+verzet stages, maar raakt de velden van een bestaande kandidaat nooit aan — een
+sheet kan dus niet overschrijven wat iemand met de hand heeft gecorrigeerd. Het
+formulier stuurt bovendien alleen de gewijzigde velden mee, zodat twee mensen
+elkaars werk niet wissen.
+
+Drie velden staan er bewust niet in: `Bewaren tot` en `Bewaartermijn verstreken`
+zijn Airtable-formules, en `Laatste contact` wordt al door de activiteitenlogger
+gezet — twee bronnen voor die datum zou de AVG-bewaartermijn laten afhangen van
+wie het laatst iets aanraakte.
+
+`scripts/import/README.md` beschrijft de werkwijze.

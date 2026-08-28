@@ -128,12 +128,30 @@ function naarObjecten(matrix) {
     .filter((rij) => Object.values(rij).some((waarde) => String(waarde).trim().length > 0))
 }
 
-/** Koppelt de kolomkoppen van de sheet aan de velden van de base. */
+/**
+ * Koppelt de kolomkoppen van de sheet aan de velden van de base.
+ *
+ * Twee passes. Eerst exact, over alle kolommen: zo wint "Totaal (100)" van
+ * "Score core (60)" voor het scoreveld. Pas daarna wordt de toelichting tussen
+ * haakjes weggelaten, voor de velden die nog niets gevonden hebben. Dat is
+ * nodig omdat niet elke opdrachtgever dezelfde koppen gebruikt — de
+ * Verhaeg-lijst schrijft "Score (totaal)" waar Royal Sanders "Totaal (100)"
+ * schrijft. Zonder die tweede pass verdwijnt de score zonder foutmelding.
+ */
 export function bouwKolomIndex(rijen) {
   const koppen = Object.keys(rijen[0] ?? {})
   const index = {}
+  const zonderHaakjes = (kop) => normaliseer(kop).replace(/\s*\(.*?\)\s*/g, ' ').trim()
+
   for (const [veld, synoniemen] of Object.entries(KOLOM_SYNONIEMEN)) {
     const treffer = koppen.find((kop) => synoniemen.includes(normaliseer(kop)))
+    if (treffer) index[veld] = treffer
+  }
+  for (const [veld, synoniemen] of Object.entries(KOLOM_SYNONIEMEN)) {
+    if (index[veld]) continue
+    const treffer = koppen.find(
+      (kop) => !Object.values(index).includes(kop) && synoniemen.includes(zonderHaakjes(kop)),
+    )
     if (treffer) index[veld] = treffer
   }
   const genegeerd = koppen.filter((kop) => !Object.values(index).includes(kop))
@@ -159,6 +177,23 @@ export const dedupeSleutel = (kandidaat) => {
 }
 
 const WAAR = ['ja', 'x', 'waar', 'true', '1']
+/** Waarden die "geen concurrent" betekenen. Alles daarbuiten telt wél. */
+const GEEN_CONCURRENT = ['', '-', 'nee', 'n', 'geen', 'false', '0', 'nvt', 'n.v.t.']
+
+/**
+ * De concurrent-kolom is niet overal een vinkje. ds-framework schrijft
+ * `direct` / `adjacent` / `niche` voor (kandidaten-schema.json, kolom I), en
+ * die vielen tegen een ja/nee-lijst allemaal weg — stil, want een lege waarde
+ * ziet er niet uit als een fout. Airtable heeft er een vinkje van gemaakt, dus
+ * de nuance tussen direct en niche gaat alsnog verloren; het onderscheid
+ * concurrent/niet-concurrent blijft nu wel staan. Dat is het onderscheid dat
+ * de outreach-gate gebruikt.
+ */
+function isConcurrent(ruw) {
+  const tekst = normaliseer(ruw)
+  if (GEEN_CONCURRENT.includes(tekst)) return undefined
+  return WAAR.includes(tekst) || tekst.length > 0 || undefined
+}
 
 /**
  * Zet de ruwe rijen om in kandidaten en aanmeldingen. Schrijft niets; geeft
@@ -259,7 +294,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
           .filter(Boolean)
           .join('\n\n') || undefined,
         'Outreach-concept': waarde(rij, index, '__outreach'),
-        Concurrent: WAAR.includes(normaliseer(waarde(rij, index, '__concurrent'))) || undefined,
+        Concurrent: isConcurrent(waarde(rij, index, '__concurrent')),
       }),
     })
   }

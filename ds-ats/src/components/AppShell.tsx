@@ -2,10 +2,13 @@ import { NavLink, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAts } from '../store/AtsProvider'
 
+// `prefix` bepaalt wanneer de tab oplicht: de klantentab hoort ook actief te
+// zijn op /opdrachtgever/:id, en de vacaturetab op /vacature/:id.
 const TABS = [
-  { pad: '/', label: 'Maandag' },
-  { pad: '/vacatures', label: 'Vacatures' },
-  { pad: '/bronnen', label: 'Bronnen' },
+  { pad: '/', label: 'Maandag', prefix: '/' },
+  { pad: '/vacatures', label: 'Vacatures', prefix: '/vacature' },
+  { pad: '/opdrachtgevers', label: 'Klanten', prefix: '/opdrachtgever' },
+  { pad: '/bronnen', label: 'Bronnen', prefix: '/bronnen' },
 ]
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -39,7 +42,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-lijn bg-white pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-2xl">
           {TABS.map((tab) => {
-            const actief = tab.pad === '/' ? pathname === '/' : pathname.startsWith(tab.pad)
+            const actief = tab.prefix === '/' ? pathname === '/' : pathname.startsWith(tab.prefix)
             return (
               <NavLink
                 key={tab.pad}

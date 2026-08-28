@@ -33,6 +33,9 @@ export const STATUS_MAP = {
   'te verifieren': { stage: 'Gescoord' },
   nieuw: { stage: 'Gescoord' },
 
+  'te benaderen': { stage: 'Gescoord' },
+  'nog niet benaderd': { stage: 'Gescoord' },
+
   'te contacten': { stage: 'Shortlist' },
   warm: { stage: 'Shortlist' },
   twijfel: { stage: 'Shortlist' },
@@ -48,6 +51,9 @@ export const STATUS_MAP = {
   reminder: { stage: 'Opgevolgd' },
 
   reageert: { stage: 'Gereageerd' },
+  // ds-framework schrijft "Reactie"; zonder deze regel viel die terug op
+  // Gescoord en zette hij de kandidaat een halve trechter terug.
+  reactie: { stage: 'Gereageerd' },
 
   gesprek: { stage: 'Gesproken' },
   'gesprek/wachten': { stage: 'Gesproken' },
@@ -144,7 +150,7 @@ export const KOLOM_SYNONIEMEN = {
   'LinkedIn-URL': ['bron-url', 'linkedin', 'linkedin url', 'linkedin-url', 'profiel', 'profile url', 'url'],
   'E-mail': ['e-mail', 'email', 'mail', 'e-mailadres'],
   Telefoon: ['telefoon', 'telefoonnummer', 'tel', 'mobiel', 'phone'],
-  Instagram: ['instagram', 'insta', 'ig'],
+  Instagram: ['instagram', 'insta', 'ig', 'instagram/facebook account', 'instagram account'],
   Woonplaats: ['locatie + reisafstand', 'woonplaats', 'plaats', 'stad', 'locatie', 'location', 'city'],
   'Huidige rol': ['huidige rol', 'functie', 'titel', 'rol', 'huidige functie', 'title'],
   'Huidige werkgever': ['werkgever', 'huidige werkgever', 'bedrijf', 'company', 'organisatie'],
@@ -153,14 +159,14 @@ export const KOLOM_SYNONIEMEN = {
   Bron: ['bron', 'source', 'kanaal'],
   __status: ['status', 'stage', 'fase', 'voortgang'],
   __reden: ['reden afvallen', 'reden', 'afvalreden', 'reden van afvallen'],
-  __score: ['totaal (100)', 'totaal', 'score', 'totaalscore', 'score totaal', 'match'],
+  __score: ['totaal (100)', 'totaal', 'score', 'totaalscore', 'score totaal', 'score (totaal)', 'match'],
   __onderbouwing: ['onderbouwing', 'score-onderbouwing', 'toelichting', 'motivatie'],
   __opmerkingen: ['opmerkingen', 'notities', 'notes', 'commentaar'],
   __signaal: ['signaal/observatie', 'signaal', 'observatie'],
   __reistijd: ['reistijd', 'reisafstand', 'reistijd minuten'],
   __concurrent: ['concurrent', 'concurrentie'],
   __outreach: ['outreach-concept', 'outreach', 'inmail concept', 'bericht'],
-  __datum: ['datum', 'laatste contact', 'laatst benaderd', 'datum benaderd'],
+  __datum: ['datum', 'laatste contact', 'laatst benaderd', 'datum benaderd', 'contactdatum'],
 }
 
 /**

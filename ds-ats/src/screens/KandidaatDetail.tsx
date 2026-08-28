@@ -4,6 +4,7 @@ import { useAts } from '../store/AtsProvider'
 import { datum, dagen } from '../lib/format'
 import StageBadge from '../components/StageBadge'
 import StageSheet from '../components/StageSheet'
+import KandidaatFormulier, { aantalLeeg } from '../components/KandidaatFormulier'
 import type { Regel } from '../lib/types'
 
 const ACTIVITEIT_TYPES = ['InMail', 'Reminder', 'Telefoon', 'Teams', 'E-mail', 'Notitie']
@@ -11,13 +12,14 @@ const ACTIVITEIT_TYPES = ['InMail', 'Reminder', 'Telefoon', 'Teams', 'E-mail', '
 export default function KandidaatDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { data, regels, wijzigStage, logActiviteit, verwijderKandidaat } = useAts()
+  const { data, regels, wijzigStage, wijzigKandidaat, logActiviteit, verwijderKandidaat } = useAts()
 
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
   const [type, setType] = useState(ACTIVITEIT_TYPES[0])
   const [samenvatting, setSamenvatting] = useState('')
   const [bezig, setBezig] = useState(false)
   const [bevestigWissen, setBevestigWissen] = useState(false)
+  const [bewerken, setBewerken] = useState(false)
 
   const kandidaat = data?.kandidaten.find((k) => k.id === id)
   const eigen = useMemo(() => regels.filter((r) => r.kandidaat?.id === id), [regels, id])
@@ -32,6 +34,13 @@ export default function KandidaatDetail() {
 
   if (!data) return null
   if (!kandidaat) return <p className="text-navy-400">Deze kandidaat bestaat niet (meer).</p>
+
+  const leeg = aantalLeeg(kandidaat)
+  // De keuzelijst voor Bron komt uit wat er al in de base staat. Zo kan het
+  // formulier geen nieuwe keuze-optie aanmaken die niemand heeft afgesproken.
+  const bronnen = [
+    ...new Set((data?.kandidaten ?? []).map((k) => k.Bron).filter((b): b is string => Boolean(b))),
+  ]
 
   async function verstuurActiviteit(event: React.FormEvent) {
     event.preventDefault()
@@ -67,7 +76,26 @@ export default function KandidaatDetail() {
         {[kandidaat['Huidige rol'], kandidaat['Huidige werkgever']].filter(Boolean).join(' · ') || '—'}
       </p>
 
-      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-2xl border border-lijn bg-white p-4 text-sm">
+      <div className="mt-4 flex items-baseline justify-between gap-3">
+        <h2 className="font-semibold">Gegevens</h2>
+        <button
+          type="button"
+          onClick={() => setBewerken((aan) => !aan)}
+          className="tik text-sm text-navy-400 underline"
+        >
+          {bewerken ? 'Sluiten' : leeg > 0 ? `${leeg} leeg · aanvullen` : 'Bewerken'}
+        </button>
+      </div>
+
+      {bewerken ? (
+        <KandidaatFormulier
+          kandidaat={kandidaat}
+          bronnen={bronnen}
+          onBewaar={(velden) => wijzigKandidaat(kandidaat.id, velden)}
+          onSluit={() => setBewerken(false)}
+        />
+      ) : (
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-2xl border border-lijn bg-white p-4 text-sm">
         <dt className="text-navy-400">Woonplaats</dt>
         <dd className="text-right">{kandidaat.Woonplaats ?? '—'}</dd>
         <dt className="text-navy-400">Opleiding</dt>
@@ -81,6 +109,7 @@ export default function KandidaatDetail() {
         <dt className="text-navy-400">Bewaren tot</dt>
         <dd className="text-right">{datum(kandidaat['Bewaren tot'])}</dd>
       </dl>
+      )}
 
       <div className="mt-3 flex flex-wrap gap-2">
         {kandidaat['LinkedIn-URL'] && (
