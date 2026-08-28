@@ -23,18 +23,44 @@ export async function leesRijen(pad, tabnaam) {
   if (!werkboek.Sheets[blad]) {
     throw new Error(`Tab "${blad}" bestaat niet. Beschikbaar: ${werkboek.SheetNames.join(', ')}`)
   }
-  return utils.sheet_to_json(werkboek.Sheets[blad], { defval: '', raw: false })
+  const matrix = utils.sheet_to_json(werkboek.Sheets[blad], { header: 1, defval: '', raw: false })
+  return naarObjecten(matrix)
 }
 
 export function leesCsv(tekst) {
   const regels = tekst.split(/\r?\n/).filter((regel) => regel.trim().length > 0)
   if (regels.length === 0) return []
-  const scheider = regels[0].includes(';') ? ';' : ','
-  const koppen = splitsCsvRegel(regels[0], scheider)
-  return regels.slice(1).map((regel) => {
-    const cellen = splitsCsvRegel(regel, scheider)
-    return Object.fromEntries(koppen.map((kop, i) => [kop, cellen[i] ?? '']))
-  })
+  const scheider = tel(regels[0], ';') > tel(regels[0], ',') ? ';' : ','
+  return naarObjecten(regels.map((regel) => splitsCsvRegel(regel, scheider)))
+}
+
+const tel = (tekst, teken) => tekst.split(teken).length - 1
+
+/**
+ * De kopregel staat niet altijd bovenaan. Beide master-sheets beginnen met een
+ * titelregel en een toelichting op de scoring; pas daaronder staan de kolomnamen.
+ * Zoek dus de eerste rij die een naamkolom bevat in plaats van rij 1 aan te nemen.
+ */
+function naarObjecten(matrix) {
+  if (matrix.length === 0) return []
+
+  const isKop = (rij) =>
+    rij.some((cel) => KOLOM_SYNONIEMEN.Naam.includes(normaliseer(cel))) &&
+    rij.filter((cel) => String(cel ?? '').trim().length > 0).length >= 3
+
+  const kopIndex = matrix.findIndex(isKop)
+  if (kopIndex === -1) {
+    throw new Error(
+      'Geen kopregel gevonden: geen enkele rij bevat een kolom Naam. Controleer of je het juiste tabblad exporteert.',
+    )
+  }
+
+  const koppen = matrix[kopIndex].map((cel) => String(cel ?? '').trim())
+  return matrix
+    .slice(kopIndex + 1)
+    .map((rij) => Object.fromEntries(koppen.map((kop, i) => [kop, rij[i] ?? ''])))
+    // Lege regels en losse toelichtingen onderaan het blad horen er niet bij.
+    .filter((rij) => Object.values(rij).some((waarde) => String(waarde).trim().length > 0))
 }
 
 function splitsCsvRegel(regel, scheider) {
