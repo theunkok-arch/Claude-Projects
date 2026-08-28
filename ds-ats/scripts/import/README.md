@@ -358,3 +358,44 @@ gevuld. Een zoekopdracht op naam mist dus bestanden zonder dat je het merkt.
 
 Daarna telt de maplisting alleen als het bestand er ook in staat. Op dit moment
 levert dat voor de RA-vacature het verkeerde bestand op; zie de tabel hierboven.
+
+## Een nieuwe opdrachtgever toevoegen
+
+De scripts hierboven vullen kandidaten en aanmeldingen. Ze maken geen
+opdrachtgever en geen vacature aan: die twee moeten er eerst zijn, want de
+aanmeldingen hangen eraan. Sinds de app dat zelf kan (`OpdrachtgeverFormulier`,
+`VacatureFormulier`) is dat geen scriptwerk meer — maar de volgorde blijft.
+
+Op 28-08-2026 zo gedaan voor Verhaeg en Normec VRO:
+
+1. **Opdrachtgever en vacature eerst.** Zonder salarisbandbreedte weigert de base
+   `Actief`; beide zijn daarom op `Intake` gezet. Dat is geen tijdelijke
+   noodgreep maar de juiste stand: een vacature zonder afgesproken band ís nog
+   niet actief.
+2. **Botsingen tellen vóór het schrijven.** Nul naamsbotsingen tegen de
+   bestaande kandidaten, nul dubbelen binnen de nieuwe lijsten zelf. Doe dit als
+   losse stap; na het schrijven is een dubbele kandidaat veel duurder om te
+   herstellen dan om te voorkomen.
+3. **Kandidaten vóór aanmeldingen**, in batches van vijftig. `typecast: true`
+   lost de koppeling op naam op — maar verzint ook een kandidaat als de naam net
+   niet matcht. Tel daarom na afloop: het aantal kandidaten hoort exact met het
+   aantal nieuwe rijen te zijn gegroeid, niet meer.
+4. **Controleer achteraf** op vier dingen: geen dubbele dedupe-sleutels, elke
+   aanmelding gekoppeld aan zowel een kandidaat als een vacature, geen dubbele
+   kandidaat-vacaturecombinaties, en de stageverdeling gelijk aan het plan.
+
+### De sheet is niet altijd de waarheid
+
+Bij Normec stond de kandidatenlijst op `Shortlist` voor iedereen, terwijl er in
+de `Outreach-log`-tab van hetzelfde bestand veertien InMails stonden, verstuurd
+op 2026-08-26, met follow-ups op 2026-09-02. Het klakkeloos overnemen van de
+kandidatentab had de ATS verteld dat er niemand benaderd was — met een reëel
+risico op een tweede InMail aan veertien mensen rond hun follow-updatum.
+
+Lees daarom altijd de andere tabbladen voordat je schrijft. `Outreach-log` is de
+betrouwbaarste bron voor wie er benaderd is en wanneer; de statuskolom op de
+kandidatentab loopt daarop achter zodra iemand vergeet hem bij te werken.
+
+Dit is ook de reden dat `Datum status` als kolom in het framework-schema hoort:
+zolang die er niet is, staat na elke import iedereen op de importdatum en zegt
+"dagen in stage" niets.
