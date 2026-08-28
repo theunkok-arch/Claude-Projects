@@ -1,7 +1,9 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { useHerkomst } from '../lib/herkomst'
 import { isActief } from '../../shared/stages.mjs'
+import OpdrachtgeverFormulier from '../components/OpdrachtgeverFormulier'
 
 /**
  * De klantenlijst. Eén regel per opdrachtgever met wat er voor hem loopt,
@@ -9,13 +11,38 @@ import { isActief } from '../../shared/stages.mjs'
  * vanuit een losse vacature.
  */
 export default function Opdrachtgevers() {
-  const { data, regels } = useAts()
+  const { data, regels, maakOpdrachtgever } = useAts()
   const herkomst = useHerkomst()
+  const navigate = useNavigate()
+  const [nieuw, setNieuw] = useState(false)
   if (!data) return null
 
   return (
     <div>
       <h1 className="text-2xl font-semibold">Opdrachtgevers</h1>
+
+      <div className="mt-3">
+        {nieuw ? (
+          <OpdrachtgeverFormulier
+            onBewaar={async (velden) => {
+              const gemaakt = await maakOpdrachtgever(velden)
+              // Meteen door naar zijn detailscherm. Een lege klantenlijst met
+              // een naam erin helpt niemand: het eerstvolgende werk is er een
+              // vacature of contactpersoon onder hangen, en dat kan alleen daar.
+              navigate(`/opdrachtgever/${gemaakt.id}`, { state: herkomst })
+            }}
+            onSluit={() => setNieuw(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setNieuw(true)}
+            className="tik w-full rounded-xl border border-lijn bg-white px-4 text-sm font-medium"
+          >
+            + Nieuwe opdrachtgever
+          </button>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-col gap-3">
         {data.opdrachtgevers.map((opdrachtgever) => {

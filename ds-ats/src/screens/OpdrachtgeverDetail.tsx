@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { funnel } from '../lib/metrics'
@@ -8,15 +8,30 @@ import { isActief } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import Funnel from '../components/Funnel'
 import Terug from '../components/Terug'
+import OpdrachtgeverFormulier from '../components/OpdrachtgeverFormulier'
+import ContactpersoonFormulier from '../components/ContactpersoonFormulier'
+import VacatureFormulier from '../components/VacatureFormulier'
+
+/** Wat er open staat in de contactpersonenlijst: niets, het aanmaakformulier, of één id. */
+type ContactOpen = { soort: 'geen' } | { soort: 'nieuw' } | { soort: 'bewerk'; id: string }
 
 /**
- * Scherm per opdrachtgever: zijn vacatures, elk met de eigen funnel. Elke trede
- * linkt door naar de kandidatenlijst van die vacature, gefilterd op die stage.
+ * Scherm per opdrachtgever: zijn contactpersonen en zijn vacatures, elk met de
+ * eigen funnel. Elke trede linkt door naar de kandidatenlijst van die vacature,
+ * gefilterd op die stage.
+ *
+ * Dit is ook de plek waar een klant wordt onderhouden. Alles wat je vlak na het
+ * aanmaken wil doen — wie is de hiring manager, welke vacature loopt er — hangt
+ * hieronder, dus staan die knoppen hier en niet op de klantenlijst.
  */
 export default function OpdrachtgeverDetail() {
   const { id } = useParams()
   const herkomst = useHerkomst()
-  const { data, regels } = useAts()
+  const { data, regels, wijzigOpdrachtgever, maakContactpersoon, wijzigContactpersoon, maakVacature } =
+    useAts()
+  const [bewerken, setBewerken] = useState(false)
+  const [contactOpen, setContactOpen] = useState<ContactOpen>({ soort: 'geen' })
+  const [nieuweVacature, setNieuweVacature] = useState(false)
 
   const opdrachtgever = data?.opdrachtgevers.find((o) => o.id === id)
   const vacatures = useMemo(
@@ -39,32 +54,141 @@ export default function OpdrachtgeverDetail() {
   return (
     <div>
       <Terug naar="/opdrachtgevers" label="Opdrachtgevers" />
-      <h1 className="mt-1 text-2xl font-semibold">{opdrachtgever.Naam}</h1>
+
+      <div className="mt-1 flex items-start justify-between gap-3">
+        <h1 className="min-w-0 text-2xl font-semibold">{opdrachtgever.Naam}</h1>
+        <button
+          type="button"
+          onClick={() => setBewerken((aan) => !aan)}
+          className="tik shrink-0 text-sm text-navy-400 underline"
+        >
+          {bewerken ? 'Sluiten' : 'Bewerken'}
+        </button>
+      </div>
       <p className="text-sm text-navy-400">
         {opdrachtgever.Status ?? '—'} · {alle.length} aanmeldingen · {actief} actief
         {teLang > 0 && <span className="font-medium text-oranje"> · {teLang} over de norm</span>}
       </p>
 
-      {contactpersonen.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-lijn bg-white p-4">
-          <h2 className="mb-2 font-semibold">Contact</h2>
-          <ul className="flex flex-col gap-1 text-sm">
-            {contactpersonen.map((persoon) => (
-              <li key={persoon.id} className="flex justify-between gap-3">
-                <span className="min-w-0 truncate">
-                  {persoon.Naam}
-                  {persoon['Is hiring manager'] && <span className="text-navy-400"> · hiring manager</span>}
-                </span>
-                <span className="shrink-0 text-navy-400">{persoon.Rol ?? ''}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {bewerken && (
+        <div className="mt-3">
+          <OpdrachtgeverFormulier
+            opdrachtgever={opdrachtgever}
+            onBewaar={(velden) => wijzigOpdrachtgever(opdrachtgever.id, velden)}
+            onSluit={() => setBewerken(false)}
+          />
+        </div>
       )}
+
+      {!bewerken && opdrachtgever.Notities && (
+        <p className="mt-3 rounded-2xl border border-lijn bg-white p-4 text-sm whitespace-pre-wrap">
+          {opdrachtgever.Notities}
+        </p>
+      )}
+
+      <h2 className="mt-6 font-semibold">Contactpersonen ({contactpersonen.length})</h2>
+
+      <div className="mt-2 flex flex-col gap-3">
+        {contactpersonen.map((persoon) =>
+          contactOpen.soort === 'bewerk' && contactOpen.id === persoon.id ? (
+            <ContactpersoonFormulier
+              key={persoon.id}
+              contactpersoon={persoon}
+              onBewaar={(velden) => wijzigContactpersoon(persoon.id, velden)}
+              onSluit={() => setContactOpen({ soort: 'geen' })}
+            />
+          ) : (
+            <section key={persoon.id} className="rounded-2xl border border-lijn bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{persoon.Naam ?? 'Naamloos'}</p>
+                  <p className="truncate text-sm text-navy-400">{persoon.Rol || '—'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setContactOpen({ soort: 'bewerk', id: persoon.id })}
+                  className="tik shrink-0 text-sm text-navy-400 underline"
+                >
+                  Bewerken
+                </button>
+              </div>
+
+              {/* Dit is de persoon die beslist; dat hoort op de kaart te staan en
+                  niet alleen in het formulier. */}
+              {persoon['Is hiring manager'] && (
+                <p className="mt-2 inline-block rounded-full bg-oranje-100 px-2.5 py-1 text-xs font-medium">
+                  Hiring manager
+                </p>
+              )}
+
+              {/* Mailen en bellen zijn één tik. `tik` alleen is niet genoeg op een
+                  <a>: min-height doet niets op een inline element, dus inline-flex. */}
+              {(persoon['E-mail'] || persoon.Telefoon) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {persoon['E-mail'] && (
+                    <a
+                      href={`mailto:${persoon['E-mail']}`}
+                      className="tik inline-flex items-center rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
+                    >
+                      Mail
+                    </a>
+                  )}
+                  {persoon.Telefoon && (
+                    <a
+                      href={`tel:${persoon.Telefoon}`}
+                      className="tik inline-flex items-center rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
+                    >
+                      Bellen
+                    </a>
+                  )}
+                </div>
+              )}
+            </section>
+          ),
+        )}
+
+        {contactpersonen.length === 0 && (
+          <p className="text-sm text-navy-400">Nog geen contactpersoon bij deze opdrachtgever.</p>
+        )}
+
+        {contactOpen.soort === 'nieuw' ? (
+          <ContactpersoonFormulier
+            onBewaar={async (velden) => {
+              await maakContactpersoon(opdrachtgever.id, velden)
+            }}
+            onSluit={() => setContactOpen({ soort: 'geen' })}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setContactOpen({ soort: 'nieuw' })}
+            className="tik w-full rounded-xl border border-lijn bg-white px-4 text-sm font-medium"
+          >
+            + Contactpersoon toevoegen
+          </button>
+        )}
+      </div>
 
       <h2 className="mt-6 font-semibold">Vacatures ({vacatures.length})</h2>
 
       <div className="mt-2 flex flex-col gap-3">
+        {nieuweVacature ? (
+          <VacatureFormulier
+            onBewaar={async (velden) => {
+              await maakVacature(opdrachtgever.id, velden)
+            }}
+            onSluit={() => setNieuweVacature(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setNieuweVacature(true)}
+            className="tik w-full rounded-xl border border-lijn bg-white px-4 text-sm font-medium"
+          >
+            + Nieuwe vacature
+          </button>
+        )}
+
         {vacatures.map((vacature) => {
           const eigen = regels.filter((r) => r.vacature?.id === vacature.id)
           const eigenTeLang = eigen.filter((r) => r.overschreden).length
@@ -112,7 +236,7 @@ export default function OpdrachtgeverDetail() {
         })}
 
         {vacatures.length === 0 && (
-          <p className="mt-4 text-navy-400">Deze opdrachtgever heeft nog geen vacatures.</p>
+          <p className="text-sm text-navy-400">Deze opdrachtgever heeft nog geen vacatures.</p>
         )}
       </div>
     </div>
