@@ -27,33 +27,14 @@ import { fileURLToPath } from 'node:url'
 import { bouwPlan, dedupeSleutel, leesRijen } from './lees.mjs'
 import { normaliseer } from './status-map.mjs'
 import { FUNNEL_STAGES } from '../../shared/stages.mjs'
+import { KANDIDAAT_VELDEN, AANMELDING_VELDEN, LINK_KANDIDAAT, LINK_VACATURE } from './velden.mjs'
 
 const HIER = dirname(fileURLToPath(import.meta.url))
 const WERKMAP = join(HIER, '.batches')
 const SYNC = join(WERKMAP, 'sync.json')
 const PER_BATCH = 50
 
-/** Veld-id's van de ATS-base appSAz5sjFyPm4e0g. Gelijk aan mcp-batches.mjs. */
-const KANDIDAAT_VELDEN = {
-  Naam: 'fldQIFur9mv4iEW3o',
-  'LinkedIn-URL': 'fldyIJfhaSHN73NvY',
-  Woonplaats: 'fldEnhEWMNzMMsEMK',
-  'Huidige rol': 'fldghxszbfwFZT3vL',
-  'Huidige werkgever': 'fldAO15vFPzDf9QGU',
-  Bron: 'fldhw1ZEIgH6pzNU1',
-}
-const AANMELDING_VELDEN = {
-  Aanmelding: 'fldrokgT9ocqlxIMM',
-  Stage: 'fldxhOfwK0xJuLmvJ',
-  'Reden afvallen': 'fldoppqbtmIYs9QOR',
-  Eigenaar: 'fldWjFTYVtdMThlBs',
-  'Datum in huidige stage': 'fld3r0aWsAVVFHPql',
-  'Datum aangemaakt': 'fldH0XlZaSPJOFGug',
-  'Score totaal': 'fldA5l5QCqwcxqXU8',
-  Concurrent: 'fldBrXKLqvGelxUDl',
-}
-const LINK_KANDIDAAT = 'fldEdzzoV2QZ0B1hC'
-const LINK_VACATURE = 'fldrGEsSZZrZPmJCL'
+// Veld-id's: zie velden.mjs. Bewust niet hier herhaald.
 
 /**
  * Positie in de trechter. Afgevallen staat er bewust buiten: dat is geen

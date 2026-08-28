@@ -19,6 +19,7 @@ import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { bouwPlan, leesRijen } from './lees.mjs'
 import { normaliseer } from './status-map.mjs'
+import { KANDIDAAT_VELDEN, AANMELDING_VELDEN, LINK_KANDIDAAT, LINK_VACATURE } from './velden.mjs'
 
 const HIER = dirname(fileURLToPath(import.meta.url))
 const WERKMAP = join(HIER, '.batches')
@@ -26,33 +27,7 @@ const PLAN = join(WERKMAP, 'plan.json')
 const BESTAAND = join(WERKMAP, 'bestaand.txt')
 const PER_BATCH = 50
 
-/** Veld-id's van de ATS-base appSAz5sjFyPm4e0g. */
-const KANDIDAAT_VELDEN = {
-  Naam: 'fldQIFur9mv4iEW3o',
-  'LinkedIn-URL': 'fldyIJfhaSHN73NvY',
-  Woonplaats: 'fldEnhEWMNzMMsEMK',
-  'Huidige rol': 'fldghxszbfwFZT3vL',
-  'Huidige werkgever': 'fldAO15vFPzDf9QGU',
-  Bron: 'fldhw1ZEIgH6pzNU1',
-}
-
-/**
- * Kernvelden van een aanmelding: genoeg om elk scherm in de app te vullen.
- * De lange teksten blijven eruit; die maken een batch vier keer zo groot en
- * zijn niet nodig voor funnels, stages of dagen in stage.
- */
-const AANMELDING_VELDEN = {
-  Aanmelding: 'fldrokgT9ocqlxIMM',
-  Stage: 'fldxhOfwK0xJuLmvJ',
-  'Reden afvallen': 'fldoppqbtmIYs9QOR',
-  Eigenaar: 'fldWjFTYVtdMThlBs',
-  'Datum in huidige stage': 'fld3r0aWsAVVFHPql',
-  'Datum aangemaakt': 'fldH0XlZaSPJOFGug',
-  'Score totaal': 'fldA5l5QCqwcxqXU8',
-  Concurrent: 'fldBrXKLqvGelxUDl',
-}
-const LINK_KANDIDAAT = 'fldEdzzoV2QZ0B1hC'
-const LINK_VACATURE = 'fldrGEsSZZrZPmJCL'
+// Veld-id's: zie velden.mjs. Bewust niet hier herhaald.
 
 const [commando, ...rest] = process.argv.slice(2)
 
