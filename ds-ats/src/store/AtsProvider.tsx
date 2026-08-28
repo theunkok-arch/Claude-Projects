@@ -35,6 +35,24 @@ interface AtsContext {
 
 const Context = createContext<AtsContext | null>(null)
 
+/**
+ * Airtable stuurt een leeggemaakt veld niet terug in het antwoord. Een kale
+ * merge over de bestaande gegevens laat zo'n veld daarom lokaal staan terwijl
+ * het in de base wél weg is: je blijft een score zien die niet meer bestaat,
+ * tot de volgende keer verversen.
+ *
+ * `geschreven` zegt welke velden deze aanroep heeft weggeschreven. Noemt het
+ * antwoord er daarvan één niet, dan is hij leeggemaakt en hoort hij ook lokaal
+ * weg. Zonder die lijst kunnen we leeg niet onderscheiden van onveranderd.
+ */
+function samenvoeg<T extends { id: string }>(oud: T, nieuw: Partial<T>, geschreven?: string[]): T {
+  const uit = { ...oud, ...nieuw, id: oud.id }
+  for (const sleutel of geschreven ?? []) {
+    if (!(sleutel in nieuw)) delete (uit as Record<string, unknown>)[sleutel]
+  }
+  return uit
+}
+
 export function AtsProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Bootstrap | null>(null)
   const [laden, setLaden] = useState(false)
@@ -105,16 +123,21 @@ export function AtsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /** Vervangt één aanmelding in de lokale state, zodat de lijst niet hoeft te herladen. */
-  const vervangAanmelding = useCallback((id: string, velden: Aanmelding) => {
-    setData((huidig) =>
-      huidig
-        ? {
-            ...huidig,
-            aanmeldingen: huidig.aanmeldingen.map((a) => (a.id === id ? { ...a, ...velden, id } : a)),
-          }
-        : huidig,
-    )
-  }, [])
+  const vervangAanmelding = useCallback(
+    (id: string, velden: Aanmelding, geschreven?: string[]) => {
+      setData((huidig) =>
+        huidig
+          ? {
+              ...huidig,
+              aanmeldingen: huidig.aanmeldingen.map((a) =>
+                a.id === id ? samenvoeg(a, velden, geschreven) : a,
+              ),
+            }
+          : huidig,
+      )
+    },
+    [],
+  )
 
   const voegActiviteitToe = useCallback((activiteit: Activiteit) => {
     setData((huidig) =>
@@ -126,7 +149,10 @@ export function AtsProvider({ children }: { children: ReactNode }) {
     (aanmeldingId, naarStage, opties) =>
       bewaakSessie(async () => {
         const res = await api.wijzigStage({ aanmeldingId, naarStage, ...opties })
-        vervangAanmelding(aanmeldingId, res.aanmelding.fields)
+        // De server zet zelf 'Reden afvallen' leeg buiten Afgevallen en
+        // 'Volgende actie' leeg bij Afgevallen; die twee moeten dus ook lokaal
+        // kunnen verdwijnen.
+        vervangAanmelding(aanmeldingId, res.aanmelding.fields, ['Reden afvallen', 'Volgende actie'])
         voegActiviteitToe(res.activiteit)
       }),
     [bewaakSessie, vervangAanmelding, voegActiviteitToe],
@@ -136,7 +162,7 @@ export function AtsProvider({ children }: { children: ReactNode }) {
     (id, velden) =>
       bewaakSessie(async () => {
         const res = await api.wijzigAanmelding(id, velden)
-        vervangAanmelding(id, res.aanmelding.fields)
+        vervangAanmelding(id, res.aanmelding.fields, Object.keys(velden))
       }),
     [bewaakSessie, vervangAanmelding],
   )
@@ -150,7 +176,7 @@ export function AtsProvider({ children }: { children: ReactNode }) {
             ? {
                 ...huidig,
                 kandidaten: huidig.kandidaten.map((k) =>
-                  k.id === id ? { ...k, ...res.kandidaat.fields, id } : k,
+                  k.id === id ? samenvoeg(k, res.kandidaat.fields, Object.keys(velden)) : k,
                 ),
               }
             : huidig,

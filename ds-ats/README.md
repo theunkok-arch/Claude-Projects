@@ -122,7 +122,10 @@ Interactieregels uit de spec die in code zitten:
   390px is daar geen ruimte om te typen én treffers te tonen. Zonder dit was
   een kandidaat alleen te vinden als je al wist in welke stage ze stond;
 - kandidaatkaarten, geen brede tabellen;
-- stage wijzigen in twee taps via een bottom sheet;
+- stage wijzigen in twee taps via een bottom sheet. Op een kaart is de
+  stage-badge zelf die knop; staat de badge uit omdat de lijst al op één stage
+  filtert, dan komt er op dezelfde plek een knop "Verplaats" met hetzelfde
+  raakvlak. De weg naar de sheet verdwijnt dus nooit;
 - bij Afgevallen verschijnt de redenlijst direct en is die verplicht — de
   server weigert Afgevallen zonder geldige reden;
 - raakvlakken minimaal 44px (`tik`-utility), sticky filterbalk, geen
@@ -282,5 +285,19 @@ Drie velden staan er bewust niet in: `Bewaren tot` en `Bewaartermijn verstreken`
 zijn Airtable-formules, en `Laatste contact` wordt al door de activiteitenlogger
 gezet — twee bronnen voor die datum zou de AVG-bewaartermijn laten afhangen van
 wie het laatst iets aanraakte.
+
+Ook de aanmelding is bewerkbaar: volgende actie, score, score-onderbouwing,
+opmerkingen en reistijd, via hetzelfde patroon op het kandidaatscherm. `Zichtbaar
+voor klant` staat er bewust niet in — dat stuurt wat er in het klantrapport
+terechtkomt en wordt automatisch gezet bij een klantzichtbare stage — en een
+stageveld hoort er nooit in, want de bottom sheet dwingt bij Afgevallen de reden
+af.
+
+**Let op bij het bijwerken van de lokale state.** Airtable stuurt een leeggemaakt
+veld niet terug in het antwoord op een PATCH. Een kale merge over de bestaande
+gegevens laat zo'n veld daarom in beeld staan terwijl het in de base al weg is.
+De helper `samenvoeg` in `AtsProvider` krijgt daarom mee wélke velden zijn
+weggeschreven, en wist wat het antwoord niet noemt. Voegt iemand een nieuw
+schrijfpad toe, dan hoort die lijst mee.
 
 `scripts/import/README.md` beschrijft de werkwijze.
