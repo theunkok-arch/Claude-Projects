@@ -25,6 +25,7 @@ import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { bouwPlan, dedupeSleutel, leesRijen } from './lees.mjs'
+import { normaliseer } from './status-map.mjs'
 import { FUNNEL_STAGES } from '../../shared/stages.mjs'
 
 const HIER = dirname(fileURLToPath(import.meta.url))
@@ -82,9 +83,18 @@ export function bouwSync(rijen, huidig, { vacatureTitel, bron, vandaag, inGespre
     aanmeldingPerKandidaat.set(aanmelding.kandidaatId, aanmelding)
   }
 
+  // "In gesprek" dekt zowel Gereageerd als Gesproken. Bij de import moest daar
+  // een knoop over worden doorgehakt, want er was verder niets. Bij een sync
+  // staat er wél iets: een stage die iemand heeft gezet. Een gok laten winnen
+  // van een beslissing is precies verkeerd om, dus zulke rijen wijzigen niets
+  // meer aan een bestaande aanmelding — ze gelden alleen nog voor kandidaten
+  // die nieuw zijn.
+  const onbeslisteNamen = new Set(plan.onbeslist.map((o) => normaliseer(o.naam)))
+
   const nieuweKandidaten = []
   const nieuweAanmeldingen = []
   const wijzigingen = []
+  const onbeslistBestaand = []
   const teruggezet = []
   const herleefd = []
   const redenOntbreekt = []
@@ -120,6 +130,10 @@ export function bouwSync(rijen, huidig, { vacatureTitel, bron, vandaag, inGespre
       ongewijzigd += 1
       continue
     }
+    if (onbeslisteNamen.has(normaliseer(naam))) {
+      onbeslistBestaand.push(regel)
+      continue
+    }
     if (van === 'Afgevallen') {
       // Iemand terughalen die is afgevallen is een besluit, geen verversing.
       herleefd.push(regel)
@@ -148,6 +162,7 @@ export function bouwSync(rijen, huidig, { vacatureTitel, bron, vandaag, inGespre
     wijzigingen,
     teruggezet,
     herleefd,
+    onbeslistBestaand,
     redenOntbreekt,
     ongewijzigd,
     nietInSheet,
@@ -232,6 +247,7 @@ function rapporteer(values, u) {
   }
   meld(u.teruggezet, 'Blad wijst terug in de trechter')
   meld(u.herleefd, 'Blad haalt een afvaller terug')
+  meld(u.onbeslistBestaand, 'Blad staat op "In gesprek", base is verder')
   meld(u.redenOntbreekt, 'Afgevallen zonder geldige reden')
 
   if (plan.onbekendeStatus.size > 0) {
@@ -264,6 +280,7 @@ function schrijf(values, u) {
         wijzigingen: u.wijzigingen,
         teruggezet: u.teruggezet,
         herleefd: u.herleefd,
+        onbeslistBestaand: u.onbeslistBestaand,
         redenOntbreekt: u.redenOntbreekt,
         ongewijzigd: u.ongewijzigd,
         nietInSheet: u.nietInSheet,

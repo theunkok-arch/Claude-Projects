@@ -238,6 +238,14 @@ heeft gedaan. Drie categorieën worden daarom **gemeld en niet toegepast**:
 | Blad wijst terug in de trechter | `Voorgesteld` in de base, `Benaderd` in het blad |
 | Blad haalt een afvaller terug | `Afgevallen` in de base, actief in het blad |
 | Afgevallen zonder geldige reden | de server weigert dat toch, dus dat gebeurt hier al |
+| Blad staat op "In gesprek", base is verder | die status dekt zowel Gereageerd als Gesproken |
+
+Die laatste verdient uitleg. Bij de import moest er over `In gesprek` een knoop
+worden doorgehakt (`--in-gesprek`), want er was verder niets. Bij een sync staat
+er wél iets: een stage die iemand heeft gezet. Een gok laten winnen van een
+beslissing is precies verkeerd om, dus zulke rijen wijzigen niets meer aan een
+bestaande aanmelding. Voor kandidaten die nieuw zijn geldt `--in-gesprek` nog
+gewoon.
 
 Ook gemeld, maar zonder actie: wie wél in de base staat en niet meer in het
 blad. Dat is bijna altijd een blad dat is opgesplitst, geen verdwenen kandidaat,
