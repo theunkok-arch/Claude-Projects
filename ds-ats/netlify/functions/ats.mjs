@@ -54,6 +54,39 @@ const KANDIDAAT_VELDEN = new Set([
   'Laatste contact',
 ])
 
+/**
+ * `Portal-token` staat hier bewust niet in. Dat is de sleutel waarmee een klant
+ * zijn rapport ziet — wie de link heeft, ziet het rapport. Een veld dat de
+ * client mag zetten nodigt uit tot een kort of raadbaar token; de server maakt
+ * hem daarom zelf aan en accepteert hem nooit van buiten. `Aantal vacatures` is
+ * een count-veld en niet schrijfbaar.
+ */
+const OPDRACHTGEVER_VELDEN = new Set(['Naam', 'Status', 'Notities'])
+
+const CONTACTPERSOON_VELDEN = new Set([
+  'Naam',
+  'Rol',
+  'E-mail',
+  'Telefoon',
+  'Is hiring manager',
+])
+
+/**
+ * `Validatie` en de rollups zijn formules en dus niet schrijfbaar. `Status` wél:
+ * de base bewaakt zelf dat een vacature pas op Actief mag met een salarisband.
+ */
+const VACATURE_VELDEN = new Set([
+  'Titel',
+  'Status',
+  'Startdatum',
+  'Streefdatum shortlist',
+  'Standplaats',
+  'Salaris min',
+  'Salaris max',
+  'Scoringsdrempel',
+  'Jobspec',
+])
+
 function pick(body, toegestaan) {
   const fields = {}
   for (const [key, value] of Object.entries(body ?? {})) {
@@ -108,6 +141,44 @@ export default async (req) => {
 
       case 'POST activiteit':
         return json(201, await logActiviteit(await req.json()))
+
+      case 'POST opdrachtgever':
+        return json(201, await maakOpdrachtgever(await req.json()))
+
+      case 'PATCH opdrachtgever': {
+        const id = segments[1]
+        if (!id) throw new HttpError(400, 'Opdrachtgever-id ontbreekt.')
+        const record = await updateRecord(
+          TABLES.opdrachtgevers,
+          id,
+          pick(await req.json(), OPDRACHTGEVER_VELDEN),
+        )
+        return json(200, { opdrachtgever: record })
+      }
+
+      case 'POST vacature':
+        return json(201, await maakVacature(await req.json()))
+
+      case 'PATCH vacature': {
+        const id = segments[1]
+        if (!id) throw new HttpError(400, 'Vacature-id ontbreekt.')
+        const record = await updateRecord(TABLES.vacatures, id, pick(await req.json(), VACATURE_VELDEN))
+        return json(200, { vacature: record })
+      }
+
+      case 'POST contactpersoon':
+        return json(201, await maakContactpersoon(await req.json()))
+
+      case 'PATCH contactpersoon': {
+        const id = segments[1]
+        if (!id) throw new HttpError(400, 'Contactpersoon-id ontbreekt.')
+        const record = await updateRecord(
+          TABLES.contactpersonen,
+          id,
+          pick(await req.json(), CONTACTPERSOON_VELDEN),
+        )
+        return json(200, { contactpersoon: record })
+      }
 
       default:
         throw new HttpError(404, `Onbekende route ${route}.`)
@@ -284,6 +355,64 @@ async function logActiviteit(body) {
 }
 
 /** AVG-verwijdering: kandidaat en alles wat aan hem hangt, onherstelbaar. */
+/**
+ * Een token dat de klant zijn eigen rapport laat zien en dat van een ander niet.
+ * 32 hex-tekens uit de systeem-CSPRNG; de rapportfunctie weigert alles onder de
+ * 24 tekens. De client mag hem niet meesturen — zie OPDRACHTGEVER_VELDEN.
+ */
+function nieuwToken() {
+  return [...crypto.getRandomValues(new Uint8Array(16))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+async function maakOpdrachtgever(body) {
+  const fields = pick(body, OPDRACHTGEVER_VELDEN)
+  if (!fields.Naam) throw new HttpError(400, 'Naam is verplicht.')
+
+  const naam = fields.Naam.trim().toLowerCase()
+  const bestaand = await listAll(TABLES.opdrachtgevers, { fields: ['Naam'] })
+  if (bestaand.some((o) => (o.fields.Naam ?? '').trim().toLowerCase() === naam)) {
+    throw new HttpError(409, `Opdrachtgever "${fields.Naam}" bestaat al.`)
+  }
+
+  const [record] = await createRecords(TABLES.opdrachtgevers, [
+    { fields: { ...fields, 'Portal-token': nieuwToken() } },
+  ])
+  return { opdrachtgever: plat(record) }
+}
+
+async function maakVacature(body) {
+  const { opdrachtgeverId } = body ?? {}
+  if (!opdrachtgeverId) throw new HttpError(400, 'Opdrachtgever-id ontbreekt.')
+  const fields = pick(body, VACATURE_VELDEN)
+  if (!fields.Titel) throw new HttpError(400, 'Titel is verplicht.')
+
+  // De base weigert Actief zonder salarisband. Dat hier ook zeggen scheelt een
+  // vacature die stilzwijgend op Intake blijft staan terwijl er al kandidaten
+  // op lopen — precies wat er met de eerste drie vacatures is gebeurd.
+  if (fields.Status === 'Actief' && (fields['Salaris min'] == null || fields['Salaris max'] == null)) {
+    throw new HttpError(400, 'Een vacature mag pas op Actief met een salarisband.')
+  }
+
+  const [record] = await createRecords(TABLES.vacatures, [
+    { fields: { ...fields, Opdrachtgever: [opdrachtgeverId] } },
+  ])
+  return { vacature: plat(record) }
+}
+
+async function maakContactpersoon(body) {
+  const { opdrachtgeverId } = body ?? {}
+  if (!opdrachtgeverId) throw new HttpError(400, 'Opdrachtgever-id ontbreekt.')
+  const fields = pick(body, CONTACTPERSOON_VELDEN)
+  if (!fields.Naam) throw new HttpError(400, 'Naam is verplicht.')
+
+  const [record] = await createRecords(TABLES.contactpersonen, [
+    { fields: { ...fields, Opdrachtgever: [opdrachtgeverId] } },
+  ])
+  return { contactpersoon: plat(record) }
+}
+
 async function verwijderKandidaat(kandidaatId) {
   const kandidaat = await getRecord(TABLES.kandidaten, kandidaatId)
   const aanmeldingIds = kandidaat.fields.Aanmeldingen ?? []
