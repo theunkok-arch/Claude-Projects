@@ -1,18 +1,22 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { afvalRedenen, funnel, opUrgentie } from '../lib/metrics'
 import { band, datum } from '../lib/format'
+import { useHerkomst } from '../lib/herkomst'
 import { FUNNEL_STAGES } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import Funnel from '../components/Funnel'
 import StageBadge from '../components/StageBadge'
 import StageSheet from '../components/StageSheet'
+import Terug, { FilterTerug } from '../components/Terug'
 import type { Regel } from '../lib/types'
 
 export default function VacatureDetail() {
   const { id } = useParams()
+  const { state } = useLocation()
+  const herkomst = useHerkomst()
   const { data, regels, wijzigStage } = useAts()
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
 
@@ -25,7 +29,9 @@ export default function VacatureDetail() {
     const volgende = new URLSearchParams(zoek)
     if (keuze === null) volgende.delete('stage')
     else volgende.set('stage', keuze)
-    setZoek(volgende)
+    // De herkomst blijft meelopen: het filter wisselen is geen nieuw scherm, en
+    // zonder dit zou de terugknop na één filterwissel weer gaan gokken.
+    setZoek(volgende, { state })
   }
 
   const vacature = data?.vacatures.find((v) => v.id === id)
@@ -62,9 +68,7 @@ export default function VacatureDetail() {
 
     return (
       <div>
-        <button type="button" onClick={() => kiesStage(null)} className="tik text-sm text-navy-400">
-          ← {vacature.Titel}
-        </button>
+        <FilterTerug onWis={() => kiesStage(null)} />
 
         <div className="mt-1 flex items-center gap-3">
           {kop ? (
@@ -107,12 +111,14 @@ export default function VacatureDetail() {
   // ── Beginscherm: de cijfers ─────────────────────────────────────────────────
   return (
     <div>
-      <Link to="/vacatures" className="text-sm text-navy-400">
-        ← Vacatures
-      </Link>
+      <Terug naar="/vacatures" label="Vacatures" />
       <h1 className="mt-1 text-2xl font-semibold">{vacature.Titel}</h1>
       {opdrachtgever ? (
-        <Link to={`/opdrachtgever/${opdrachtgever.id}`} className="text-sm text-navy-400 underline">
+        <Link
+          to={`/opdrachtgever/${opdrachtgever.id}`}
+          state={herkomst}
+          className="text-sm text-navy-400 underline"
+        >
           {opdrachtgever.Naam}
         </Link>
       ) : (

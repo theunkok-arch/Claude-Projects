@@ -104,13 +104,13 @@ Vite + React 19 + TypeScript + Tailwind v4. Ontworpen op 375px.
 
 | Route | Scherm |
 |---|---|
-| `/` | Maandagoverzicht — de aantallen per stage, te filteren op klant en vacature; `?stage=` toont die kandidaten |
+| `/` | Maandagoverzicht — de aantallen per stage, te filteren op klant, vacature en bron; `?stage=` toont die kandidaten |
 | `/vacatures` | Alle vacatures met funnel en aantallen |
 | `/vacature/:id` | Funnel en reden-analyse; `?stage=` toont de kandidatenlijst |
 | `/opdrachtgevers` | Klantenlijst met wat er per klant loopt |
 | `/opdrachtgever/:id` | Eén klant: zijn vacatures, elk met eigen funnel |
 | `/kandidaat/:id` | Gegevens, alle aanmeldingen, historie, contact loggen, AVG-verwijderen |
-| `/bronnen` | Bron-effectiviteit: van gescoord naar voorgesteld naar geplaatst |
+| `/bronnen` | Bron-effectiviteit: van gescoord naar voorgesteld naar geplaatst; elke bron linkt door naar `/?bron=` |
 | `/rapport/:token` | Klantrapport, geen login |
 | `/privacy` | Privacyverklaring voor kandidaten, publiek |
 
@@ -144,7 +144,17 @@ Interactieregels uit de spec die in code zitten:
   lijst. Met 263 actieve aanmeldingen is een scherm dat direct in kaarten opent
   onbruikbaar: je scrolt langs tweehonderd namen voordat je ziet waar het werk
   zit. De keuze staat in de URL (`/?stage=Benaderd`), dus terugknop en delen
-  werken zoals verwacht.
+  werken zoals verwacht;
+- **elk getal brengt je ergens.** Ook op `/bronnen`: een bron linkt naar
+  `/?bron=…`, met de vacaturekeuze van dat scherm erbij. Dat overzicht toont wie
+  er nu van dat kanaal loopt, dus minder dan de kolom "gescoord" — die telt ook
+  afgevallen en geplaatste kandidaten mee;
+- **één terugknop**, `src/components/Terug.tsx`. Elke link naar een detailscherm
+  geeft mee waar je vandaan komt (`useHerkomst`), en de knop noemt die
+  bestemming: "← Royal Sanders", niet "← Terug". Zonder herkomst — een gedeelde
+  link, een ververste pagina — valt hij terug op het overzicht waar het scherm
+  onder hangt. De doorgeklikte lijsten wissen alleen een filter en blijven op
+  hetzelfde scherm; die knop heet daarom "✕ Filter wissen".
 
 Huisstijl: navy `#1A1A2E`, oranje `#E8722A`, cream `#FCF5EE`, Poppins.
 Stage-badges volgen 7. Shortlist stond niet in de kleurenlijst; die kreeg oranje

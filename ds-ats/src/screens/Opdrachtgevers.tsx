@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
+import { useHerkomst } from '../lib/herkomst'
 import { isActief } from '../../shared/stages.mjs'
 
 /**
@@ -9,6 +10,7 @@ import { isActief } from '../../shared/stages.mjs'
  */
 export default function Opdrachtgevers() {
   const { data, regels } = useAts()
+  const herkomst = useHerkomst()
   if (!data) return null
 
   return (
@@ -27,6 +29,7 @@ export default function Opdrachtgevers() {
             <Link
               key={opdrachtgever.id}
               to={`/opdrachtgever/${opdrachtgever.id}`}
+              state={herkomst}
               className="rounded-2xl border border-lijn bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">

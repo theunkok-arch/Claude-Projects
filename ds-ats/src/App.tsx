@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Link, Route, Routes } from 'react-router-dom'
 import { AtsProvider, useAts } from './store/AtsProvider'
 import AppShell from './components/AppShell'
 import LoginGate from './components/LoginGate'
@@ -55,9 +55,28 @@ function InterneApp() {
         <Route path="/opdrachtgever/:id" element={<OpdrachtgeverDetail />} />
         <Route path="/kandidaat/:id" element={<KandidaatDetail />} />
         <Route path="/bronnen" element={<Bronnen />} />
-        <Route path="*" element={<p className="text-navy-400">Pagina niet gevonden.</p>} />
+        <Route path="*" element={<NietGevonden />} />
       </Routes>
     </AppShell>
+  )
+}
+
+/**
+ * Kale tekst zonder weg terug was hier een doodlopend eind: de tabbalk staat
+ * onderaan, maar wie hier belandt is iets kwijt en hoort één duidelijke uitweg
+ * te krijgen naar het scherm waar de dag begint.
+ */
+function NietGevonden() {
+  return (
+    <div className="mt-8 text-center">
+      <p className="text-navy-400">Pagina niet gevonden.</p>
+      <Link
+        to="/"
+        className="tik mt-4 inline-flex items-center rounded-xl border border-lijn bg-white px-4 py-2 text-sm font-medium"
+      >
+        Naar het maandagoverzicht
+      </Link>
+    </div>
   )
 }
 

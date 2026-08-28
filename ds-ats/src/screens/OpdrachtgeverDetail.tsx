@@ -3,9 +3,11 @@ import { Link, useParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { funnel } from '../lib/metrics'
 import { band, datum } from '../lib/format'
+import { useHerkomst } from '../lib/herkomst'
 import { isActief } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import Funnel from '../components/Funnel'
+import Terug from '../components/Terug'
 
 /**
  * Scherm per opdrachtgever: zijn vacatures, elk met de eigen funnel. Elke trede
@@ -13,6 +15,7 @@ import Funnel from '../components/Funnel'
  */
 export default function OpdrachtgeverDetail() {
   const { id } = useParams()
+  const herkomst = useHerkomst()
   const { data, regels } = useAts()
 
   const opdrachtgever = data?.opdrachtgevers.find((o) => o.id === id)
@@ -35,9 +38,7 @@ export default function OpdrachtgeverDetail() {
 
   return (
     <div>
-      <Link to="/opdrachtgevers" className="text-sm text-navy-400">
-        ← Opdrachtgevers
-      </Link>
+      <Terug naar="/opdrachtgevers" label="Opdrachtgevers" />
       <h1 className="mt-1 text-2xl font-semibold">{opdrachtgever.Naam}</h1>
       <p className="text-sm text-navy-400">
         {opdrachtgever.Status ?? '—'} · {alle.length} aanmeldingen · {actief} actief
@@ -71,7 +72,11 @@ export default function OpdrachtgeverDetail() {
           return (
             <section key={vacature.id} className="rounded-2xl border border-lijn bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <Link to={`/vacature/${vacature.id}`} className="min-w-0 font-semibold underline">
+                <Link
+                  to={`/vacature/${vacature.id}`}
+                  state={herkomst}
+                  className="min-w-0 font-semibold underline"
+                >
                   {vacature.Titel}
                 </Link>
                 <span className="shrink-0 rounded-full bg-cream px-2.5 py-1 text-xs font-medium">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
+import { useHerkomst } from '../lib/herkomst'
 import StageBadge from './StageBadge'
 
 /** Lowercase, zonder accenten. "Désirée" moet ook op "desiree" te vinden zijn. */
@@ -27,6 +28,7 @@ const MAX_TREFFERS = 20
 export default function Zoek({ open, onSluit }: { open: boolean; onSluit: () => void }) {
   const { data, regels } = useAts()
   const navigate = useNavigate()
+  const herkomst = useHerkomst()
   const [term, setTerm] = useState('')
   const veld = useRef<HTMLInputElement>(null)
 
@@ -111,7 +113,7 @@ export default function Zoek({ open, onSluit }: { open: boolean; onSluit: () => 
                   type="button"
                   onClick={() => {
                     onSluit()
-                    navigate(`/kandidaat/${treffer.id}`)
+                    navigate(`/kandidaat/${treffer.id}`, { state: herkomst })
                   }}
                   className="tik w-full rounded-2xl border border-lijn bg-white px-4 py-3 text-left"
                 >

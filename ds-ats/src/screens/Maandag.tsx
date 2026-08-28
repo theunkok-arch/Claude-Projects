@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
-import { actieveRegels, opUrgentie } from '../lib/metrics'
+import { actieveRegels, bronVan, opUrgentie } from '../lib/metrics'
 import { FUNNEL_STAGES } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import StageBadge from '../components/StageBadge'
 import StageTegels, { type StageTelling } from '../components/StageTegels'
 import StageSheet from '../components/StageSheet'
+import { FilterTerug } from '../components/Terug'
 import type { Regel } from '../lib/types'
 
 /** Pseudo-stage in de URL: alles wat de servicenorm overschrijdt, ongeacht stage. */
@@ -27,6 +28,10 @@ export default function Maandag() {
 
   const klantFilter = zoek.get('klant') ?? 'alle'
   const vacatureFilter = zoek.get('vacature') ?? 'alle'
+  // `?bron=` komt van het bronscherm: daar was een getal een doodlopend eind.
+  // Het werkt als klant en vacature — een filter op de scope, in de URL, dus
+  // deelbaar en met een werkende terugknop.
+  const bronFilter = zoek.get('bron')
   const stage = zoek.get('stage')
 
   const zetZoek = (sleutel: string, waarde: string | null) => {
@@ -45,8 +50,11 @@ export default function Maandag() {
     if (vacatureFilter !== 'alle') {
       actief = actief.filter((r) => r.vacature?.id === vacatureFilter)
     }
+    if (bronFilter) {
+      actief = actief.filter((r) => bronVan(r) === bronFilter)
+    }
     return actief
-  }, [regels, klantFilter, vacatureFilter])
+  }, [regels, klantFilter, vacatureFilter, bronFilter])
 
   const teLang = useMemo(() => inScope.filter((r) => r.overschreden), [inScope])
 
@@ -76,6 +84,15 @@ export default function Maandag() {
       ? alleActieveVacatures
       : alleActieveVacatures.filter((v) => v.Opdrachtgever?.[0] === klantFilter)
 
+  // Wie via het bronscherm binnenkomt neemt de vacaturekeuze van dáár mee, en
+  // die lijst kent ook gesloten vacatures. Staat die keuze niet in de lijst,
+  // dan toont de keuzelijst niets terwijl er wel op gefilterd wordt.
+  const gekozenVacature = (data?.vacatures ?? []).find((v) => v.id === vacatureFilter)
+  const vacatureOpties =
+    gekozenVacature && !actieveVacatures.some((v) => v.id === gekozenVacature.id)
+      ? [gekozenVacature, ...actieveVacatures]
+      : actieveVacatures
+
   // Alleen klanten met werk in de trechter; een lege naam in een keuzelijst
   // kost een tik en levert een leeg scherm op.
   const klanten = (data?.opdrachtgevers ?? []).filter((o) =>
@@ -83,10 +100,7 @@ export default function Maandag() {
   )
   const klantNaam =
     klantFilter === 'alle' ? null : (klanten.find((o) => o.id === klantFilter)?.Naam ?? null)
-  const vacatureNaam =
-    vacatureFilter === 'alle'
-      ? null
-      : (actieveVacatures.find((v) => v.id === vacatureFilter)?.Titel ?? null)
+  const vacatureNaam = vacatureFilter === 'alle' ? null : (gekozenVacature?.Titel ?? null)
 
   const linkNaarStage = (s: string) => {
     const volgende = new URLSearchParams(zoek)
@@ -96,15 +110,9 @@ export default function Maandag() {
 
   // ── Doorgeklikt: de kandidaten van één stage ────────────────────────────────
   if (stage) {
-    const terug = new URLSearchParams(zoek)
-    terug.delete('stage')
-    const terugPad = terug.toString() ? `/?${terug.toString()}` : '/'
-
     return (
       <div>
-        <Link to={terugPad} className="text-sm text-navy-400">
-          ← Maandagoverzicht
-        </Link>
+        <FilterTerug onWis={() => zetZoek('stage', null)} />
 
         <div className="mt-1 flex items-center gap-3">
           {stage === NORM ? (
@@ -114,9 +122,9 @@ export default function Maandag() {
           )}
           <span className="text-2xl font-semibold tabular-nums">{lijst.length}</span>
         </div>
-        {(klantNaam || vacatureNaam) && (
+        {(klantNaam || vacatureNaam || bronFilter) && (
           <p className="text-sm text-navy-400">
-            {[klantNaam, vacatureNaam].filter(Boolean).join(' · ')}
+            {[klantNaam, vacatureNaam, bronFilter && `via ${bronFilter}`].filter(Boolean).join(' · ')}
           </p>
         )}
 
@@ -156,6 +164,28 @@ export default function Maandag() {
         {klantNaam && ` · ${klantNaam}`}
       </p>
 
+      {/*
+        De klant en de vacature hebben een keuzelijst; de bron komt van buiten,
+        via een link op het bronscherm. Zonder deze knop is hij alleen kwijt te
+        raken met de terugknop van de browser, en dan blijf je je afvragen
+        waarom de aantallen lager zijn dan je gewend bent.
+      */}
+      {bronFilter && (
+        <button
+          type="button"
+          onClick={() => zetZoek('bron', null)}
+          className="tik mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-lijn bg-white px-3 text-sm"
+        >
+          <span className="min-w-0 truncate">
+            Bron: <span className="font-medium">{bronFilter}</span>
+          </span>
+          <span aria-hidden className="text-navy-400">
+            ✕
+          </span>
+          <span className="sr-only">bronfilter wissen</span>
+        </button>
+      )}
+
       <div className="sticky top-[57px] z-20 -mx-4 mt-3 flex gap-2 border-b border-lijn bg-cream/95 px-4 py-2 backdrop-blur">
         <select
           value={klantFilter}
@@ -187,7 +217,7 @@ export default function Maandag() {
           className="tik min-w-0 flex-1 rounded-xl border border-lijn bg-white px-3 text-sm"
         >
           <option value="alle">Alle vacatures</option>
-          {actieveVacatures.map((vacature) => (
+          {vacatureOpties.map((vacature) => (
             <option key={vacature.id} value={vacature.id}>
               {vacature.Titel}
             </option>
