@@ -105,14 +105,3 @@ export function bronEffectiviteit(regels: Regel[]) {
     .map(([bron, rij]) => ({ bron, ...rij }))
     .sort((a, b) => b.geplaatst - a.geplaatst || b.voorgesteld - a.voorgesteld || b.gescoord - a.gescoord)
 }
-
-/** Momentopname per stage, voor de filters. Alleen de stage waar iemand nú staat. */
-export function aantalPerStage(regels: Regel[]): Map<StageId, number> {
-  const tellingen = new Map<StageId, number>()
-  for (const regel of regels) {
-    const stage = regel.aanmelding.Stage
-    if (!stage) continue
-    tellingen.set(stage, (tellingen.get(stage) ?? 0) + 1)
-  }
-  return tellingen
-}

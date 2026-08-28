@@ -104,9 +104,9 @@ Vite + React 19 + TypeScript + Tailwind v4. Ontworpen op 375px.
 
 | Route | Scherm |
 |---|---|
-| `/` | Maandagoverzicht — per stage de actieve kandidaten, dagen in stage, volgende actie |
+| `/` | Maandagoverzicht — de aantallen per stage; `?stage=` toont die kandidaten |
 | `/vacatures` | Alle vacatures met funnel en aantallen |
-| `/vacature/:id` | Funnel, reden-analyse, kandidatenlijst met snelle stagewijziging |
+| `/vacature/:id` | Funnel en reden-analyse; `?stage=` toont de kandidatenlijst |
 | `/opdrachtgevers` | Klantenlijst met wat er per klant loopt |
 | `/opdrachtgever/:id` | Eén klant: zijn vacatures, elk met eigen funnel |
 | `/kandidaat/:id` | Gegevens, alle aanmeldingen, historie, contact loggen, AVG-verwijderen |
@@ -130,7 +130,13 @@ Interactieregels uit de spec die in code zitten:
   stage staat in de URL, dus zo'n weergave is deelbaar en de terugknop werkt;
 - **filteren kan op elke stage**, niet alleen op "over de norm". Het
   maandagoverzicht filtert binnen de actieve stages, de vacature ook op
-  Afgevallen. De aantallen in het filter volgen de vacaturekeuze.
+  Afgevallen. De aantallen volgen de vacaturekeuze;
+- **beginschermen tonen cijfers, geen namen.** Het maandagoverzicht en het
+  vacaturescherm openen op tellingen per stage; pas na doorklikken verschijnt de
+  lijst. Met 263 actieve aanmeldingen is een scherm dat direct in kaarten opent
+  onbruikbaar: je scrolt langs tweehonderd namen voordat je ziet waar het werk
+  zit. De keuze staat in de URL (`/?stage=Benaderd`), dus terugknop en delen
+  werken zoals verwacht.
 
 Huisstijl: navy `#1A1A2E`, oranje `#E8722A`, cream `#FCF5EE`, Poppins.
 Stage-badges volgen 7. Shortlist stond niet in de kleurenlijst; die kreeg oranje
