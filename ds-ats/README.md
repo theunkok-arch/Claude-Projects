@@ -191,8 +191,10 @@ netlify dev               # frontend plus functions op één poort
 
 ## Airtable-limiet
 
-Het gratis plan stopt bij 1.000 records per base. Geteld op de echte sheets:
-Brand Manager 143 rijen en RA Officer 143 rijen, en elke rij kost drie records
-(`Kandidaten`, `Aanmeldingen`, `Stagelog`). Dat is **855 records** voor die twee
-lijsten samen — ze passen er net in, en Formulation Technologist past er niet
-meer bij. Regel het Team-plan vóór de import.
+Het gratis plan stopt bij 1.000 records per base. Geteld op de echte
+CSV-export: Brand Manager 272 rijen en RA Officer 159 rijen, en elke rij kost
+drie records (`Kandidaten`, `Aanmeldingen`, `Stagelog`). Dat is **1.297 records**
+voor die twee lijsten samen, 297 meer dan het gratis plan toestaat.
+
+Regel het Team-plan vóór de import. Formulation Technologist komt daar nog
+bovenop.

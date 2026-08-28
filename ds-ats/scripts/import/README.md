@@ -6,34 +6,50 @@ en de oude statussen vertaalt naar de nieuwe pipeline.
 
 ## Wat er in de sheets staat
 
-Gecontroleerd op 28-08-2026 tegen de twee master-sheets in Drive:
+Geteld op 28-08-2026 op de echte CSV-export van beide sheets:
 
-| Sheet | Rijen | Statussen |
+| Sheet | Vacature | Rijen |
 |---|---|---|
-| `090826_kandidaten_shortlist_compleet` (Brand Manager) | 143 | Afgevallen 86, Benaderd 53, Opgevolgd 2, Voorgesteld 1, **In gesprek 1** |
-| `Royal_Sanders_RA_Officer_kandidatenlijst_samengevoegd` | 143 | Benaderd 62, Afgevallen 38, Gescoord 33, Opgevolgd 5, Shortlist 1, **In gesprek 4** |
+| `090826_kandidaten_shortlist_compleet` | Brand Manager | **272** |
+| `Royal_Sanders_RA_Officer_kandidatenlijst_samengevoegd` | Regulatory Affairs Officer | **159** |
 
-Goed nieuws: **de sheets zijn al vrijwel omgezet** naar de nieuwe woordenschat
-uit 13.3. Beide gebruiken Gescoord, Benaderd, Opgevolgd, Shortlist, Voorgesteld
-en Afgevallen, en de kolom `Reden afvallen` staat al vol geldige redenen. Het
+Geen enkele persoon staat op beide lijsten, dus 431 unieke kandidaten.
+
+Stageverdeling na vertaling:
+
+| | Brand Manager | RA Officer |
+|---|---|---|
+| Afgevallen | 127 | 41 |
+| Benaderd | 71 | 75 |
+| Gescoord | 69 | 33 |
+| Opgevolgd | 2 | 5 |
+| Gesproken | 2 | 4 |
+| Voorgesteld | 1 | — |
+| Shortlist | — | 1 |
+
+De sheets zijn al vrijwel omgezet naar de nieuwe woordenschat uit 13.3. Het
 script draait er schoon doorheen: nul onbekende statussen, nul onbekende
-redenen, nul naambotsingen.
+redenen, nul naambotsingen. De twee resterende oude termen worden automatisch
+vertaald: `Nieuw` (69x, Brand Manager) wordt Gescoord, en `Afgewezen` (1x) wordt
+Afgevallen met reden "Afgewezen door ons (profielcheck)".
 
-Er is nog één ding te beslissen: **de vijf rijen die op "In gesprek" staan.**
-Die status dekt zowel Gereageerd (alleen geantwoord) als Gesproken (echt
-gesproken), en juist dat onderscheid maakt het conversiecijfer bruikbaar. Het
-script raadt daar niet naar en slaat die rijen over tot je kiest:
+De zes rijen op `In gesprek` (2 Brand Manager, 4 RA) zijn op 28-08 door
+Dominique vastgesteld als **Gesproken**; draai daarom met
+`--in-gesprek Gesproken`.
 
-| Sheet | Kandidaat |
-|---|---|
-| Brand Manager | Ine Lenaerts (Kenvue) |
-| RA Officer | Wouter Mul (SkinConsult) |
-| RA Officer | Dick Bakker (Unilever) |
-| RA Officer | Thomas Luijkx, PhD (CARBOGEN AMCIS) |
-| RA Officer | Roy Bonnema (Teleon Surgical) |
+### Lees de sheet, niet de tekstweergave
 
-Zet de status in de sheet zelf goed, of draai met `--in-gesprek Gereageerd`
-(of `Gesproken`) als het voor alle rijen hetzelfde is.
+Bij het bouwen van dit script zijn de sheets eerst via de natuurlijketaal-weergave
+van de Google Drive-koppeling gelezen. Die weergave **liet rijen weg**: 143 in
+plaats van 272 en 159. Alle cijfers die daarop gebaseerd waren, klopten niet.
+
+Gebruik dus altijd de echte export:
+
+- in Drive: `download_file_content` met `exportMimeType: text/csv`, niet
+  `read_file_content`;
+- met de hand: Bestand → Downloaden → CSV.
+
+Beide leveren byte-identieke inhoud; dat is nagerekend.
 
 ## Volgorde
 
@@ -116,28 +132,22 @@ node scripts/import/import.mjs ... --echt
 ## Rate limits en recordaantallen
 
 Airtable staat vijf verzoeken per seconde per base toe. Het script wacht 220ms
-tussen verzoeken en schrijft in batches van tien. 143 rijen kost daarmee ruwweg
-tien seconden.
+tussen verzoeken en schrijft in batches van tien. 431 rijen kost daarmee ruwweg
+een halve minuut.
 
-Reken vooraf uit wat je gaat opmaken. Elke rij kost drie records:
+Elke rij kost drie records:
 
 | | Kandidaten | Aanmeldingen | Stagelog | Totaal |
 |---|---|---|---|---|
-| Brand Manager | 142 | 142 | 142 | 426 |
-| RA Officer | 143 | 143 | 143 | 429 |
-| **Samen** | **285** | **285** | **285** | **855** |
+| Brand Manager | 272 | 272 | 272 | 816 |
+| RA Officer | 159 | 159 | 159 | 477 |
+| Bestaand (opdrachtgever + vacatures) | | | | 4 |
+| **Samen** | **431** | **431** | **431** | **1297** |
 
-Dat is met de vijf In gesprek-rijen meegerekend. Het gratis Airtable-plan stopt
-bij 1.000 records per base, dus deze twee lijsten passen er net in en
-Formulation Technologist past er niet meer bij. Regel het Team-plan vóór de
-import; achteraf migreren is vervelender.
+**Het gratis Airtable-plan stopt bij 1.000 records per base.** Deze twee lijsten
+passen daar niet in: je komt 297 records tekort. Upgrade naar het Team-plan
+(circa 20 dollar per gebruiker per maand) vóór de import. Halverwege tegen de
+limiet aanlopen laat de base in een halve staat achter.
 
-## Testen zonder credentials
-
-`lees.mjs` bevat het lezen en vertalen en raakt het netwerk niet:
-
-```js
-import { leesRijen, bouwPlan } from './lees.mjs'
-const rijen = await leesRijen('proef.csv')
-console.log(bouwPlan(rijen, { vacatureTitel: 'Brand Manager', vandaag: '2026-08-28' }))
-```
+Wil je toch eerst klein beginnen: importeer alleen de RA-lijst (477 records,
+past wel), en doe Brand Manager na de upgrade.

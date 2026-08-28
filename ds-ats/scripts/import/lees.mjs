@@ -28,10 +28,75 @@ export async function leesRijen(pad, tabnaam) {
 }
 
 export function leesCsv(tekst) {
-  const regels = tekst.split(/\r?\n/).filter((regel) => regel.trim().length > 0)
-  if (regels.length === 0) return []
-  const scheider = tel(regels[0], ';') > tel(regels[0], ',') ? ';' : ','
-  return naarObjecten(regels.map((regel) => splitsCsvRegel(regel, scheider)))
+  const zonderBom = tekst.replace(/^\uFEFF/, '')
+  const scheider = kiesScheider(zonderBom)
+  return naarObjecten(splitsCsv(zonderBom, scheider))
+}
+
+/**
+ * Volledige CSV-parser (RFC 4180). Scant teken voor teken in plaats van eerst
+ * op regels te splitsen: de score-onderbouwingen in de kandidatenlijsten
+ * bevatten regelafbrekingen binnen aanhalingstekens, en een regel-splitsing
+ * maakt van één kandidaat er dan stilzwijgend meerdere.
+ */
+export function splitsCsv(tekst, scheider) {
+  const rijen = []
+  let rij = []
+  let cel = ''
+  let inAanhaling = false
+
+  for (let i = 0; i < tekst.length; i++) {
+    const teken = tekst[i]
+
+    if (inAanhaling) {
+      if (teken === '"') {
+        if (tekst[i + 1] === '"') {
+          cel += '"'
+          i++
+        } else inAanhaling = false
+      } else cel += teken
+      continue
+    }
+
+    if (teken === '"') {
+      inAanhaling = true
+    } else if (teken === scheider) {
+      rij.push(cel.trim())
+      cel = ''
+    } else if (teken === '\r') {
+      // \r\n telt als één regeleinde; een losse \r ook.
+      if (tekst[i + 1] === '\n') i++
+      rij.push(cel.trim())
+      rijen.push(rij)
+      rij = []
+      cel = ''
+    } else if (teken === '\n') {
+      rij.push(cel.trim())
+      rijen.push(rij)
+      rij = []
+      cel = ''
+    } else {
+      cel += teken
+    }
+  }
+
+  if (cel.length > 0 || rij.length > 0) {
+    rij.push(cel.trim())
+    rijen.push(rij)
+  }
+
+  return rijen.filter((r) => r.some((c) => c.length > 0))
+}
+
+/**
+ * Bepaalt het scheidingsteken op de kopregel, niet op de eerste regel: de
+ * titelregel erboven bevat vaak zelf komma's of puntkomma's.
+ */
+function kiesScheider(tekst) {
+  const eersteRegels = tekst.split(/\r?\n/).slice(0, 20)
+  const kop = eersteRegels.find((regel) => /(^|[,;\t])naam([,;\t]|$)/i.test(regel)) ?? eersteRegels[0] ?? ''
+  const kandidaten = [',', ';', '\t']
+  return kandidaten.reduce((beste, teken) => (tel(kop, teken) > tel(kop, beste) ? teken : beste), ',')
 }
 
 const tel = (tekst, teken) => tekst.split(teken).length - 1
@@ -61,26 +126,6 @@ function naarObjecten(matrix) {
     .map((rij) => Object.fromEntries(koppen.map((kop, i) => [kop, rij[i] ?? ''])))
     // Lege regels en losse toelichtingen onderaan het blad horen er niet bij.
     .filter((rij) => Object.values(rij).some((waarde) => String(waarde).trim().length > 0))
-}
-
-function splitsCsvRegel(regel, scheider) {
-  const cellen = []
-  let huidig = ''
-  let inAanhaling = false
-  for (let i = 0; i < regel.length; i++) {
-    const teken = regel[i]
-    if (teken === '"') {
-      if (inAanhaling && regel[i + 1] === '"') {
-        huidig += '"'
-        i++
-      } else inAanhaling = !inAanhaling
-    } else if (teken === scheider && !inAanhaling) {
-      cellen.push(huidig.trim())
-      huidig = ''
-    } else huidig += teken
-  }
-  cellen.push(huidig.trim())
-  return cellen
 }
 
 /** Koppelt de kolomkoppen van de sheet aan de velden van de base. */
