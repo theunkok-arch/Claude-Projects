@@ -49,7 +49,10 @@ ze raken elkaar niet. The BTC app is independent — don't touch it for EIGEN wo
 
 The owner (Theun) has standing approval for routine work:
 - File edits, creates, deletes within the repo.
-- `npm install`, `npm run build`, `npm run dev`, `npm run lint` (run inside `eigen-poc/`).
+- `npm install`, `npm run build`, `npm run dev` en de checks van het project waar
+  je in werkt: `npm run lint` in `eigen-poc/`, `npm run typecheck` in `ds-ats/`
+  (die zit ook al in `npm run build`). Draai ze altijd in de projectmap — in de
+  repo-root staat geen `package.json`.
 - `git add`, `git commit`, `git push origin main`.
 - Routine `netlify` CLI commands: reading deploy logs, `netlify deploy`.
 - **Doorpakken tot en met live.** Werk op een branch is pas af als het op
