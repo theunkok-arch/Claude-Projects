@@ -176,6 +176,50 @@ export const dedupeSleutel = (kandidaat) => {
   return normaliseer(`${kandidaat.Naam ?? ''}|${kandidaat.Woonplaats ?? ''}`)
 }
 
+const MAANDEN = {
+  januari: 1, jan: 1, februari: 2, feb: 2, maart: 3, mrt: 3, april: 4, apr: 4,
+  mei: 5, juni: 6, jun: 6, juli: 7, jul: 7, augustus: 8, aug: 8,
+  september: 9, sep: 9, sept: 9, oktober: 10, okt: 10,
+  november: 11, nov: 11, december: 12, dec: 12,
+}
+
+const pad = (n) => String(n).padStart(2, '0')
+
+/**
+ * Datumtekst naar ISO, of niets.
+ *
+ * De datumkolom is vrije tekst en elke opdrachtgever vult hem anders: de
+ * Verhaeg-lijst heeft "13 juli 2026" staan. Dat ging ongewijzigd door naar een
+ * datumveld, en met `typecast: true` maakt Airtable daar zelf iets van — je
+ * krijgt dus geen foutmelding maar stilzwijgend een verkeerde datum. Liever
+ * niets dan iets verzonnens: wat hier niet uitkomt valt terug op de
+ * importdatum en wordt gemeld.
+ */
+export function naarISO(ruw) {
+  const tekst = String(ruw ?? '').trim()
+  if (!tekst) return undefined
+
+  const iso = tekst.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) return tekst
+
+  const woord = normaliseer(tekst).match(/^(\d{1,2})\s+([a-z.]+)\s+(\d{4})$/)
+  if (woord) {
+    const maand = MAANDEN[woord[2].replace(/\.$/, '')]
+    if (maand) return `${woord[3]}-${pad(maand)}-${pad(woord[1])}`
+  }
+
+  // Dag-eerst, zoals overal in Nederland geschreven. 13-07-2026 en 13/7/2026.
+  const cijfers = tekst.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/)
+  if (cijfers) {
+    const [, dag, maand, jaar] = cijfers
+    if (Number(maand) >= 1 && Number(maand) <= 12 && Number(dag) >= 1 && Number(dag) <= 31) {
+      return `${jaar}-${pad(maand)}-${pad(dag)}`
+    }
+  }
+
+  return undefined
+}
+
 const WAAR = ['ja', 'x', 'waar', 'true', '1']
 /** Waarden die "geen concurrent" betekenen. Alles daarbuiten telt wél. */
 const GEEN_CONCURRENT = ['', '-', 'nee', 'n', 'geen', 'false', '0', 'nvt', 'n.v.t.']
@@ -196,6 +240,22 @@ function isConcurrent(ruw) {
 }
 
 /**
+ * Niet elk blad heeft een concurrent-kolom. De Verhaeg-lijst zet het oordeel
+ * vooraan in de notitie: "CONCURRENT DIRECT. Werkt Hilversum, woont Almere."
+ * Zonder deze regel blijft het vinkje leeg terwijl de informatie er staat — en
+ * dat vinkje voedt de outreach-gate, dus dat is geen detail.
+ *
+ * Alleen aan het begin van de tekst, en alleen als de kolom zelf niets zei:
+ * "geen concurrent van ons" ergens in een lange notitie mag geen vinkje zetten.
+ */
+function concurrentUitTekst(tekst) {
+  const kop = normaliseer(tekst).slice(0, 40)
+  if (/^niet-?\s*concurrent/.test(kop)) return undefined
+  if (/^concurrent\b/.test(kop)) return true
+  return undefined
+}
+
+/**
  * Zet de ruwe rijen om in kandidaten en aanmeldingen. Schrijft niets; geeft
  * terug wat er zou gebeuren, inclusief wat het niet kon plaatsen.
  */
@@ -208,12 +268,19 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
   const bronVertaling = new Map()
   const onbeslist = []
   const overgeslagen = []
+  const onleesbareDatums = new Map()
 
   for (const [nummer, rij] of rijen.entries()) {
     const naam = waarde(rij, index, 'Naam')
     if (!naam) {
       overgeslagen.push({ rij: nummer + 2, reden: 'geen naam' })
       continue
+    }
+
+    const ruweDatum = waarde(rij, index, '__datum')
+    const datum = naarISO(ruweDatum)
+    if (ruweDatum && !datum) {
+      onleesbareDatums.set(ruweDatum, (onleesbareDatums.get(ruweDatum) ?? 0) + 1)
     }
 
     const kandidaat = schoon({
@@ -228,7 +295,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
       Opleiding: waarde(rij, index, 'Opleiding'),
       Talen: waarde(rij, index, 'Talen'),
       Bron: bronVan(rij, index, bron, bronVertaling),
-      'Laatste contact': waarde(rij, index, '__datum'),
+      'Laatste contact': datum,
     })
 
     const ruweStatus = waarde(rij, index, '__status')
@@ -285,7 +352,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
         'Reden afvallen': reden,
         Eigenaar: 'Dominique',
         // De sheets kennen geen stagedatum; de import is het startpunt van de klok.
-        'Datum in huidige stage': waarde(rij, index, '__datum') ?? vandaag,
+        'Datum in huidige stage': datum ?? vandaag,
         'Datum aangemaakt': vandaag,
         'Score totaal': Number.isFinite(score) ? score : undefined,
         'Reistijd minuten': Number.isFinite(reistijd) ? reistijd : undefined,
@@ -294,7 +361,9 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
           .filter(Boolean)
           .join('\n\n') || undefined,
         'Outreach-concept': waarde(rij, index, '__outreach'),
-        Concurrent: isConcurrent(waarde(rij, index, '__concurrent')),
+        Concurrent:
+          isConcurrent(waarde(rij, index, '__concurrent')) ??
+          concurrentUitTekst(waarde(rij, index, '__opmerkingen')),
       }),
     })
   }
@@ -309,6 +378,8 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
     bronVertaling,
     onbeslist,
     overgeslagen,
+    onleesbareDatums,
+    genegeerdMetInhoud: gevuldeGenegeerdeKolommen(rijen, genegeerd),
     naamBotsingen: naamBotsingen(kandidaten),
   }
 }
@@ -339,4 +410,21 @@ function naamBotsingen(kandidaten) {
 
 function schoon(object) {
   return Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined))
+}
+
+
+/**
+ * Een genegeerde kolom die leeg is, is ruis. Een genegeerde kolom met inhoud is
+ * verlies: dat is informatie die iemand heeft ingevuld en die nergens terechtkomt.
+ * De Verhaeg-lijst heeft zo zeventien ingevulde ervaringsjaren die verdwijnen.
+ * Alleen die eerste soort hoort in een terzijde; deze hoort opgemerkt te worden.
+ */
+function gevuldeGenegeerdeKolommen(rijen, genegeerd) {
+  return genegeerd
+    .map((kop) => ({
+      kop,
+      gevuld: rijen.filter((rij) => String(rij[kop] ?? '').trim().length > 0).length,
+    }))
+    .filter((rij) => rij.gevuld > 0)
+    .sort((a, b) => b.gevuld - a.gevuld)
 }

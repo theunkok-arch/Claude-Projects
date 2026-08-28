@@ -288,7 +288,29 @@ eerst exact, dan nog eens met de toelichting tussen haakjes weggelaten. Zo wint
 stilzwijgend weg.
 
 Kijk het regeltje **genegeerde kolommen** in het rapport altijd na. Dat is de
-plek waar een kolom die je wél wilde meenemen zichtbaar wordt.
+plek waar een kolom die je wél wilde meenemen zichtbaar wordt. Een genegeerde
+kolom die leeg is, is ruis; een genegeerde kolom met inhoud is verlies. Het
+rapport telt daarom per genegeerde kolom hoeveel cellen gevuld zijn — bij
+Verhaeg zijn dat er zeventien voor `Ervaring (jaren)`, `Röntgendiploma (j/n)` en
+`Regio (j/n)` elk, en dat zijn precies de harde eisen uit die jobspec.
+
+## Twee dingen die het per opdrachtgever anders doen
+
+**De concurrent-vlag staat niet altijd in een kolom.** De Verhaeg-lijst zet het
+oordeel vooraan in de notitie: `CONCURRENT DIRECT. Werkt Hilversum, woont
+Almere.` Zonder die tekst te lezen bleef het vinkje leeg terwijl de informatie
+er stond — en dat vinkje voedt de outreach-gate. De importer kijkt daarom naar
+het begin van de notitie als de kolom zelf niets zegt. Alleen het begin, en
+alleen bij een lege kolom: "geen concurrent van ons" halverwege een lange
+notitie mag geen vinkje zetten.
+
+**De datumkolom is vrije tekst.** Royal Sanders schrijft ISO, Verhaeg schrijft
+`13 juli 2026`. Dat ging ongewijzigd door naar een datumveld, en met
+`typecast: true` maakt Airtable daar zelf iets van — geen foutmelding, wel een
+verkeerde datum. `naarISO()` herkent nu ISO, Nederlandse maandnamen en
+dag-eerst-notatie met streepjes of schuine strepen. Wat daar niet uitkomt valt
+terug op de importdatum en komt in het rapport te staan onder **onleesbare
+datums**; liever niets dan iets verzonnens.
 
 
 ## Drie kolomindelingen in de Drive
