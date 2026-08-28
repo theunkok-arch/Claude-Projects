@@ -13,7 +13,21 @@
 // dat is uitgerekend het bestand waarmee deze base gevuld is. Een zoekopdracht
 // op naam mist dus stilzwijgend bestanden. Een maplisting op parentId niet.
 
-const SHEET = 'application/vnd.google-apps.spreadsheet'
+/**
+ * Wat de importer kan lezen. Een Google Sheet exporteer je naar CSV, een
+ * geüploade xlsx leest `leesRijen` rechtstreeks.
+ *
+ * Deze lijst stond eerst alleen op Google Sheets, en dat was fout. In de
+ * Normec-map staat de actuele kandidatenlijst als xlsx-upload, zes uur nieuwer
+ * dan de Google Sheet ernaast — die viel af op zijn bestandstype, niet op zijn
+ * inhoud. Een filter dat het nieuwste bestand weggooit is erger dan geen filter.
+ */
+const LEESBAAR = new Set([
+  'application/vnd.google-apps.spreadsheet',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/csv',
+])
 
 /**
  * Namen die in deze Drive voorkomen en nooit de werkversie zijn. Bewust op
@@ -41,8 +55,8 @@ export function kiesNieuwste(bestanden, { krapUren = 1 } = {}) {
   const kandidaten = []
 
   for (const bestand of bestanden) {
-    if (bestand.mimeType && bestand.mimeType !== SHEET) {
-      afgewezen.push({ bestand, reden: 'geen Google Sheet' })
+    if (bestand.mimeType && !LEESBAAR.has(bestand.mimeType)) {
+      afgewezen.push({ bestand, reden: 'geen leesbaar werkblad' })
       continue
     }
     const afleider = AFLEIDERS.find((a) => a.patroon.test(bestand.title ?? ''))

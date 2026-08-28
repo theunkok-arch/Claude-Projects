@@ -340,9 +340,15 @@ node scripts/import/kies-bestand.mjs < maplisting.json
 ```
 
 Neemt een maplisting (de ruwe uitvoer van een Drive-listing op `parentId`) en
-geeft de meest recent bewerkte sheet terug, met `_OLD`, `DONTUSE`, `Kopie van`
-en `backup` eruit en met een waarschuwing als de nummer twee binnen een uur van
-de winnaar is bewerkt.
+geeft het meest recent bewerkte werkblad terug, met `_OLD`, `DONTUSE`, `Kopie
+van` en `backup` eruit en met een waarschuwing als de nummer twee binnen een uur
+van de winnaar is bewerkt.
+
+**Werkblad, niet Google Sheet.** Dit filter stond eerst alleen op Google Sheets,
+en dat was fout. In de Normec-map staat de actuele kandidatenlijst als
+xlsx-upload, zes uur nieuwer dan de Google Sheet ernaast; die viel af op zijn
+bestandstype in plaats van op zijn inhoud. `leesRijen` leest xlsx gewoon. Een
+filter dat het nieuwste bestand weggooit is erger dan geen filter.
 
 **Neem een maplisting, geen naamzoekopdracht.** Drive's
 `title contains 'kandidaten'` vindt
