@@ -11,14 +11,19 @@ import Funnel from '../components/Funnel'
 import StageBadge from '../components/StageBadge'
 import StageSheet from '../components/StageSheet'
 import Terug, { FilterTerug } from '../components/Terug'
+import VacatureFormulier from '../components/VacatureFormulier'
 import type { Regel } from '../lib/types'
 
 export default function VacatureDetail() {
   const { id } = useParams()
   const { state } = useLocation()
   const herkomst = useHerkomst()
-  const { data, regels, wijzigStage } = useAts()
+  const { data, regels, wijzigStage, wijzigVacature } = useAts()
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
+  // Bewerken hoort hier en niet op het vacature-overzicht: dit is het scherm
+  // waar de salarisband en de streefdatum staan, dus waar je ziet dat er iets
+  // ontbreekt.
+  const [bewerken, setBewerken] = useState(false)
 
   // De stagekeuze staat in de URL, zodat een aangeklikte funnel-trede een
   // deelbare link is en de terugknop van de browser gewoon werkt. Geen stage
@@ -129,7 +134,25 @@ export default function VacatureDetail() {
         <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{vacature.Validatie}</p>
       )}
 
-      <dl className="mt-4 grid grid-cols-2 gap-y-1 rounded-2xl border border-lijn bg-white p-4 text-sm">
+      <div className="mt-4 flex items-baseline justify-between gap-3">
+        <h2 className="font-semibold">Gegevens</h2>
+        <button
+          type="button"
+          onClick={() => setBewerken((aan) => !aan)}
+          className="tik text-sm text-navy-400 underline"
+        >
+          {bewerken ? 'Sluiten' : 'Bewerken'}
+        </button>
+      </div>
+
+      {bewerken ? (
+        <VacatureFormulier
+          vacature={vacature}
+          onBewaar={(velden) => wijzigVacature(vacature.id, velden)}
+          onSluit={() => setBewerken(false)}
+        />
+      ) : (
+      <dl className="mt-2 grid grid-cols-2 gap-y-1 rounded-2xl border border-lijn bg-white p-4 text-sm">
         <dt className="text-navy-400">Status</dt>
         <dd className="text-right">{vacature.Status ?? '—'}</dd>
         <dt className="text-navy-400">Standplaats</dt>
@@ -140,7 +163,10 @@ export default function VacatureDetail() {
         <dd className="text-right">{datum(vacature.Startdatum)}</dd>
         <dt className="text-navy-400">Streefdatum shortlist</dt>
         <dd className="text-right">{datum(vacature['Streefdatum shortlist'])}</dd>
+        <dt className="text-navy-400">Scoringsdrempel</dt>
+        <dd className="text-right">{vacature.Scoringsdrempel ?? '—'}</dd>
       </dl>
+      )}
 
       <section className="mt-5 rounded-2xl border border-lijn bg-cream p-4">
         <h2 className="mb-3 font-semibold">Funnel</h2>
