@@ -1,4 +1,12 @@
-import type { Aanmelding, Activiteit, Bootstrap, Kandidaat } from './types'
+import type {
+  Aanmelding,
+  Activiteit,
+  Bootstrap,
+  Contactpersoon,
+  Kandidaat,
+  Opdrachtgever,
+  Vacature,
+} from './types'
 import type { StageId } from '../../shared/stages.mjs'
 
 const SLEUTEL_OPSLAG = 'ds-ats-sleutel'
@@ -88,6 +96,42 @@ export const api = {
 
   wijzigKandidaat: (id: string, velden: Partial<Kandidaat>) =>
     vraag<{ kandidaat: { id: string; fields: Kandidaat } }>(`kandidaat/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(velden),
+    }),
+
+  maakOpdrachtgever: (velden: Partial<Opdrachtgever>) =>
+    vraag<{ opdrachtgever: Opdrachtgever }>('opdrachtgever', {
+      method: 'POST',
+      body: JSON.stringify(velden),
+    }),
+
+  wijzigOpdrachtgever: (id: string, velden: Partial<Opdrachtgever>) =>
+    vraag<{ opdrachtgever: { id: string; fields: Opdrachtgever } }>(`opdrachtgever/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(velden),
+    }),
+
+  maakVacature: (opdrachtgeverId: string, velden: Partial<Vacature>) =>
+    vraag<{ vacature: Vacature }>('vacature', {
+      method: 'POST',
+      body: JSON.stringify({ opdrachtgeverId, ...velden }),
+    }),
+
+  wijzigVacature: (id: string, velden: Partial<Vacature>) =>
+    vraag<{ vacature: { id: string; fields: Vacature } }>(`vacature/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(velden),
+    }),
+
+  maakContactpersoon: (opdrachtgeverId: string, velden: Partial<Contactpersoon>) =>
+    vraag<{ contactpersoon: Contactpersoon }>('contactpersoon', {
+      method: 'POST',
+      body: JSON.stringify({ opdrachtgeverId, ...velden }),
+    }),
+
+  wijzigContactpersoon: (id: string, velden: Partial<Contactpersoon>) =>
+    vraag<{ contactpersoon: { id: string; fields: Contactpersoon } }>(`contactpersoon/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(velden),
     }),

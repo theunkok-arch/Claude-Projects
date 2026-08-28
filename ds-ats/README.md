@@ -301,3 +301,37 @@ weggeschreven, en wist wat het antwoord niet noemt. Voegt iemand een nieuw
 schrijfpad toe, dan hoort die lijst mee.
 
 `scripts/import/README.md` beschrijft de werkwijze.
+
+---
+
+## Klanten, vacatures en contactpersonen beheren
+
+Deze drie tabellen waren alleen in Airtable zelf te bewerken. Dat blokkeerde het
+toevoegen van nieuwe opdrachtgevers, want de import koppelt elke aanmelding op
+naam aan een vacature die er al moet zijn — en `import.mjs` maakt die niet aan.
+
+De endpoints staan er nu:
+
+| Route | Doet |
+|---|---|
+| `POST /api/ats/opdrachtgever` | nieuwe klant, weigert een dubbele naam |
+| `PATCH /api/ats/opdrachtgever/:id` | naam, status, notities |
+| `POST /api/ats/vacature` | nieuwe vacature onder een klant |
+| `PATCH /api/ats/vacature/:id` | titel, status, data, standplaats, salarisband, drempel, jobspec |
+| `POST /api/ats/contactpersoon` | nieuwe contactpersoon onder een klant |
+| `PATCH /api/ats/contactpersoon/:id` | naam, rol, e-mail, telefoon, hiring manager |
+
+Twee dingen die daarin vastliggen:
+
+- **`Portal-token` accepteert de server nooit van de client.** Dat is de sleutel
+  waarmee een klant zijn rapport ziet; een invoerveld nodigt uit tot een kort of
+  raadbaar token. De server genereert hem bij het aanmaken: 32 hex-tekens uit de
+  systeem-CSPRNG, ruim boven de 24 die `rapport.mjs` minimaal eist. Hij staat
+  niet in de veld-whitelist, dus meesturen heeft geen effect.
+- **Een vacature mag pas op Actief met een salarisband.** De base bewaakt dat al
+  via `Validatie`, maar die weigert stil: je vacature blijft dan op Intake staan
+  terwijl er kandidaten op lopen. Dat is met de eerste drie vacatures gebeurd.
+  De server zegt het nu hardop.
+
+`Validatie` en de rollups zijn formules en staan daarom in geen enkele
+whitelist.
