@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { actieveRegels, bronVan, opUrgentie } from '../lib/metrics'
-import { FUNNEL_STAGES } from '../../shared/stages.mjs'
+import { FUNNEL_STAGES, dagenTussen } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import StageBadge from '../components/StageBadge'
@@ -15,6 +15,21 @@ import type { Regel } from '../lib/types'
 const NORM = 'norm'
 
 /**
+ * Sinds wanneer een aanmelding meetelt, in dagen terug vanaf vandaag.
+ * `null` is alles.
+ *
+ * Dit filtert op `Datum aangemaakt` van de aanmelding, niet van de kandidaat:
+ * iemand die al een jaar in de base staat maar vandaag pas aan deze vacature is
+ * gekoppeld, is voor deze opdracht wel degelijk nieuw.
+ */
+const PERIODES = [
+  { dagen: null, label: 'Alles' },
+  { dagen: 0, label: 'Vandaag' },
+  { dagen: 7, label: '7 dagen' },
+  { dagen: 30, label: '30 dagen' },
+] as const
+
+/**
  * Scherm 1, template 2 uit het playbook. Het beginscherm toont de tellingen per
  * stage; pas na doorklikken krijg je de kandidaten van één stage te zien.
  *
@@ -23,6 +38,9 @@ const NORM = 'norm'
  */
 export default function Maandag() {
   const { regels, data, wijzigStage } = useAts()
+  // De datum van de server, niet van de telefoon. Een toestel met een verkeerd
+  // ingestelde klok zou anders een andere selectie "nieuw" noemen dan de base.
+  const vandaag = data?.vandaag ?? ''
   const [zoek, setZoek] = useSearchParams()
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
 
@@ -32,6 +50,11 @@ export default function Maandag() {
   // Het werkt als klant en vacature — een filter op de scope, in de URL, dus
   // deelbaar en met een werkende terugknop.
   const bronFilter = zoek.get('bron')
+  // `?sinds=7` — alleen wat in de laatste zeven dagen is toegevoegd. Na elke
+  // nieuwe importronde is dit hoe je ziet wat erbij is gekomen zonder de hele
+  // lijst opnieuw door te lopen.
+  const sindsRuw = zoek.get('sinds')
+  const sindsFilter = sindsRuw === null ? null : Number(sindsRuw)
   const stage = zoek.get('stage')
 
   const zetZoek = (sleutel: string, waarde: string | null) => {
@@ -53,8 +76,17 @@ export default function Maandag() {
     if (bronFilter) {
       actief = actief.filter((r) => bronVan(r) === bronFilter)
     }
+    if (sindsFilter !== null && Number.isFinite(sindsFilter)) {
+      actief = actief.filter((r) => {
+        const oud = dagenTussen(r.aanmelding['Datum aangemaakt'], vandaag)
+        // Zonder datum weet je niet of het nieuw is. Die aanmeldingen vallen
+        // buiten het filter in plaats van erin: een lijst "nieuw sinds vandaag"
+        // die stiekem ook datumloze regels toont, is geen antwoord op de vraag.
+        return oud !== null && oud <= sindsFilter
+      })
+    }
     return actief
-  }, [regels, klantFilter, vacatureFilter, bronFilter])
+  }, [regels, klantFilter, vacatureFilter, bronFilter, sindsFilter, vandaag])
 
   const teLang = useMemo(() => inScope.filter((r) => r.overschreden), [inScope])
 
@@ -101,6 +133,14 @@ export default function Maandag() {
   const klantNaam =
     klantFilter === 'alle' ? null : (klanten.find((o) => o.id === klantFilter)?.Naam ?? null)
   const vacatureNaam = vacatureFilter === 'alle' ? null : (gekozenVacature?.Titel ?? null)
+  // In de doorgeklikte lijst staan de keuzelijsten niet meer op het scherm.
+  // Zonder deze regel zie je een korter lijstje en weet je niet waarom.
+  const periodeNaam =
+    sindsFilter === null
+      ? null
+      : sindsFilter === 0
+        ? 'vandaag toegevoegd'
+        : `toegevoegd in ${sindsFilter} dagen`
 
   const linkNaarStage = (s: string) => {
     const volgende = new URLSearchParams(zoek)
@@ -122,9 +162,11 @@ export default function Maandag() {
           )}
           <span className="text-2xl font-semibold tabular-nums">{lijst.length}</span>
         </div>
-        {(klantNaam || vacatureNaam || bronFilter) && (
+        {(klantNaam || vacatureNaam || bronFilter || periodeNaam) && (
           <p className="text-sm text-navy-400">
-            {[klantNaam, vacatureNaam, bronFilter && `via ${bronFilter}`].filter(Boolean).join(' · ')}
+            {[klantNaam, vacatureNaam, bronFilter && `via ${bronFilter}`, periodeNaam]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
         )}
 
@@ -223,6 +265,35 @@ export default function Maandag() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/*
+        Chips en geen derde keuzelijst: op 390px houden drie selects naast elkaar
+        elk zo'n 120px over, en dan past geen enkel label er nog in. Vier chips
+        op een rij zijn bovendien in één tik te wisselen, en je ziet zonder open
+        te klappen welke aan staat.
+      */}
+      <div
+        role="group"
+        aria-label="Filter op wanneer de aanmelding is toegevoegd"
+        className="mt-2 flex gap-2 overflow-x-auto"
+      >
+        {PERIODES.map((periode) => {
+          const aan = sindsFilter === periode.dagen || (periode.dagen === null && sindsRuw === null)
+          return (
+            <button
+              key={periode.label}
+              type="button"
+              aria-pressed={aan}
+              onClick={() => zetZoek('sinds', periode.dagen === null ? null : String(periode.dagen))}
+              className={`tik shrink-0 rounded-full border px-3 text-sm ${
+                aan ? 'border-oranje bg-oranje/10 font-medium text-oranje' : 'border-lijn bg-white'
+              }`}
+            >
+              {periode.label}
+            </button>
+          )
+        })}
       </div>
 
       {teLang.length > 0 && (
