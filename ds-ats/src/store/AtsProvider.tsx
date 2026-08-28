@@ -18,6 +18,7 @@ interface AtsContext {
   laden: boolean
   fout: string | null
   ingelogd: boolean
+  verbergFout: () => void
   logIn: (sleutel: string) => Promise<void>
   logUit: () => void
   herlaad: () => Promise<void>
@@ -51,6 +52,8 @@ export function AtsProvider({ children }: { children: ReactNode }) {
         setIngelogd(false)
         setData(null)
       }
+      // Bootstrap is ook de inlogpoging, dus hier blijft de melding van api.ts
+      // staan ("Onjuist wachtwoord.") en niet de sessietekst uit bewaakSessie.
       setFout(error instanceof Error ? error.message : 'Onbekende fout.')
     } finally {
       setLaden(false)
@@ -75,6 +78,32 @@ export function AtsProvider({ children }: { children: ReactNode }) {
     setIngelogd(false)
   }, [])
 
+  const verbergFout = useCallback(() => setFout(null), [])
+
+  /**
+   * Om elke actie heen. Vangt uitsluitend een AuthFout af: bij een 401 heeft
+   * api.ts de sleutel al gewist, dus zonder dit blijft de app denken dat je
+   * ingelogd bent terwijl elke volgende aanroep stil faalt. Nu val je terug op
+   * het inlogscherm, ongeacht welke actie de 401 opliep.
+   *
+   * De fout wordt daarna opnieuw gegooid, en dat is geen detail: StageSheet en
+   * KandidaatFormulier vangen hem zelf en tonen hem in de sheet respectievelijk
+   * het formulier — precies waar de gebruiker staat te kijken. Slikt deze
+   * wrapper de fout in, dan verdwijnt juist die melding.
+   */
+  const bewaakSessie = useCallback(async function <T>(actie: () => Promise<T>): Promise<T> {
+    try {
+      return await actie()
+    } catch (error) {
+      if (error instanceof AuthFout) {
+        setIngelogd(false)
+        setData(null)
+        setFout('Je sessie is verlopen. Log opnieuw in.')
+      }
+      throw error
+    }
+  }, [])
+
   /** Vervangt één aanmelding in de lokale state, zodat de lijst niet hoeft te herladen. */
   const vervangAanmelding = useCallback((id: string, velden: Aanmelding) => {
     setData((huidig) =>
@@ -94,69 +123,84 @@ export function AtsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const wijzigStage = useCallback<AtsContext['wijzigStage']>(
-    async (aanmeldingId, naarStage, opties) => {
-      const res = await api.wijzigStage({ aanmeldingId, naarStage, ...opties })
-      vervangAanmelding(aanmeldingId, res.aanmelding.fields)
-      voegActiviteitToe(res.activiteit)
-    },
-    [vervangAanmelding, voegActiviteitToe],
+    (aanmeldingId, naarStage, opties) =>
+      bewaakSessie(async () => {
+        const res = await api.wijzigStage({ aanmeldingId, naarStage, ...opties })
+        vervangAanmelding(aanmeldingId, res.aanmelding.fields)
+        voegActiviteitToe(res.activiteit)
+      }),
+    [bewaakSessie, vervangAanmelding, voegActiviteitToe],
   )
 
   const wijzigAanmelding = useCallback<AtsContext['wijzigAanmelding']>(
-    async (id, velden) => {
-      const res = await api.wijzigAanmelding(id, velden)
-      vervangAanmelding(id, res.aanmelding.fields)
-    },
-    [vervangAanmelding],
+    (id, velden) =>
+      bewaakSessie(async () => {
+        const res = await api.wijzigAanmelding(id, velden)
+        vervangAanmelding(id, res.aanmelding.fields)
+      }),
+    [bewaakSessie, vervangAanmelding],
   )
 
-  const wijzigKandidaat = useCallback<AtsContext['wijzigKandidaat']>(async (id, velden) => {
-    const res = await api.wijzigKandidaat(id, velden)
-    setData((huidig) =>
-      huidig
-        ? {
-            ...huidig,
-            kandidaten: huidig.kandidaten.map((k) => (k.id === id ? { ...k, ...res.kandidaat.fields, id } : k)),
-          }
-        : huidig,
-    )
-  }, [])
-
-  const verwijderKandidaat = useCallback<AtsContext['verwijderKandidaat']>(async (id) => {
-    await api.verwijderKandidaat(id)
-    setData((huidig) => {
-      if (!huidig) return huidig
-      const aanmeldingIds = new Set(
-        huidig.aanmeldingen.filter((a) => a.Kandidaat?.[0] === id).map((a) => a.id),
-      )
-      return {
-        ...huidig,
-        kandidaten: huidig.kandidaten.filter((k) => k.id !== id),
-        aanmeldingen: huidig.aanmeldingen.filter((a) => !aanmeldingIds.has(a.id)),
-        activiteiten: huidig.activiteiten.filter((a) => !aanmeldingIds.has(a.Aanmelding?.[0] ?? '')),
-      }
-    })
-  }, [])
-
-  const logActiviteit = useCallback<AtsContext['logActiviteit']>(
-    async (aanmeldingId, type, samenvatting) => {
-      const res = await api.logActiviteit({ aanmeldingId, type, samenvatting })
-      voegActiviteitToe(res.activiteit)
-      if (res.kandidaat) {
-        const bijgewerkt = res.kandidaat
+  const wijzigKandidaat = useCallback<AtsContext['wijzigKandidaat']>(
+    (id, velden) =>
+      bewaakSessie(async () => {
+        const res = await api.wijzigKandidaat(id, velden)
         setData((huidig) =>
           huidig
             ? {
                 ...huidig,
                 kandidaten: huidig.kandidaten.map((k) =>
-                  k.id === bijgewerkt.id ? { ...k, ...bijgewerkt } : k,
+                  k.id === id ? { ...k, ...res.kandidaat.fields, id } : k,
                 ),
               }
             : huidig,
         )
-      }
-    },
-    [voegActiviteitToe],
+      }),
+    [bewaakSessie],
+  )
+
+  const verwijderKandidaat = useCallback<AtsContext['verwijderKandidaat']>(
+    (id) =>
+      bewaakSessie(async () => {
+        await api.verwijderKandidaat(id)
+        setData((huidig) => {
+          if (!huidig) return huidig
+          const aanmeldingIds = new Set(
+            huidig.aanmeldingen.filter((a) => a.Kandidaat?.[0] === id).map((a) => a.id),
+          )
+          return {
+            ...huidig,
+            kandidaten: huidig.kandidaten.filter((k) => k.id !== id),
+            aanmeldingen: huidig.aanmeldingen.filter((a) => !aanmeldingIds.has(a.id)),
+            activiteiten: huidig.activiteiten.filter(
+              (a) => !aanmeldingIds.has(a.Aanmelding?.[0] ?? ''),
+            ),
+          }
+        })
+      }),
+    [bewaakSessie],
+  )
+
+  const logActiviteit = useCallback<AtsContext['logActiviteit']>(
+    (aanmeldingId, type, samenvatting) =>
+      bewaakSessie(async () => {
+        const res = await api.logActiviteit({ aanmeldingId, type, samenvatting })
+        voegActiviteitToe(res.activiteit)
+        if (res.kandidaat) {
+          const bijgewerkt = res.kandidaat
+          setData((huidig) =>
+            huidig
+              ? {
+                  ...huidig,
+                  kandidaten: huidig.kandidaten.map((k) =>
+                    k.id === bijgewerkt.id ? { ...k, ...bijgewerkt } : k,
+                  ),
+                }
+              : huidig,
+          )
+        }
+      }),
+    [bewaakSessie, voegActiviteitToe],
   )
 
   const regels = useMemo(() => (data ? bouwRegels(data) : []), [data])
@@ -168,6 +212,7 @@ export function AtsProvider({ children }: { children: ReactNode }) {
       laden,
       fout,
       ingelogd,
+      verbergFout,
       logIn,
       logUit,
       herlaad,
@@ -183,6 +228,7 @@ export function AtsProvider({ children }: { children: ReactNode }) {
       laden,
       fout,
       ingelogd,
+      verbergFout,
       logIn,
       logUit,
       herlaad,

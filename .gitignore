@@ -10,3 +10,9 @@ dosolutions-website/
 
 # Local Netlify folder
 .netlify
+
+# Tijdelijke git-worktrees van parallel werkende agents. Dit is scaffolding van
+# de werkomgeving, geen projectinhoud — er zouden complete checkouts van deze
+# repo in de geschiedenis belanden. De rest van .claude/ (skills, settings) mag
+# wel gewoon mee, vandaar dat alleen deze map genegeerd wordt.
+.claude/worktrees/

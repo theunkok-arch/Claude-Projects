@@ -3,6 +3,11 @@ import type { StageId } from '../../shared/stages.mjs'
 
 const SLEUTEL_OPSLAG = 'ds-ats-sleutel'
 
+/**
+ * Een 401. De sleutel is op dat moment al gewist, dus de aanroeper moet hierop
+ * terugvallen op het inlogscherm: blijft de app "ingelogd", dan faalt elke
+ * volgende actie stil omdat er geen sleutel meer meegaat.
+ */
 export class AuthFout extends Error {}
 
 export function bewaardeSleutel(): string | null {
@@ -31,14 +36,23 @@ export function wisSleutel() {
 
 async function vraag<T>(pad: string, init: RequestInit = {}): Promise<T> {
   const sleutel = bewaardeSleutel()
-  const res = await fetch(`/api/ats/${pad}`, {
-    ...init,
-    headers: {
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(sleutel ? { 'x-ats-key': sleutel } : {}),
-      ...init.headers,
-    },
-  })
+
+  let res: Response
+  try {
+    res = await fetch(`/api/ats/${pad}`, {
+      ...init,
+      headers: {
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(sleutel ? { 'x-ats-key': sleutel } : {}),
+        ...init.headers,
+      },
+    })
+  } catch {
+    // Zonder verbinding gooit fetch een Engelse TypeError ("Failed to fetch").
+    // Die viel niet op toen fouten werden ingeslikt, maar komt nu wel bij de
+    // knop te staan waar de gebruiker op wacht — en de app is Nederlands.
+    throw new Error('Geen verbinding met de server. Probeer het opnieuw.')
+  }
 
   if (res.status === 401) {
     wisSleutel()

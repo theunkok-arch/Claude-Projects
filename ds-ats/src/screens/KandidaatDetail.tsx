@@ -23,6 +23,8 @@ export default function KandidaatDetail() {
   const [bezig, setBezig] = useState(false)
   const [bevestigWissen, setBevestigWissen] = useState(false)
   const [bewerken, setBewerken] = useState(false)
+  const [logFout, setLogFout] = useState<string | null>(null)
+  const [wisFout, setWisFout] = useState<string | null>(null)
 
   const kandidaat = data?.kandidaten.find((k) => k.id === id)
   const eigen = useMemo(() => regels.filter((r) => r.kandidaat?.id === id), [regels, id])
@@ -50,9 +52,16 @@ export default function KandidaatDetail() {
     const doel = eigen[0]
     if (!doel || !samenvatting.trim()) return
     setBezig(true)
+    setLogFout(null)
     try {
       await logActiviteit(doel.aanmelding.id, type, samenvatting.trim())
       setSamenvatting('')
+    } catch (error) {
+      // De tekst blijft staan zodat er niets hoeft te worden overgetypt, maar
+      // dan moet er wel bij staan dat het níet gelogd is: een knop die weer
+      // actief wordt bij een leeggemaakt veld leest als "gelukt", en de tweede
+      // tik levert een dubbele activiteit op als de eerste toch aankwam.
+      setLogFout(error instanceof Error ? error.message : 'Loggen mislukt.')
     } finally {
       setBezig(false)
     }
@@ -61,9 +70,14 @@ export default function KandidaatDetail() {
   async function wis() {
     if (!kandidaat) return
     setBezig(true)
+    setWisFout(null)
     try {
       await verwijderKandidaat(kandidaat.id)
       navigate('/')
+    } catch (error) {
+      // Onomkeerbare actie: zonder melding is "er is niets gebeurd" niet te
+      // onderscheiden van "het is gewist maar de navigatie hing".
+      setWisFout(error instanceof Error ? error.message : 'Verwijderen mislukt.')
     } finally {
       setBezig(false)
     }
@@ -229,6 +243,11 @@ export default function KandidaatDetail() {
                 className="tik min-w-0 flex-1 rounded-xl border border-lijn px-3 text-sm"
               />
             </div>
+            {logFout && (
+              <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                {logFout}
+              </p>
+            )}
             <button
               type="submit"
               disabled={bezig || samenvatting.trim().length === 0}
@@ -265,6 +284,14 @@ export default function KandidaatDetail() {
           </a>
           .
         </p>
+        {wisFout && (
+          <p
+            role="alert"
+            className="mt-3 rounded-xl border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-800"
+          >
+            {wisFout} Ververs om te controleren of de kandidaat er nog staat.
+          </p>
+        )}
         {bevestigWissen ? (
           <div className="mt-3 flex gap-2">
             <button

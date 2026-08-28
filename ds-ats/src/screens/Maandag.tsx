@@ -125,7 +125,9 @@ export default function Maandag() {
             <AanmeldingKaart
               key={regel.aanmelding.id}
               regel={regel}
-              toonVacature={vacatureFilter === 'alle'}
+              // Deze lijst is één stage, op "Over de norm" na: daar staat de kop
+              // al boven het scherm en zou elke kaart dezelfde badge dragen.
+              toonStage={stage === NORM}
               onStage={() => setSheetVoor(regel)}
             />
           ))}

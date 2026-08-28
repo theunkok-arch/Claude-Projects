@@ -8,13 +8,19 @@ const RANDGRENS_DAGEN = 10
 
 interface Props {
   regel: Regel
-  toonVacature?: boolean
+  /**
+   * Uit op een lijst die al op één stage filtert: daar draagt de badge geen
+   * informatie meer, terwijl hij wel de opvallendste kleur op het scherm is.
+   */
+  toonStage?: boolean
   onStage?: () => void
 }
 
-export default function AanmeldingKaart({ regel, toonVacature = false, onStage }: Props) {
-  const { aanmelding, kandidaat, vacature, dagenInStage, overschreden, standaardActie } = regel
+export default function AanmeldingKaart({ regel, toonStage = true, onStage }: Props) {
+  const { aanmelding, kandidaat, vacature, opdrachtgever, dagenInStage, overschreden, standaardActie } =
+    regel
   const opvallend = (dagenInStage ?? 0) > RANDGRENS_DAGEN
+  const score = aanmelding['Score totaal']
 
   return (
     <article
@@ -33,11 +39,39 @@ export default function AanmeldingKaart({ regel, toonVacature = false, onStage }
             {[kandidaat?.['Huidige rol'], kandidaat?.['Huidige werkgever']].filter(Boolean).join(' · ') ||
               'Rol onbekend'}
           </p>
-          {toonVacature && (
-            <p className="mt-0.5 truncate text-xs text-navy-400">{vacature?.Titel ?? 'Geen vacature'}</p>
-          )}
+          {/*
+            Waar de aanmelding bij hoort staat er altijd bij, ook in een lijst die
+            al op één vacature filtert: zonder die regel zijn honderd kaarten niet
+            uit elkaar te houden. De klantnaam hangt achter de vacaturetitel in
+            plaats van bovenaan te staan, want hij is context, geen kop.
+          */}
+          <p className="mt-0.5 truncate text-xs text-navy-400">
+            {[vacature?.Titel, opdrachtgever?.Naam].filter(Boolean).join(' · ') || 'Geen vacature'}
+          </p>
         </Link>
-        <StageBadge stage={aanmelding.Stage} klein onClick={onStage} />
+        {toonStage ? (
+          <StageBadge stage={aanmelding.Stage} klein onClick={onStage} />
+        ) : (
+          onStage && (
+            /*
+              De badge is tegelijk de knop naar de bottom sheet. Staat hij uit, dan
+              blijft die functie hier als grijze tekstknop staan: hetzelfde raakvlak
+              en dezelfde twee taps, zonder de kleur te herhalen die op zo'n lijst
+              voor elke kaart gelijk is.
+            */
+            <button
+              type="button"
+              onClick={onStage}
+              aria-label={`Verplaats ${kandidaat?.Naam ?? 'kandidaat'} naar een andere stage`}
+              className="tik -my-2 -mr-2 flex shrink-0 items-center justify-center gap-1 rounded-xl px-2 text-sm text-navy-400"
+            >
+              Verplaats
+              <span aria-hidden className="opacity-60">
+                ▾
+              </span>
+            </button>
+          )
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -49,8 +83,16 @@ export default function AanmeldingKaart({ regel, toonVacature = false, onStage }
             Concurrent
           </span>
         )}
-        {typeof aanmelding['Score totaal'] === 'number' && (
-          <span className="text-navy-400">score {aanmelding['Score totaal']}</span>
+        {/*
+          De score is de sleutel waarop de lijst na urgentie geordend is. Daarom
+          rechts uitgelijnd en in tabelcijfers: zo vormt hij over de kaarten heen
+          één kolom die je van boven naar beneden afleest.
+        */}
+        {typeof score === 'number' && (
+          <span className="ml-auto shrink-0 tabular-nums">
+            <span className="text-base font-semibold">{score}</span>
+            <span className="text-xs text-navy-400">/100</span>
+          </span>
         )}
       </div>
 

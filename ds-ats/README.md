@@ -116,6 +116,11 @@ Vite + React 19 + TypeScript + Tailwind v4. Ontworpen op 375px.
 
 Interactieregels uit de spec die in code zitten:
 
+- **zoeken op naam, rol of werkgever** via het vergrootglas in de kop. Alle
+  kandidaten staan al in de browser, dus dat gaat niet langs de server. Het
+  zoekscherm gaat over de app heen in plaats van in de kopbalk te staan: op
+  390px is daar geen ruimte om te typen én treffers te tonen. Zonder dit was
+  een kandidaat alleen te vinden als je al wist in welke stage ze stond;
 - kandidaatkaarten, geen brede tabellen;
 - stage wijzigen in twee taps via een bottom sheet;
 - bij Afgevallen verschijnt de redenlijst direct en is die verplicht — de
