@@ -128,12 +128,30 @@ function naarObjecten(matrix) {
     .filter((rij) => Object.values(rij).some((waarde) => String(waarde).trim().length > 0))
 }
 
-/** Koppelt de kolomkoppen van de sheet aan de velden van de base. */
+/**
+ * Koppelt de kolomkoppen van de sheet aan de velden van de base.
+ *
+ * Twee passes. Eerst exact, over alle kolommen: zo wint "Totaal (100)" van
+ * "Score core (60)" voor het scoreveld. Pas daarna wordt de toelichting tussen
+ * haakjes weggelaten, voor de velden die nog niets gevonden hebben. Dat is
+ * nodig omdat niet elke opdrachtgever dezelfde koppen gebruikt — de
+ * Verhaeg-lijst schrijft "Score (totaal)" waar Royal Sanders "Totaal (100)"
+ * schrijft. Zonder die tweede pass verdwijnt de score zonder foutmelding.
+ */
 export function bouwKolomIndex(rijen) {
   const koppen = Object.keys(rijen[0] ?? {})
   const index = {}
+  const zonderHaakjes = (kop) => normaliseer(kop).replace(/\s*\(.*?\)\s*/g, ' ').trim()
+
   for (const [veld, synoniemen] of Object.entries(KOLOM_SYNONIEMEN)) {
     const treffer = koppen.find((kop) => synoniemen.includes(normaliseer(kop)))
+    if (treffer) index[veld] = treffer
+  }
+  for (const [veld, synoniemen] of Object.entries(KOLOM_SYNONIEMEN)) {
+    if (index[veld]) continue
+    const treffer = koppen.find(
+      (kop) => !Object.values(index).includes(kop) && synoniemen.includes(zonderHaakjes(kop)),
+    )
     if (treffer) index[veld] = treffer
   }
   const genegeerd = koppen.filter((kop) => !Object.values(index).includes(kop))

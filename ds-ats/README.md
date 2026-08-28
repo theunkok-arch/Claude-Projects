@@ -220,3 +220,26 @@ hem alsnog. Eindstand: 431 kandidaten + 431 aanmeldingen + 1 opdrachtgever +
 Wat er nog bij moet, past dus niet zomaar. Formulation Technologist, de
 tweede ronde met score-onderbouwing (dat zijn velden, geen records) en het
 moment dat Stagelog wél gaat vollopen: regel vóór dat alles het Team-plan.
+
+---
+
+## Bijwerken vanuit de Drive
+
+De statussen worden ook buiten de app bijgehouden, in de kandidatensheets in
+de klantmappen op de Drive. `scripts/import/sync.mjs` legt zo'n sheet naast de
+base en laat het verschil zien: wie nieuw is, wiens stage is opgeschoven, en
+waar blad en base elkaar tegenspreken.
+
+Twee regels dragen dat:
+
+- **vooruit wel, terug niet.** Wat in de app al verder staat dan in het blad,
+  blijft staan. Zo'n verschil wordt gemeld, niet toegepast — anders gooi je weg
+  wat iemand met de hand heeft gezet;
+- **geen enkel bestand wordt automatisch gekozen.** De mappen op de Drive zijn
+  een werkplek: de namen lopen uiteen, er staan `_OLD`- en `Kopie van`-varianten
+  tussen, en de RA-lijst waarmee deze base gevuld is stond niet eens in de
+  klantmap. `sync.mjs` schrijft daarom geen batch weg zonder
+  `--bevestigd-door`, en legt id, naam en wijzigingsdatum van het gelezen
+  bestand vast bij het resultaat.
+
+`scripts/import/README.md` beschrijft de werkwijze.
