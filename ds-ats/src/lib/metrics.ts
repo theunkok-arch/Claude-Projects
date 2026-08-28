@@ -39,10 +39,17 @@ export const actieveRegels = (regels: Regel[]) => regels.filter((r) => isActief(
 /**
  * Sortering van het maandagoverzicht: eerst wat de norm overschrijdt, daarbinnen
  * het langst stilstaand bovenaan. Dat is de volgorde waarin je moet bellen.
+ *
+ * Daarachter de score aflopend. Na de import staat iedereen op dezelfde datum in
+ * huidige stage, dus de eerste twee sleutels beslissen nu vrijwel nooit iets en
+ * zou de volgorde willekeurig zijn; met de score erbij staat de beste kandidaat
+ * altijd bovenaan.
  */
 export function opUrgentie(a: Regel, b: Regel): number {
   if (a.overschreden !== b.overschreden) return a.overschreden ? -1 : 1
-  return (b.dagenInStage ?? 0) - (a.dagenInStage ?? 0)
+  const stilstand = (b.dagenInStage ?? 0) - (a.dagenInStage ?? 0)
+  if (stilstand !== 0) return stilstand
+  return (b.aanmelding['Score totaal'] ?? 0) - (a.aanmelding['Score totaal'] ?? 0)
 }
 
 export function groepeerPerStage(regels: Regel[]): Array<{ stage: StageId; regels: Regel[] }> {

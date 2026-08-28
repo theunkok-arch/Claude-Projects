@@ -56,6 +56,9 @@ export default function VacatureDetail() {
   if (stage) {
     const kop =
       stage === 'lopend' ? 'Lopend' : stage === 'alles' ? 'Alle kandidaten' : null
+    // "Lopend" en "Alles" lopen over meerdere stages heen; daar zegt de badge per
+    // kaart iets. Bij één gekozen stage staat hij al in de kop.
+    const gemengd = kop !== null
 
     return (
       <div>
@@ -81,6 +84,7 @@ export default function VacatureDetail() {
             <AanmeldingKaart
               key={regel.aanmelding.id}
               regel={regel}
+              toonStage={gemengd}
               onStage={() => setSheetVoor(regel)}
             />
           ))}
