@@ -11,6 +11,7 @@ import KandidaatDetail from './screens/KandidaatDetail'
 import Bronnen from './screens/Bronnen'
 import Rapport from './screens/Rapport'
 import Privacy from './screens/Privacy'
+import KlantPortaal from './klant/KlantPortaal'
 
 export default function App() {
   return (
@@ -19,6 +20,12 @@ export default function App() {
       <Route path="/rapport/:token" element={<Rapport />} />
       {/* Publiek: kandidaten moeten dit kunnen lezen zonder inlog. */}
       <Route path="/privacy" element={<Privacy />} />
+      {/*
+        Het klantportaal staat buiten de provider, net als het rapport. Dat is
+        geen ordening maar een grens: er loopt geen pad van hier naar de interne
+        data, en de gedeelde ATS-sleutel komt op dit scherm niet voor.
+      */}
+      <Route path="/klant/*" element={<KlantPortaal />} />
       <Route
         path="*"
         element={

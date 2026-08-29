@@ -232,6 +232,19 @@ al loopt de sessie nog acht uur.
 Vereist op de Netlify-site: `PORTAL_SESSION_SECRET`, minimaal 32 tekens
 willekeurig.
 
+### Het scherm
+
+`/klant` staat in `src/klant/`, buiten `AtsProvider`, net als het rapport en de
+privacypagina. Dat is geen ordening maar een grens: `src/lib/klant.ts` kent geen
+sleutel, en de sessie zit in een cookie dat `HttpOnly` is — de frontend kan hem
+niet lezen en dus ook niet ergens anders naartoe sturen. `npm test` bewaakt dat
+`src/klant/` niets importeert uit `lib/api`, `store/AtsProvider` of `screens/`.
+
+Er is geen aparte "ben ik ingelogd"-vraag aan de server. Het portaal haalt
+gewoon het overzicht op; lukt dat niet, dan verschijnt het inlogscherm. Eén
+verzoek in plaats van twee, en geen tweede plek waar de frontend een eigen
+mening over de sessie kan krijgen.
+
 ### Toetsen
 
 `npm test` draait `scripts/test/portal.test.mjs` zonder netwerk en zonder de

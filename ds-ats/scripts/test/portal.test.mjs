@@ -272,3 +272,34 @@ test('het cookie wordt tussen andere cookies teruggevonden', () => {
   assert.equal(cookieUitHeader(''), null)
   assert.equal(cookieUitHeader(undefined), null)
 })
+
+// --- de grens tussen klant en kantoor ---------------------------------------
+
+test('het klantscherm importeert niets uit de interne app', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+
+  // api.ts haalt bij elk verzoek de gedeelde ATS-sleutel uit localStorage en
+  // plakt hem in een header. Eén import daarvan in src/klant/ is genoeg om die
+  // sleutel op het scherm van een opdrachtgever te laten belanden. Dezelfde
+  // reden voor AtsProvider: die houdt de complete base in het geheugen.
+  const VERBODEN_IMPORTS = ['lib/api', 'store/AtsProvider', 'screens/']
+
+  const map = new URL('../../src/klant/', import.meta.url).pathname
+  const bestanden = readdirSync(map).filter((n) => n.endsWith('.tsx') || n.endsWith('.ts'))
+  assert.ok(bestanden.length > 0, 'src/klant/ is leeg — is het portaal verplaatst?')
+
+  for (const bestand of bestanden) {
+    const inhoud = readFileSync(join(map, bestand), 'utf8')
+    for (const regel of inhoud.split('\n')) {
+      if (!/^\s*import\b/.test(regel)) continue
+      for (const verboden of VERBODEN_IMPORTS) {
+        assert.equal(
+          regel.includes(verboden),
+          false,
+          `${bestand} importeert uit ${verboden}: ${regel.trim()}`,
+        )
+      }
+    }
+  }
+})
