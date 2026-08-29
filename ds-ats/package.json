@@ -3,10 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Do Solutions ATS — mobile-first pipeline op Airtable",
+  "description": "Do Solutions ATS \u2014 mobile-first pipeline op Airtable",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "node --test \"scripts/test/*.test.mjs\"",
     "preview": "vite preview",
     "typecheck": "tsc -b --force",
     "import": "node scripts/import/import.mjs"

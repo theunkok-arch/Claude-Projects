@@ -12,6 +12,7 @@ export const TABLES = {
   stagelog: 'Stagelog',
   scorecards: 'Scorecards',
   beoordelingen: 'Beoordelingen',
+  portaalgebruikers: 'Portaalgebruikers',
 }
 
 const API = 'https://api.airtable.com/v0'

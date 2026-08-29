@@ -40,8 +40,15 @@ ze raken elkaar niet. The BTC app is independent — don't touch it for EIGEN wo
   dat bestand; wijzig het nooit op één plek na. Types staan in `stages.d.mts`.
 - **De stage hoort bij de aanmelding, nooit bij de kandidaat.** Dat is de hele
   reden dat het datamodel zo is; zet nooit een statusveld op `Kandidaten`.
-- **`netlify/functions/rapport.mjs` filtert server-side.** Voeg daar nooit een veld
-  toe zonder te controleren of de klant het mag zien (README, "Toegang en privacy").
+- **`netlify/functions/rapport.mjs` en `portal.mjs` filteren server-side.** Voeg
+  daar nooit een veld toe zonder te controleren of de klant het mag zien (README,
+  "Klantportaal" en "Toegang en privacy"). Nergens een `...fields`: elk veld dat
+  naar buiten gaat staat met de hand genoemd, zodat een nieuw veld in de base niet
+  vanzelf meelift. `npm test` bewaakt dat, en zoekt op waarden in plaats van op
+  veldnamen zodat hernoemen de toets niet stilzwijgend uitzet.
+- **`portal.mjs` krijgt nooit een route die ATS-data wijzigt.** Klanttoegang is
+  alleen-lezen omdat de code er niet is, niet omdat een controle het tegenhoudt.
+  Bouw klantfunctionaliteit dus nooit in `ats.mjs` achter een rolvlag.
 - **De Airtable-key hoort uitsluitend in de Netlify-omgevingsvariabelen.** De
   frontend praat alleen met `/api/*`.
 
