@@ -19,7 +19,21 @@ export default function Opdrachtgevers() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Opdrachtgevers</h1>
+      <div className="flex items-baseline justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Opdrachtgevers</h1>
+        {/*
+          Geen vijfde tab in de balk onderaan. Klanttoegang beheer je een paar
+          keer per jaar; die vier tabs zijn er voor wat dagelijks is, en op 390
+          pixels kost een vijfde ze allemaal ruimte. Hij hoort hier, want dit is
+          het scherm waar je aan je klanten denkt.
+        */}
+        <Link
+          to="/klanttoegang"
+          className="tik inline-flex shrink-0 items-center rounded-xl border border-lijn bg-white px-4 text-sm font-medium"
+        >
+          Klanttoegang
+        </Link>
+      </div>
 
       <div className="mt-3">
         {nieuw ? (

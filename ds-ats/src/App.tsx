@@ -9,21 +9,19 @@ import Opdrachtgevers from './screens/Opdrachtgevers'
 import OpdrachtgeverDetail from './screens/OpdrachtgeverDetail'
 import KandidaatDetail from './screens/KandidaatDetail'
 import Bronnen from './screens/Bronnen'
-import Rapport from './screens/Rapport'
 import Privacy from './screens/Privacy'
+import Portaaltoegang from './screens/Portaaltoegang'
 import KlantPortaal from './klant/KlantPortaal'
 
 export default function App() {
   return (
     <Routes>
-      {/* Het klantrapport staat bewust buiten de provider: geen sleutel, geen app-data. */}
-      <Route path="/rapport/:token" element={<Rapport />} />
       {/* Publiek: kandidaten moeten dit kunnen lezen zonder inlog. */}
       <Route path="/privacy" element={<Privacy />} />
       {/*
-        Het klantportaal staat buiten de provider, net als het rapport. Dat is
-        geen ordening maar een grens: er loopt geen pad van hier naar de interne
-        data, en de gedeelde ATS-sleutel komt op dit scherm niet voor.
+        Het klantportaal staat buiten de provider. Dat is geen ordening maar
+        een grens: er loopt geen pad van hier naar de interne data, en de
+        gedeelde ATS-sleutel komt op dit scherm niet voor.
       */}
       <Route path="/klant/*" element={<KlantPortaal />} />
       <Route
@@ -62,6 +60,7 @@ function InterneApp() {
         <Route path="/opdrachtgever/:id" element={<OpdrachtgeverDetail />} />
         <Route path="/kandidaat/:id" element={<KandidaatDetail />} />
         <Route path="/bronnen" element={<Bronnen />} />
+        <Route path="/klanttoegang" element={<Portaaltoegang />} />
         <Route path="*" element={<NietGevonden />} />
       </Routes>
     </AppShell>

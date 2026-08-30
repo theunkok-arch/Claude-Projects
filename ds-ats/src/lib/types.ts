@@ -77,6 +77,24 @@ export interface Aanmelding extends AirtableRecord {
   Opmerkingen?: string
 }
 
+/**
+ * Een klantgebruiker van het portaal op /klant.
+ *
+ * `Wachtwoord-hash` en `Salt` staan hier niet in en horen hier ook nooit in te
+ * komen: de server stuurt ze niet mee, en een type dat ze kent nodigt uit tot
+ * een scherm dat ze verwacht.
+ */
+export interface Portaalgebruiker extends AirtableRecord {
+  Naam?: string | null
+  'E-mail'?: string | null
+  Opdrachtgever?: string[]
+  Vacatures?: string[]
+  Status?: 'Actief' | 'Geblokkeerd'
+  'Verloopt op'?: string | null
+  'Laatste login'?: string | null
+  'Geblokkeerd tot'?: string | null
+}
+
 export interface Activiteit extends AirtableRecord {
   Samenvatting?: string
   Aanmelding?: string[]

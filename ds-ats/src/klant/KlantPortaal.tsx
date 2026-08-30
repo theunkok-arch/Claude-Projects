@@ -9,9 +9,9 @@ import VersieMelding from '../components/VersieMelding'
 /**
  * Het klantportaal op /klant. Alleen lezen.
  *
- * Deze boom staat buiten `AtsProvider`, net als het klantrapport en de
- * privacypagina. Dat is geen ordening maar een grens: er is geen pad van hier
- * naar de interne data, en de gedeelde ATS-sleutel komt niet in beeld.
+ * Deze boom staat buiten `AtsProvider`, net als de privacypagina. Dat is geen
+ * ordening maar een grens: er is geen pad van hier naar de interne data, en de
+ * gedeelde ATS-sleutel komt niet in beeld.
  *
  * Er is geen aparte "ben ik ingelogd"-vraag aan de server. Het portaal
  * probeert gewoon het overzicht op te halen; lukt dat niet, dan verschijnt het

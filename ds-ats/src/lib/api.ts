@@ -5,6 +5,7 @@ import type {
   Contactpersoon,
   Kandidaat,
   Opdrachtgever,
+  Portaalgebruiker,
   Vacature,
 } from './types'
 import type { StageId } from '../../shared/stages.mjs'
@@ -142,6 +143,29 @@ export const api = {
   maakAanmelding: (body: { kandidaatId: string; vacatureId: string; stage?: StageId }) =>
     vraag<{ aanmelding: Aanmelding }>('aanmelding', { method: 'POST', body: JSON.stringify(body) }),
 
+  haalPortaalgebruikers: () =>
+    vraag<{ portaalgebruikers: Portaalgebruiker[] }>('portaalgebruikers'),
+
+  /**
+   * Het gegenereerde wachtwoord komt hier één keer terug en wordt nergens
+   * bewaard. Het scherm moet het dus meteen tonen; verdwijnt het uit beeld,
+   * dan is het weg en moet er een nieuw worden gemaakt.
+   */
+  maakPortaalgebruiker: (velden: Partial<Portaalgebruiker>) =>
+    vraag<{ portaalgebruiker: Portaalgebruiker; wachtwoord: string }>('portaalgebruiker', {
+      method: 'POST',
+      body: JSON.stringify(velden),
+    }),
+
+  wijzigPortaalgebruiker: (id: string, velden: Partial<Portaalgebruiker> & { nieuwWachtwoord?: true }) =>
+    vraag<{ portaalgebruiker: Portaalgebruiker; wachtwoord: string | null }>(
+      `portaalgebruiker/${id}`,
+      { method: 'PATCH', body: JSON.stringify(velden) },
+    ),
+
+  verwijderPortaalgebruiker: (id: string) =>
+    vraag<{ verwijderd: string }>(`portaalgebruiker/${id}`, { method: 'DELETE' }),
+
   logActiviteit: (body: {
     aanmeldingId: string
     type: string
@@ -152,11 +176,4 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-}
-
-/** Het klantrapport heeft geen sleutel; de token in de URL is de toegang. */
-export async function haalRapport(token: string) {
-  const res = await fetch(`/api/rapport/${encodeURIComponent(token)}`)
-  if (!res.ok) throw new Error('Dit rapport bestaat niet of is niet meer geldig.')
-  return res.json()
 }

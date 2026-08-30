@@ -39,7 +39,7 @@ Base: **`appSAz5sjFyPm4e0g`** — "Do Solutions ATS" in workspace `wsp624CfW8Eop
 
 | Tabel | Rol |
 |---|---|
-| `Opdrachtgevers` | Klanten. Bevat `Portal-token` voor `/rapport/{token}`. |
+| `Opdrachtgevers` | Klanten. `Portal-token` is een restant van het oude rapport en wordt niet meer gebruikt. |
 | `Contactpersonen` | Wie je spreekt bij de klant, met `Is hiring manager`. |
 | `Vacatures` | De opdracht. Salarisband, streefdatum shortlist, rollups. |
 | `Kandidaten` | Eén record per persoon. Nooit een stage. |
@@ -245,6 +245,23 @@ gewoon het overzicht op; lukt dat niet, dan verschijnt het inlogscherm. Eén
 verzoek in plaats van twee, en geen tweede plek waar de frontend een eigen
 mening over de sessie kan krijgen.
 
+### Beheer
+
+Het scherm **Klanttoegang** hangt onder Opdrachtgevers, niet als vijfde tab in
+de balk: die vier zijn er voor wat dagelijks is, en op 390 pixels kost een
+vijfde ze allemaal ruimte. Daar maak je gebruikers aan, vink je hun vacatures
+aan, genereer je een nieuw wachtwoord, blokkeer je iemand of verwijder je hem.
+
+Het gegenereerde wachtwoord verschijnt **bovenaan** het scherm en haalt zichzelf
+in beeld. Dat is geen opsmuk: het stond eerst in de kaart van de gebruiker zelf,
+en omdat een nieuwe gebruiker onderaan de lijst kwam, verscheen het wachtwoord
+buiten beeld — het ene moment waarop het bestaat.
+
+De server weigert een vacature die niet bij de gekozen opdrachtgever hoort in
+plaats van hem stil te laten vallen. Stil laten vallen is de slechtste optie:
+dan vink je iets aan, zie je het aangevinkt staan, en belt de klant later dat
+hij die vacature niet ziet.
+
 ### Toetsen
 
 `npm test` draait `scripts/test/portal.test.mjs` zonder netwerk en zonder de
@@ -252,6 +269,11 @@ echte base. De kern van die toets is niet dat de goede velden erin zitten — da
 zie je met het oog — maar dat de verboden waarden er niet uit komen. Er wordt
 gezocht op de **waarden** en niet op de veldnamen, zodat een veld hernoemen de
 toets niet stilzwijgend uitzet.
+
+Hetzelfde geldt voor het beheer: er is een toets die controleert dat
+`Wachtwoord-hash` en `Salt` nooit meegaan naar het beheerscherm. Die twee zeggen
+Dominique niets — een hash is niet terug te rekenen — maar ze zijn wel precies
+wat iemand nodig heeft om er offline op te gaan raden.
 
 ---
 
@@ -272,10 +294,10 @@ Dat is volgens 12 de grootste juridische blootstelling, dus:
   `netlify/functions/portal.mjs` staat los van `ats.mjs` en kent geen route die
   ATS-data wijzigt. Wat een opdrachtgever ziet staat hierboven onder
   Klantportaal, en `npm test` bewaakt het.
-- **Het klantrapport filtert server-side.** `netlify/functions/rapport.mjs` bouwt
-  het antwoord op uit alleen wat de klant mag zien. Vervalt zodra het portaal
-  live staat: twee klantgerichte oppervlakken met elk een eigen veldfilter
-  lopen vroeg of laat uit de pas. Interne scores,
+- **Het oude tokenrapport is weg.** `/rapport/{token}` gaf toegang aan wie de
+  link had, zonder inlog. Dat is vervangen door het portaal met een wachtwoord
+  per persoon. Het veld `Portal-token` staat nog in de base maar wordt nergens
+  meer gelezen; er hangt geen route meer aan. Interne scores,
   concurrent-vlaggen, salarisinschattingen, outreach-concepten en namen van
   afgewezen kandidaten verlaten de server niet — ze worden niet in de frontend
   verborgen, ze worden niet verstuurd.

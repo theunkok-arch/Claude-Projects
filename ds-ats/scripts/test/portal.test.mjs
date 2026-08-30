@@ -303,3 +303,47 @@ test('het klantscherm importeert niets uit de interne app', async () => {
     }
   }
 })
+
+// --- het beheer van portaalgebruikers ---------------------------------------
+
+test('een portaalgebruiker gaat nooit met hash of salt terug naar het scherm', async () => {
+  const { platteGebruiker } = await import('../../netlify/functions/ats.mjs')
+
+  const HASH = 'a'.repeat(128)
+  const SALT = 'b'.repeat(32)
+  const uit = platteGebruiker({
+    id: 'recGebruiker00001',
+    fields: {
+      Naam: 'Jeroen de Wit',
+      'E-mail': 'jeroen@klant.nl',
+      'Wachtwoord-hash': HASH,
+      Salt: SALT,
+      Opdrachtgever: ['recOpdrachtgeverRS'],
+      Vacatures: ['recVacFT'],
+      Status: 'Actief',
+      // Een veld dat morgen in de base bij komt en dat niemand hier verwacht.
+      'Interne notitie': 'GEHEIM',
+    },
+  })
+
+  const tekst = JSON.stringify(uit)
+  assert.equal(tekst.includes(HASH), false, 'de wachtwoord-hash staat in het antwoord')
+  assert.equal(tekst.includes(SALT), false, 'de salt staat in het antwoord')
+  assert.equal(tekst.includes('GEHEIM'), false, 'een onbekend veld lift mee naar buiten')
+
+  assert.deepEqual(Object.keys(uit).sort(), [
+    'E-mail', 'Geblokkeerd tot', 'Laatste login', 'Naam',
+    'Opdrachtgever', 'Status', 'Vacatures', 'Verloopt op', 'id',
+  ])
+})
+
+test('het e-mailadres wordt gecontroleerd maar niet overdreven streng', async () => {
+  const { eisAdres } = await import('../../netlify/functions/ats.mjs')
+
+  assert.equal(eisAdres('  jeroen@royalsanders.nl '), 'jeroen@royalsanders.nl', 'spaties eromheen')
+  assert.equal(eisAdres('j.de-wit+ats@sub.example.co.uk'), 'j.de-wit+ats@sub.example.co.uk')
+
+  for (const fout of ['', '   ', 'jeroen', 'jeroen@', '@klant.nl', 'jeroen@klant', 'a b@klant.nl']) {
+    assert.throws(() => eisAdres(fout), /geldig e-mailadres/i, `${JSON.stringify(fout)} werd geaccepteerd`)
+  }
+})

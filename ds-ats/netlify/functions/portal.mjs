@@ -1,8 +1,7 @@
 // Het klantportaal op /api/portal/*. Alleen lezen.
 //
-// Dit is na rapport.mjs de tweede plek waar data het systeem verlaat richting
-// een buitenstaander, en het is de eerste met een inlog. Twee dingen bepalen
-// het ontwerp:
+// Dit is de enige plek waar data het systeem verlaat richting een
+// buitenstaander. Twee dingen bepalen het ontwerp:
 //
 // 1. **Er is geen route die ATS-data wijzigt.** Niet uitgeschakeld, niet
 //    achter een controle — er bestaat geen code voor. Een klantsessie kan geen
