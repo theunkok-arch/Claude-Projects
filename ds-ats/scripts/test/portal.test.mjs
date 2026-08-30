@@ -347,3 +347,72 @@ test('het e-mailadres wordt gecontroleerd maar niet overdreven streng', async ()
     assert.throws(() => eisAdres(fout), /geldig e-mailadres/i, `${JSON.stringify(fout)} werd geaccepteerd`)
   }
 })
+
+// --- de terugkoppeling van de outreach ---------------------------------------
+
+test('LinkedIn-URLs die dezelfde persoon aanwijzen worden gelijk gemaakt', async () => {
+  const { normaliseerUrl } = await import('../../netlify/functions/outreach.mjs')
+
+  // Allemaal dezelfde persoon. Zonder normalisering zou het eindpunt netjes
+  // antwoorden dat de kandidaat niet bestaat, en niemand die het merkt.
+  const zelfde = [
+    'https://www.linkedin.com/in/jan-de-vries-123',
+    'http://linkedin.com/in/jan-de-vries-123',
+    'https://linkedin.com/in/jan-de-vries-123/',
+    'https://www.linkedin.com/in/jan-de-vries-123?utm_source=share',
+    'https://www.linkedin.com/in/jan-de-vries-123#profiel',
+    '  https://WWW.LinkedIn.com/in/Jan-De-Vries-123/  ',
+  ]
+  const genormaliseerd = new Set(zelfde.map(normaliseerUrl))
+  assert.equal(genormaliseerd.size, 1, `verschillende uitkomsten: ${[...genormaliseerd].join(' | ')}`)
+  assert.equal([...genormaliseerd][0], 'linkedin.com/in/jan-de-vries-123')
+
+  // Twee verschillende mensen blijven verschillend.
+  assert.notEqual(
+    normaliseerUrl('https://linkedin.com/in/jan-de-vries-123'),
+    normaliseerUrl('https://linkedin.com/in/jan-de-vries-124'),
+  )
+  assert.equal(normaliseerUrl(''), '')
+  assert.equal(normaliseerUrl(undefined), '')
+  assert.equal(normaliseerUrl(null), '')
+})
+
+test('elke gebeurtenis vertaalt naar een bestaande ATS-fase', async () => {
+  const { STAGE_IDS } = await import('../../shared/stages.mjs')
+  const bron = await import('node:fs').then((fs) =>
+    fs.readFileSync(new URL('../../netlify/functions/outreach.mjs', import.meta.url), 'utf8'),
+  )
+
+  // De tabel staat niet in een export omdat hij nergens anders nodig is; deze
+  // toets leest hem uit de bron. Het punt is dat er nooit een fase in staat
+  // die shared/stages.mjs niet kent — dan zou Airtable met typecast stilzwijgen
+  // iets anders maken van de waarde.
+  const blok = bron.slice(bron.indexOf('const GEBEURTENISSEN'), bron.indexOf('export default'))
+  const fasen = [...blok.matchAll(/:\s*'([^']+)'/g)].map((m) => m[1])
+
+  assert.ok(fasen.length >= 5, `te weinig gebeurtenissen gevonden: ${fasen.length}`)
+  for (const fase of fasen) {
+    assert.ok(STAGE_IDS.includes(fase), `"${fase}" is geen bestaande ATS-fase`)
+  }
+
+  // Het framework kent Reactie/Gesprek/Shortlist; die namen mogen hier niet
+  // rechtstreeks in staan, want in de ATS betekenen ze iets anders.
+  for (const val of ['Reactie', 'Gesprek', 'Nieuw', 'Twijfel', 'Wacht op akkoord']) {
+    assert.equal(fasen.includes(val), false, `frameworknaam "${val}" lekt de ATS in`)
+  }
+})
+
+test('elke ingang heeft zijn eigen sleutel en header', async () => {
+  const { requireKey, HttpError } = await import('../../netlify/lib/airtable.mjs')
+  const verzoek = (headers) => ({ headers: { get: (n) => headers[n] ?? null } })
+
+  process.env.TOETS_SLEUTEL = 'het-juiste-geheim'
+  assert.doesNotThrow(() => requireKey(verzoek({ 'x-toets': 'het-juiste-geheim' }), 'x-toets', 'TOETS_SLEUTEL'))
+  assert.throws(() => requireKey(verzoek({ 'x-toets': 'fout' }), 'x-toets', 'TOETS_SLEUTEL'), HttpError)
+  assert.throws(() => requireKey(verzoek({}), 'x-toets', 'TOETS_SLEUTEL'), HttpError)
+
+  // Een sleutel die niet is ingesteld laat niemand binnen, ook niet met een
+  // lege header — anders opent een vergeten variabele de deur.
+  delete process.env.TOETS_SLEUTEL
+  assert.throws(() => requireKey(verzoek({ 'x-toets': '' }), 'x-toets', 'TOETS_SLEUTEL'), /TOETS_SLEUTEL/)
+})

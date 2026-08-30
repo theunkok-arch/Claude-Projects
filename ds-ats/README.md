@@ -29,6 +29,8 @@ in de base, zodat je ze handmatig kunt vullen zonder later te hoeven migreren.
 
 ## Airtable
 
+Live op **https://dosolats.netlify.app** — de interne app op `/`, het klantportaal op `/klant`.
+
 Base: **`appSAz5sjFyPm4e0g`** — "Do Solutions ATS" in workspace `wsp624CfW8Eop0hmY`.
 
 > Niet te verwarren met `appMLC8Zv6wqnYUdu` ("Do Solutions Kandidaten"), de
@@ -328,6 +330,7 @@ app hoort bij een **tweede Netlify-site**:
    | `AIRTABLE_BASE_ID` | `appSAz5sjFyPm4e0g` |
    | `ATS_APP_PASSWORD` | lang, willekeurig |
    | `PORTAL_SESSION_SECRET` | minimaal 32 tekens willekeurig; ondertekent de sessies van het klantportaal |
+   | `OUTREACH_KEY` | lang, willekeurig; waarmee de outreach-skill fases terugmeldt |
 
 Een push naar `main` bouwt beide sites; ze raken elkaar niet.
 
@@ -370,6 +373,69 @@ Drie dingen vangen dat op, in deze volgorde:
 Zit een toestel er nog steeds op vast, dan helpt één keer verversen met de
 cache leeg: op iOS de app sluiten en het tabblad opnieuw openen, op Android
 lang drukken op de verversknop.
+
+---
+
+## Terugkoppeling vanuit de outreach
+
+De outreach draait in Cowork, buiten deze repo, en logde elke verzending in
+`kandidaten.xlsx`. Daardoor stond de waarheid over "is deze persoon al
+benaderd" op twee plekken en liep de base stil achter na elke follow-upronde.
+
+`netlify/functions/outreach.mjs` is de brug: `POST /api/outreach` met de header
+`x-outreach-key`. Het eindpunt zoekt de kandidaat op LinkedIn-URL, vindt zijn
+aanmelding, en verzet de fase via dezelfde `wijzigStage` als de app — dus mét
+stagelog, klok en klantzichtbaarheid.
+
+```json
+{
+  "linkedinUrl": "https://www.linkedin.com/in/...",
+  "opdrachtgever": "Normec VRO",
+  "vacature": "SNA inspecteur",
+  "gebeurtenis": "follow-up",
+  "kanaal": "inmail",
+  "datum": "2026-09-02"
+}
+```
+
+### Waarom een eigen sleutel
+
+Het alternatief was de skill rechtstreeks met Airtable laten praten. Dan staat
+er een tweede kopie van een token met lees- en schrijfrechten op honderden
+kandidaatdossiers in een omgeving buiten Netlify, en dat is precies wat
+"Toegang en privacy" verbiedt.
+
+`ATS_APP_PASSWORD` meegeven was ook geen optie: die opent de hele interne API.
+`OUTREACH_KEY` kan één ding — de fase van een bestaande aanmelding verzetten en
+dat loggen. Lekt hij, dan kan iemand kandidaten als benaderd markeren. Vervelend,
+en van een andere orde dan vijfhonderd dossiers.
+
+### Gebeurtenissen, geen fasenamen
+
+Het eindpunt accepteert **wat er gebeurd is**, niet waar iemand daarna hoort te
+staan:
+
+| gebeurtenis | wordt |
+|---|---|
+| `eerste bericht` | Benaderd |
+| `follow-up` | Opgevolgd |
+| `reactie` | Gereageerd |
+| `gesproken` | Gesproken |
+| `afgevallen` | Afgevallen (reden verplicht, uit de vaste lijst) |
+
+Dat is met opzet. Het framework in Cowork en de ATS spreken niet dezelfde taal:
+het framework kent `Reactie` en `Gesprek` waar de ATS `Gereageerd` en
+`Gesproken` zegt, en `Shortlist` betekent in de twee lijsten iets heel anders —
+in het framework iemand die nog benaderd moet worden, in de ATS iemand die al
+gesproken is. Die verwarring heeft eerder 25 kandidaten in de verkeerde fase
+gezet. De vertaling staat nu op één plek in code, niet in het hoofd van wie het
+script aanroept.
+
+Twee dingen die het eindpunt bewust niet doet: het maakt geen kandidaten of
+aanmeldingen aan (die komen uit de import, zodat jij het moment van toelaten
+houdt), en het raadt niet welke vacature je bedoelt als iemand er bij meerdere
+loopt — dan krijg je een 409 met de vraag om opdrachtgever en vacature mee te
+geven.
 
 ---
 

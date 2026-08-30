@@ -267,7 +267,13 @@ const plat = (record) => ({ id: record.id, ...record.fields })
  * resetten, klantzichtbaarheid zetten, de reden afdwingen en bij Geplaatst
  * de Ingewerkt-check inplannen.
  */
-async function wijzigStage(body) {
+/**
+ * Ook gebruikt door outreach.mjs. Bewust gedeeld en niet gekopieerd: hier
+ * hangen de vijf automations aan (stagelog schrijven, de klok resetten,
+ * klantzichtbaarheid zetten, de reden afdwingen, de vervolgactie zetten). Een
+ * tweede versie daarvan zou binnen een maand uit de pas lopen.
+ */
+export async function wijzigStage(body) {
   const { aanmeldingId, naarStage, redenAfvallen, volgendeActie, notitie } = body ?? {}
 
   if (!aanmeldingId) throw new HttpError(400, 'Aanmelding-id ontbreekt.')

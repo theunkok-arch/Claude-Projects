@@ -11,7 +11,7 @@
 | Onderdeel | Wat | Deploy |
 |---|---|---|
 | **`eigen-poc/`** | EIGEN — AI real-estate PoC (React 19 + Vite 8 + Tailwind v4, SPA) | **Netlify** → https://eigenpoc.netlify.app, branch `main`, config in root `netlify.toml` (`base = "eigen-poc"`) |
-| **`ds-ats/`** | Do Solutions ATS — recruitment-pipeline op Airtable (React 19 + Vite 8 + Tailwind v4 + TS, Netlify Functions) | **Netlify**, eigen site met base directory `ds-ats`, config in `ds-ats/netlify.toml`, branch `main` |
+| **`ds-ats/`** | Do Solutions ATS — recruitment-pipeline op Airtable (React 19 + Vite 8 + Tailwind v4 + TS, Netlify Functions) | **Netlify** → https://dosolats.netlify.app, eigen site met base directory `ds-ats`, config in `ds-ats/netlify.toml`, branch `main` |
 | **Root `index.html` / `app.js` / ...** | Losse "BTC EMA26 Alerts" PWA | **GitHub Pages** via `.github/workflows/deploy.yml`, branch `claude/bitcoin-ema-alerts-b9BPw` |
 
 **De root `netlify.toml` bouwt alleen `eigen-poc/`.** De ATS is een *tweede*
@@ -52,6 +52,11 @@ ze raken elkaar niet. The BTC app is independent — don't touch it for EIGEN wo
   Bouw klantfunctionaliteit dus nooit in `ats.mjs` achter een rolvlag. Het beheer
   van portaalgebruikers hoort daar wél: dat is werk van Dominique, achter het
   interne wachtwoord. Stuur vanaf daar nooit `Wachtwoord-hash` of `Salt` terug.
+- **Elke ingang krijgt zijn eigen sleutel, met zo min mogelijk macht.**
+  `ATS_APP_PASSWORD` opent de hele interne API, `OUTREACH_KEY` kan alleen een
+  fase verzetten. Geef nooit een bestaande sleutel aan een nieuwe aanroeper
+  omdat dat sneller is, en laat de Airtable-key nooit buiten Netlify komen —
+  ook niet naar een script in Cowork.
 - **De Airtable-key hoort uitsluitend in de Netlify-omgevingsvariabelen.** De
   frontend praat alleen met `/api/*`.
 
