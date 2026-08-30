@@ -31,13 +31,3 @@ export function dagen(aantal: number | null): string {
   if (aantal === null) return '—'
   return aantal === 1 ? '1 dag' : `${aantal} dagen`
 }
-
-export function initialen(naam?: string): string {
-  if (!naam) return '?'
-  return naam
-    .split(/\s+/)
-    .filter((deel) => deel.length > 1)
-    .slice(0, 2)
-    .map((deel) => deel[0]?.toUpperCase())
-    .join('')
-}

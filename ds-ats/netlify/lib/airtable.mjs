@@ -135,11 +135,23 @@ export function safeEqual(a, b) {
   return diff === 0
 }
 
-export function requireAppKey(req) {
-  const expected = process.env.ATS_APP_PASSWORD
-  if (!expected) throw new HttpError(500, 'ATS_APP_PASSWORD is niet ingesteld op deze Netlify-site.')
-  const given = req.headers.get('x-ats-key') ?? ''
+/**
+ * Een gedeeld geheim uit een header controleren.
+ *
+ * Elke ingang heeft zijn eigen sleutel en zijn eigen header, zodat een sleutel
+ * niet meer macht geeft dan bij die ingang hoort. `ATS_APP_PASSWORD` opent de
+ * hele interne API; `OUTREACH_KEY` kan alleen een fase verzetten. Ze door
+ * elkaar kunnen gebruiken zou dat onderscheid weer opheffen.
+ */
+export function requireKey(req, header, envNaam) {
+  const expected = process.env[envNaam]
+  if (!expected) throw new HttpError(500, `${envNaam} is niet ingesteld op deze Netlify-site.`)
+  const given = req.headers.get(header) ?? ''
   if (!safeEqual(given, expected)) throw new HttpError(401, 'Onjuist wachtwoord.')
+}
+
+export function requireAppKey(req) {
+  requireKey(req, 'x-ats-key', 'ATS_APP_PASSWORD')
 }
 
 export function today() {

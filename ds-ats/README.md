@@ -29,6 +29,8 @@ in de base, zodat je ze handmatig kunt vullen zonder later te hoeven migreren.
 
 ## Airtable
 
+Live op **https://dosolats.netlify.app** — de interne app op `/`, het klantportaal op `/klant`.
+
 Base: **`appSAz5sjFyPm4e0g`** — "Do Solutions ATS" in workspace `wsp624CfW8Eop0hmY`.
 
 > Niet te verwarren met `appMLC8Zv6wqnYUdu` ("Do Solutions Kandidaten"), de
@@ -245,6 +247,37 @@ gewoon het overzicht op; lukt dat niet, dan verschijnt het inlogscherm. Eén
 verzoek in plaats van twee, en geen tweede plek waar de frontend een eigen
 mening over de sessie kan krijgen.
 
+### Wie is er met naam zichtbaar
+
+Het veld `Zichtbaar voor klant` op een aanmelding bepaalt of de opdrachtgever
+een naam ziet of alleen initialen. Het staat op het **kandidaatscherm**, onder
+elke aanmelding, als een blok dat letterlijk toont wat de klant ziet — met een
+knop om het om te zetten.
+
+Dat blok gebruikt `shared/klantweergave.mjs`, dezelfde functie waarmee
+`portal.mjs` zijn antwoord opbouwt. Dat is geen nettigheid: stonden daar twee
+implementaties, dan zou op het scherm van Dominique iets anders kunnen staan
+dan bij de klant, en dat verschil ziet niemand tot een kandidaat belt. Er stond
+inderdaad een tweede `initialen` in `src/lib/format.ts` die van "Jan de Vries"
+JD maakte in plaats van J.V.; die werd nergens gebruikt en is verwijderd.
+
+Het vinkje gaat **twee kanten op**. Het gaat automatisch aan zodra een
+aanmelding `Voorgesteld` of verder bereikt, en weer uit zodra hij daaronder
+zakt. Dat laatste ontbrak: een kandidaat die werd teruggetrokken van
+Voorgesteld naar Gesproken bleef met naam en werkgever zichtbaar op het
+portaal. Precies andersom dan bedoeld.
+
+`Afgevallen` is de uitzondering en verandert het vinkje niet. Afgevallen
+kandidaten worden in het portaal sowieso niet als rij getoond, alleen geteld
+per reden, dus het vinkje doet daar niets — en verliest de aanmelding later
+zijn afvalstatus, dan klopt de oude stand nog.
+
+Het blok is bewust **niet oranje** als een naam is vrijgegeven. Oranje betekent
+in deze app dat iets aandacht vraagt; een vrijgegeven naam is een bewust
+besluit dat klopt. Het kandidaatscherm heeft al twee oranje knoppen, en een
+derde die iets anders bedoelt leert de lezer om oranje te negeren. Het verschil
+zit in de tekst: "T.W." naast "Tom Willems" vraagt geen uitleg.
+
 ### Beheer
 
 Het scherm **Klanttoegang** hangt onder Opdrachtgevers, niet als vijfde tab in
@@ -328,6 +361,7 @@ app hoort bij een **tweede Netlify-site**:
    | `AIRTABLE_BASE_ID` | `appSAz5sjFyPm4e0g` |
    | `ATS_APP_PASSWORD` | lang, willekeurig |
    | `PORTAL_SESSION_SECRET` | minimaal 32 tekens willekeurig; ondertekent de sessies van het klantportaal |
+   | `OUTREACH_KEY` | lang, willekeurig; waarmee de outreach-skill fases terugmeldt |
 
 Een push naar `main` bouwt beide sites; ze raken elkaar niet.
 
@@ -370,6 +404,69 @@ Drie dingen vangen dat op, in deze volgorde:
 Zit een toestel er nog steeds op vast, dan helpt één keer verversen met de
 cache leeg: op iOS de app sluiten en het tabblad opnieuw openen, op Android
 lang drukken op de verversknop.
+
+---
+
+## Terugkoppeling vanuit de outreach
+
+De outreach draait in Cowork, buiten deze repo, en logde elke verzending in
+`kandidaten.xlsx`. Daardoor stond de waarheid over "is deze persoon al
+benaderd" op twee plekken en liep de base stil achter na elke follow-upronde.
+
+`netlify/functions/outreach.mjs` is de brug: `POST /api/outreach` met de header
+`x-outreach-key`. Het eindpunt zoekt de kandidaat op LinkedIn-URL, vindt zijn
+aanmelding, en verzet de fase via dezelfde `wijzigStage` als de app — dus mét
+stagelog, klok en klantzichtbaarheid.
+
+```json
+{
+  "linkedinUrl": "https://www.linkedin.com/in/...",
+  "opdrachtgever": "Normec VRO",
+  "vacature": "SNA inspecteur",
+  "gebeurtenis": "follow-up",
+  "kanaal": "inmail",
+  "datum": "2026-09-02"
+}
+```
+
+### Waarom een eigen sleutel
+
+Het alternatief was de skill rechtstreeks met Airtable laten praten. Dan staat
+er een tweede kopie van een token met lees- en schrijfrechten op honderden
+kandidaatdossiers in een omgeving buiten Netlify, en dat is precies wat
+"Toegang en privacy" verbiedt.
+
+`ATS_APP_PASSWORD` meegeven was ook geen optie: die opent de hele interne API.
+`OUTREACH_KEY` kan één ding — de fase van een bestaande aanmelding verzetten en
+dat loggen. Lekt hij, dan kan iemand kandidaten als benaderd markeren. Vervelend,
+en van een andere orde dan vijfhonderd dossiers.
+
+### Gebeurtenissen, geen fasenamen
+
+Het eindpunt accepteert **wat er gebeurd is**, niet waar iemand daarna hoort te
+staan:
+
+| gebeurtenis | wordt |
+|---|---|
+| `eerste bericht` | Benaderd |
+| `follow-up` | Opgevolgd |
+| `reactie` | Gereageerd |
+| `gesproken` | Gesproken |
+| `afgevallen` | Afgevallen (reden verplicht, uit de vaste lijst) |
+
+Dat is met opzet. Het framework in Cowork en de ATS spreken niet dezelfde taal:
+het framework kent `Reactie` en `Gesprek` waar de ATS `Gereageerd` en
+`Gesproken` zegt, en `Shortlist` betekent in de twee lijsten iets heel anders —
+in het framework iemand die nog benaderd moet worden, in de ATS iemand die al
+gesproken is. Die verwarring heeft eerder 25 kandidaten in de verkeerde fase
+gezet. De vertaling staat nu op één plek in code, niet in het hoofd van wie het
+script aanroept.
+
+Twee dingen die het eindpunt bewust niet doet: het maakt geen kandidaten of
+aanmeldingen aan (die komen uit de import, zodat jij het moment van toelaten
+houdt), en het raadt niet welke vacature je bedoelt als iemand er bij meerdere
+loopt — dan krijg je een 409 met de vraag om opdrachtgever en vacature mee te
+geven.
 
 ---
 

@@ -347,3 +347,161 @@ test('het e-mailadres wordt gecontroleerd maar niet overdreven streng', async ()
     assert.throws(() => eisAdres(fout), /geldig e-mailadres/i, `${JSON.stringify(fout)} werd geaccepteerd`)
   }
 })
+
+// --- de terugkoppeling van de outreach ---------------------------------------
+
+test('LinkedIn-URLs die dezelfde persoon aanwijzen worden gelijk gemaakt', async () => {
+  const { normaliseerUrl } = await import('../../netlify/functions/outreach.mjs')
+
+  // Allemaal dezelfde persoon. Zonder normalisering zou het eindpunt netjes
+  // antwoorden dat de kandidaat niet bestaat, en niemand die het merkt.
+  const zelfde = [
+    'https://www.linkedin.com/in/jan-de-vries-123',
+    'http://linkedin.com/in/jan-de-vries-123',
+    'https://linkedin.com/in/jan-de-vries-123/',
+    'https://www.linkedin.com/in/jan-de-vries-123?utm_source=share',
+    'https://www.linkedin.com/in/jan-de-vries-123#profiel',
+    '  https://WWW.LinkedIn.com/in/Jan-De-Vries-123/  ',
+  ]
+  const genormaliseerd = new Set(zelfde.map(normaliseerUrl))
+  assert.equal(genormaliseerd.size, 1, `verschillende uitkomsten: ${[...genormaliseerd].join(' | ')}`)
+  assert.equal([...genormaliseerd][0], 'linkedin.com/in/jan-de-vries-123')
+
+  // Twee verschillende mensen blijven verschillend.
+  assert.notEqual(
+    normaliseerUrl('https://linkedin.com/in/jan-de-vries-123'),
+    normaliseerUrl('https://linkedin.com/in/jan-de-vries-124'),
+  )
+  assert.equal(normaliseerUrl(''), '')
+  assert.equal(normaliseerUrl(undefined), '')
+  assert.equal(normaliseerUrl(null), '')
+})
+
+test('elke gebeurtenis vertaalt naar een bestaande ATS-fase', async () => {
+  const { STAGE_IDS } = await import('../../shared/stages.mjs')
+  const bron = await import('node:fs').then((fs) =>
+    fs.readFileSync(new URL('../../netlify/functions/outreach.mjs', import.meta.url), 'utf8'),
+  )
+
+  // De tabel staat niet in een export omdat hij nergens anders nodig is; deze
+  // toets leest hem uit de bron. Het punt is dat er nooit een fase in staat
+  // die shared/stages.mjs niet kent — dan zou Airtable met typecast stilzwijgen
+  // iets anders maken van de waarde.
+  const blok = bron.slice(bron.indexOf('const GEBEURTENISSEN'), bron.indexOf('export default'))
+  const fasen = [...blok.matchAll(/:\s*'([^']+)'/g)].map((m) => m[1])
+
+  assert.ok(fasen.length >= 5, `te weinig gebeurtenissen gevonden: ${fasen.length}`)
+  for (const fase of fasen) {
+    assert.ok(STAGE_IDS.includes(fase), `"${fase}" is geen bestaande ATS-fase`)
+  }
+
+  // Het framework kent Reactie/Gesprek/Shortlist; die namen mogen hier niet
+  // rechtstreeks in staan, want in de ATS betekenen ze iets anders.
+  for (const val of ['Reactie', 'Gesprek', 'Nieuw', 'Twijfel', 'Wacht op akkoord']) {
+    assert.equal(fasen.includes(val), false, `frameworknaam "${val}" lekt de ATS in`)
+  }
+})
+
+test('elke ingang heeft zijn eigen sleutel en header', async () => {
+  const { requireKey, HttpError } = await import('../../netlify/lib/airtable.mjs')
+  const verzoek = (headers) => ({ headers: { get: (n) => headers[n] ?? null } })
+
+  process.env.TOETS_SLEUTEL = 'het-juiste-geheim'
+  assert.doesNotThrow(() => requireKey(verzoek({ 'x-toets': 'het-juiste-geheim' }), 'x-toets', 'TOETS_SLEUTEL'))
+  assert.throws(() => requireKey(verzoek({ 'x-toets': 'fout' }), 'x-toets', 'TOETS_SLEUTEL'), HttpError)
+  assert.throws(() => requireKey(verzoek({}), 'x-toets', 'TOETS_SLEUTEL'), HttpError)
+
+  // Een sleutel die niet is ingesteld laat niemand binnen, ook niet met een
+  // lege header — anders opent een vergeten variabele de deur.
+  delete process.env.TOETS_SLEUTEL
+  assert.throws(() => requireKey(verzoek({ 'x-toets': '' }), 'x-toets', 'TOETS_SLEUTEL'), /TOETS_SLEUTEL/)
+})
+
+// --- wat de klant van een kandidaat ziet --------------------------------------
+
+test('de initialen zijn overal dezelfde, en laten tussenvoegsels weg', async () => {
+  const { initialen } = await import('../../shared/klantweergave.mjs')
+
+  // Er stonden twee implementaties in de repo die het oneens waren: die in
+  // format.ts maakte van "Jan de Vries" JD en van "Jaap Jan van der Berg" JJ.
+  // Op het scherm van Dominique zou dan iets anders staan dan bij de klant.
+  assert.equal(initialen('Jan de Vries'), 'J.V.')
+  assert.equal(initialen('Jaap Jan van der Berg'), 'J.B.')
+  assert.equal(initialen('Yurita Yona Boodhram'), 'Y.B.')
+  assert.equal(initialen('Chen'), 'C.')
+  assert.equal(initialen('  fatima   yildiz '), 'F.Y.')
+  assert.equal(initialen(''), '?')
+  assert.equal(initialen(null), '?')
+  assert.equal(initialen(undefined), '?')
+})
+
+test('een niet-vrijgegeven kandidaat levert nergens een naam op', async () => {
+  const { klantZiet } = await import('../../shared/klantweergave.mjs')
+
+  const kandidaat = {
+    Naam: 'Jan de Vries',
+    'Huidige rol': 'Lab Technician',
+    'Huidige werkgever': 'Ander BV',
+    Woonplaats: 'Tilburg',
+  }
+
+  const anoniem = klantZiet(kandidaat, false)
+  const tekst = JSON.stringify(anoniem)
+  for (const verboden of ['Jan', 'Vries', 'Ander BV', 'Tilburg']) {
+    assert.equal(tekst.includes(verboden), false, `"${verboden}" staat in de anonieme weergave`)
+  }
+  assert.equal(anoniem.kop, 'J.V.')
+  assert.equal(anoniem.regel, 'Lab Technician')
+  assert.equal(anoniem.anoniem, true)
+
+  const vrij = klantZiet(kandidaat, true)
+  assert.equal(vrij.kop, 'Jan de Vries')
+  assert.equal(vrij.regel, 'Lab Technician · Ander BV · Tilburg')
+  assert.equal(vrij.anoniem, false)
+
+  // Een kandidaat die er niet is mag geen lege plek opleveren.
+  assert.equal(klantZiet(undefined, false).kop, '?')
+  assert.equal(klantZiet(null, true).kop, '?')
+})
+
+test('de portal en het ATS-scherm tonen dezelfde kop', async () => {
+  const { bouwOverzicht } = await import('../../netlify/functions/portal.mjs')
+  const { klantZiet } = await import('../../shared/klantweergave.mjs')
+
+  // Beide kanten met dezelfde gegevens voeden en de uitkomst vergelijken. Deze
+  // twee moeten het eens zijn; zo niet, dan staat er bij Dominique iets anders
+  // op het scherm dan bij haar klant.
+  const KLANT = 'recKlant000000001'
+  const kandidaat = { Naam: 'Jaap Jan van der Berg', 'Huidige rol': 'Formulator' }
+
+  for (const vrijgegeven of [false, true]) {
+    const payload = bouwOverzicht({
+      gebruiker: { id: 'recG', fields: { Opdrachtgever: [KLANT], Vacatures: ['recV'] } },
+      opdrachtgever: { id: KLANT, fields: { Naam: 'Royal Sanders' } },
+      vacatures: [{ id: 'recV', fields: { Titel: 'Rol', Opdrachtgever: [KLANT] } }],
+      aanmeldingen: [
+        {
+          id: 'recA',
+          fields: {
+            Vacature: ['recV'],
+            Kandidaat: ['recK'],
+            Stage: 'Voorgesteld',
+            'Zichtbaar voor klant': vrijgegeven,
+          },
+        },
+      ],
+      kandidaten: [{ id: 'recK', fields: kandidaat }],
+      vandaag: '2026-08-30',
+    })
+
+    const rij = payload.vacatures[0].kandidaten[0]
+    const opScherm = klantZiet(kandidaat, vrijgegeven)
+    const inPortal = rij.vrijgegeven && rij.naam ? rij.naam : rij.initialen
+
+    assert.equal(
+      inPortal,
+      opScherm.kop,
+      `portal toont "${inPortal}" en het ATS-scherm "${opScherm.kop}" (vrijgegeven: ${vrijgegeven})`,
+    )
+  }
+})

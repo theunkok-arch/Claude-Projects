@@ -267,7 +267,13 @@ const plat = (record) => ({ id: record.id, ...record.fields })
  * resetten, klantzichtbaarheid zetten, de reden afdwingen en bij Geplaatst
  * de Ingewerkt-check inplannen.
  */
-async function wijzigStage(body) {
+/**
+ * Ook gebruikt door outreach.mjs. Bewust gedeeld en niet gekopieerd: hier
+ * hangen de vijf automations aan (stagelog schrijven, de klok resetten,
+ * klantzichtbaarheid zetten, de reden afdwingen, de vervolgactie zetten). Een
+ * tweede versie daarvan zou binnen een maand uit de pas lopen.
+ */
+export async function wijzigStage(body) {
   const { aanmeldingId, naarStage, redenAfvallen, volgendeActie, notitie } = body ?? {}
 
   if (!aanmeldingId) throw new HttpError(400, 'Aanmelding-id ontbreekt.')
@@ -289,7 +295,20 @@ async function wijzigStage(body) {
     'Reden afvallen': naarStage === 'Afgevallen' ? redenAfvallen : null,
   }
 
+  // Beide kanten op, en dat was het niet.
+  //
+  // Het vinkje ging alleen aan. Trok Dominique een kandidaat terug van
+  // Voorgesteld naar Gesproken — omdat de voordracht toch niet doorging —
+  // dan bleef zijn volledige naam voor de opdrachtgever zichtbaar op het
+  // portaal. Precies andersom dan bedoeld: iemand die juist uit beeld is
+  // gehaald, bleef in beeld.
+  //
+  // Afgevallen is de uitzondering. Die kandidaten worden in de portal sowieso
+  // niet als rij getoond, alleen geteld per reden, dus het vinkje doet daar
+  // niets. Het blijft staan zoals het stond: verliest de aanmelding zijn
+  // afvalstatus weer, dan klopt het nog.
   if (isKlantZichtbaar(naarStage)) fields['Zichtbaar voor klant'] = true
+  else if (naarStage !== 'Afgevallen') fields['Zichtbaar voor klant'] = false
 
   if (volgendeActie !== undefined) fields['Volgende actie'] = volgendeActie
   else if (naarStage === 'Geplaatst') fields['Volgende actie'] = `Ingewerkt-check op ${plusDays(30)}`

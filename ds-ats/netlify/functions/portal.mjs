@@ -42,6 +42,7 @@ import {
   wisCookie,
 } from '../lib/portaal.mjs'
 import { FUNNEL_STAGES, STAGE_IDS, dagenTussen } from '../../shared/stages.mjs'
+import { initialen } from '../../shared/klantweergave.mjs'
 
 export const config = { path: '/api/portal/*' }
 
@@ -323,18 +324,6 @@ function kandidaatregel(aanmelding, kandidaatById, vandaag) {
     huidigeWerkgever: vrijgegeven ? (kandidaat['Huidige werkgever'] ?? null) : null,
     woonplaats: vrijgegeven ? (kandidaat.Woonplaats ?? null) : null,
   }
-}
-
-/** "Jan de Vries" wordt "J.V." — voornaam en achternaam, tussenvoegsels eruit. */
-function initialen(naam) {
-  const delen = String(naam ?? '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-  if (delen.length === 0) return '?'
-  const eerste = delen[0][0]
-  const laatste = delen.length > 1 ? delen[delen.length - 1][0] : ''
-  return [eerste, laatste].filter(Boolean).map((l) => `${l.toUpperCase()}.`).join('')
 }
 
 /**
