@@ -14,10 +14,11 @@ interface Veld {
  * Precies de velden die de server accepteert (`AANMELDING_VELDEN` in
  * netlify/functions/ats.mjs). Bewust niet erbij:
  *
- * - `Zichtbaar voor klant` bepaalt wat er in het klantrapport terechtkomt, en
- *   wordt gezet zodra een aanmelding een klantzichtbare stage bereikt. Daar met
- *   de hand overheen kunnen is een privacybesluit dat een eigen ontwerp
- *   verdient, geen selectievakje tussen de dagelijkse invoer;
+ * - `Zichtbaar voor klant` bepaalt of de opdrachtgever de naam en werkgever van
+ *   deze kandidaat op het portaal ziet in plaats van alleen initialen, en wordt
+ *   gezet zodra een aanmelding een klantzichtbare stage bereikt. Daar met de
+ *   hand overheen kunnen is een privacybesluit dat een eigen ontwerp verdient,
+ *   geen selectievakje tussen de dagelijkse invoer;
  * - `Concurrent` is een signaal uit de sourcing, geen dagelijkse invoer;
  * - `Outreach-concept` en `Eigenaar` horen bij respectievelijk de outreach en
  *   een tweede gebruiker; geen van beide loopt vandaag via dit scherm;

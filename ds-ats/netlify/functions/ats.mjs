@@ -15,6 +15,7 @@ import {
   today,
   plusDays,
 } from '../lib/airtable.mjs'
+import { genereerWachtwoord, hashWachtwoord, nieuweSalt } from '../lib/portaal.mjs'
 import {
   STAGE_IDS,
   ALLE_AFVAL_REDENEN,
@@ -55,11 +56,12 @@ const KANDIDAAT_VELDEN = new Set([
 ])
 
 /**
- * `Portal-token` staat hier bewust niet in. Dat is de sleutel waarmee een klant
- * zijn rapport ziet — wie de link heeft, ziet het rapport. Een veld dat de
- * client mag zetten nodigt uit tot een kort of raadbaar token; de server maakt
- * hem daarom zelf aan en accepteert hem nooit van buiten. `Aantal vacatures` is
- * een count-veld en niet schrijfbaar.
+ * `Portal-token` staat hier bewust niet in. Dat veld hoorde bij het oude
+ * tokenrapport op /rapport/{token} en wordt nergens meer gelezen; klanttoegang
+ * loopt nu via `Portaalgebruikers` met een eigen wachtwoord per persoon. Het
+ * veld staat nog in de base zodat oude records niet stilzwijgend leeglopen,
+ * maar er hangt geen route meer aan. `Aantal vacatures` is een count-veld en
+ * niet schrijfbaar.
  */
 const OPDRACHTGEVER_VELDEN = new Set(['Naam', 'Status', 'Notities'])
 
@@ -177,6 +179,25 @@ export default async (req) => {
           pick(await req.json(), CONTACTPERSOON_VELDEN),
         )
         return json(200, { contactpersoon: record })
+      }
+
+      case 'GET portaalgebruikers':
+        return json(200, { portaalgebruikers: await leesPortaalgebruikers() })
+
+      case 'POST portaalgebruiker':
+        return json(201, await maakPortaalgebruiker(await req.json()))
+
+      case 'PATCH portaalgebruiker': {
+        const id = segments[1]
+        if (!id) throw new HttpError(400, 'Portaalgebruiker-id ontbreekt.')
+        return json(200, await wijzigPortaalgebruiker(id, await req.json()))
+      }
+
+      case 'DELETE portaalgebruiker': {
+        const id = segments[1]
+        if (!id) throw new HttpError(400, 'Portaalgebruiker-id ontbreekt.')
+        await deleteRecords(TABLES.portaalgebruikers, [id])
+        return json(200, { verwijderd: id })
       }
 
       default:
@@ -384,17 +405,6 @@ async function logActiviteit(body) {
 }
 
 /** AVG-verwijdering: kandidaat en alles wat aan hem hangt, onherstelbaar. */
-/**
- * Een token dat de klant zijn eigen rapport laat zien en dat van een ander niet.
- * 32 hex-tekens uit de systeem-CSPRNG; de rapportfunctie weigert alles onder de
- * 24 tekens. De client mag hem niet meesturen — zie OPDRACHTGEVER_VELDEN.
- */
-function nieuwToken() {
-  return [...crypto.getRandomValues(new Uint8Array(16))]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-}
-
 async function maakOpdrachtgever(body) {
   const fields = pick(body, OPDRACHTGEVER_VELDEN)
   if (!fields.Naam) throw new HttpError(400, 'Naam is verplicht.')
@@ -405,9 +415,7 @@ async function maakOpdrachtgever(body) {
     throw new HttpError(409, `Opdrachtgever "${fields.Naam}" bestaat al.`)
   }
 
-  const [record] = await createRecords(TABLES.opdrachtgevers, [
-    { fields: { ...fields, 'Portal-token': nieuwToken() } },
-  ])
+  const [record] = await createRecords(TABLES.opdrachtgevers, [{ fields }])
   return { opdrachtgever: plat(record) }
 }
 
@@ -459,4 +467,193 @@ async function verwijderKandidaat(kandidaatId) {
 
   await deleteRecords(TABLES.kandidaten, [kandidaatId])
   return { verwijderd: kandidaatId, aanmeldingen: aanmeldingIds.length }
+}
+
+// ---------------------------------------------------------------------------
+// Portaalgebruikers: het beheer van de klanttoegang
+// ---------------------------------------------------------------------------
+
+/**
+ * Wat er van een portaalgebruiker terug mag naar het beheerscherm.
+ *
+ * `Wachtwoord-hash` en `Salt` staan hier met opzet niet in, en dat is geen
+ * overdreven voorzichtigheid: die twee horen de base nooit te verlaten. Ze
+ * zeggen niets tegen Dominique — een hash is niet terug te rekenen — maar ze
+ * zijn wel precies wat iemand nodig heeft om offline op wachtwoorden te gaan
+ * raden. Een `plat()` met een spread zou ze hebben meegestuurd.
+ */
+export const platteGebruiker = (record) => ({
+  id: record.id,
+  Naam: record.fields.Naam ?? null,
+  'E-mail': record.fields['E-mail'] ?? null,
+  Opdrachtgever: record.fields.Opdrachtgever ?? [],
+  Vacatures: record.fields.Vacatures ?? [],
+  Status: record.fields.Status ?? 'Actief',
+  'Verloopt op': record.fields['Verloopt op'] ?? null,
+  'Laatste login': record.fields['Laatste login'] ?? null,
+  'Geblokkeerd tot': record.fields['Geblokkeerd tot'] ?? null,
+})
+
+/** Standaard drie maanden. Toegang die nooit verloopt, verloopt nooit. */
+const STANDAARD_GELDIGHEID_DAGEN = 90
+
+async function leesPortaalgebruikers() {
+  const records = await listAll(TABLES.portaalgebruikers)
+  return records.map(platteGebruiker)
+}
+
+const genormaliseerd = (waarde) => String(waarde ?? '').trim().toLowerCase()
+
+/**
+ * Airtable kent geen uniciteit op een veld, dus de server bewaakt het.
+ * Twee gebruikers met hetzelfde adres zou betekenen dat de login altijd bij de
+ * eerste uitkomt en de tweede stilzwijgend nooit werkt.
+ */
+async function eisUniekAdres(email, behalveId = null) {
+  const bestaand = await listAll(TABLES.portaalgebruikers, { fields: ['E-mail'] })
+  const botsing = bestaand.find(
+    (g) => g.id !== behalveId && genormaliseerd(g.fields['E-mail']) === genormaliseerd(email),
+  )
+  if (botsing) throw new HttpError(409, 'Er bestaat al een portaalgebruiker met dit e-mailadres.')
+}
+
+/**
+ * De vacatures moeten van de opgegeven opdrachtgever zijn.
+ *
+ * De portal controleert dit bij het uitserveren nog een keer, dus een fout hier
+ * lekt niets. Maar stil laten vallen wat niet klopt, is de slechtste van de
+ * drie opties: dan vinkt Dominique iets aan, ziet ze het aangevinkt staan, en
+ * belt de klant later dat hij die vacature niet ziet. Liever hier weigeren.
+ */
+async function eisEigenVacatures(opdrachtgeverId, vacatureIds) {
+  if (vacatureIds.length === 0) return
+  const vacatures = await listAll(TABLES.vacatures, { fields: ['Titel', 'Opdrachtgever'] })
+  const perId = new Map(vacatures.map((v) => [v.id, v]))
+
+  for (const id of vacatureIds) {
+    const vacature = perId.get(id)
+    if (!vacature) throw new HttpError(400, `Vacature ${id} bestaat niet.`)
+    if (!(vacature.fields.Opdrachtgever ?? []).includes(opdrachtgeverId)) {
+      throw new HttpError(
+        400,
+        `De vacature "${vacature.fields.Titel ?? id}" hoort bij een andere opdrachtgever.`,
+      )
+    }
+  }
+}
+
+export function eisAdres(email) {
+  const tekst = String(email ?? '').trim()
+  // Bewust ruim: een adres afkeuren dat de klant wél gebruikt is erger dan er
+  // een doorlaten dat nooit post ontvangt. Dit veld is een inlognaam.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tekst)) throw new HttpError(400, 'Vul een geldig e-mailadres in.')
+  return tekst
+}
+
+/**
+ * Het gegenereerde wachtwoord gaat één keer terug naar het scherm en wordt
+ * nergens bewaard. Dominique geeft het door; daarna bestaat het alleen nog in
+ * het hoofd of de wachtwoordkluis van de klant. Kwijt is opnieuw genereren, en
+ * dat is met opzet zo: een wachtwoord dat op te zoeken is, is een wachtwoord
+ * dat iedereen met base-toegang kan opzoeken.
+ */
+async function nieuwWachtwoordVelden() {
+  const wachtwoord = genereerWachtwoord()
+  const salt = nieuweSalt()
+  return {
+    wachtwoord,
+    velden: {
+      Salt: salt,
+      'Wachtwoord-hash': await hashWachtwoord(wachtwoord, salt),
+      'Mislukte pogingen': 0,
+      'Geblokkeerd tot': null,
+    },
+  }
+}
+
+async function maakPortaalgebruiker(body) {
+  const naam = String(body?.Naam ?? '').trim()
+  const email = eisAdres(body?.['E-mail'])
+  const opdrachtgeverId = first(body?.Opdrachtgever)
+  const vacatureIds = Array.isArray(body?.Vacatures) ? body.Vacatures : []
+
+  if (!naam) throw new HttpError(400, 'Vul een naam in.')
+  if (!opdrachtgeverId) throw new HttpError(400, 'Kies een opdrachtgever.')
+
+  await eisUniekAdres(email)
+  await eisEigenVacatures(opdrachtgeverId, vacatureIds)
+
+  const { wachtwoord, velden } = await nieuwWachtwoordVelden()
+
+  const [record] = await createRecords(TABLES.portaalgebruikers, [
+    {
+      Naam: naam,
+      'E-mail': email,
+      Opdrachtgever: [opdrachtgeverId],
+      Vacatures: vacatureIds,
+      Status: 'Actief',
+      'Verloopt op': body?.['Verloopt op'] || plusDays(STANDAARD_GELDIGHEID_DAGEN),
+      ...velden,
+    },
+  ])
+
+  return { portaalgebruiker: platteGebruiker(record), wachtwoord }
+}
+
+async function wijzigPortaalgebruiker(id, body) {
+  const huidig = await getRecord(TABLES.portaalgebruikers, id)
+  const fields = {}
+
+  if (body?.Naam !== undefined) {
+    const naam = String(body.Naam).trim()
+    if (!naam) throw new HttpError(400, 'Vul een naam in.')
+    fields.Naam = naam
+  }
+
+  if (body?.['E-mail'] !== undefined) {
+    const email = eisAdres(body['E-mail'])
+    await eisUniekAdres(email, id)
+    fields['E-mail'] = email
+  }
+
+  if (body?.Status !== undefined) {
+    if (!['Actief', 'Geblokkeerd'].includes(body.Status)) {
+      throw new HttpError(400, 'Status moet Actief of Geblokkeerd zijn.')
+    }
+    fields.Status = body.Status
+  }
+
+  if (body?.['Verloopt op'] !== undefined) fields['Verloopt op'] = body['Verloopt op'] || null
+
+  // De opdrachtgever en de vacatures horen bij elkaar: verhuist de een, dan
+  // moet de ander opnieuw worden gecontroleerd. Ze worden daarom samen getoetst
+  // tegen de eindsituatie, niet los tegen de oude.
+  const opdrachtgeverId = body?.Opdrachtgever !== undefined
+    ? first(body.Opdrachtgever)
+    : first(huidig.fields.Opdrachtgever)
+  const vacatureIds = body?.Vacatures !== undefined
+    ? body.Vacatures
+    : (huidig.fields.Vacatures ?? [])
+
+  if (body?.Opdrachtgever !== undefined || body?.Vacatures !== undefined) {
+    if (!opdrachtgeverId) throw new HttpError(400, 'Kies een opdrachtgever.')
+    await eisEigenVacatures(opdrachtgeverId, vacatureIds)
+    fields.Opdrachtgever = [opdrachtgeverId]
+    fields.Vacatures = vacatureIds
+  }
+
+  // Een nieuw wachtwoord heft een tijdelijke blokkade op. Wie een nieuw
+  // wachtwoord doorgeeft wil dat de klant er meteen in kan, niet pas na een
+  // kwartier wachten op een teller die van iemand anders is.
+  let wachtwoord = null
+  if (body?.nieuwWachtwoord === true) {
+    const nieuw = await nieuwWachtwoordVelden()
+    wachtwoord = nieuw.wachtwoord
+    Object.assign(fields, nieuw.velden)
+  }
+
+  if (Object.keys(fields).length === 0) throw new HttpError(400, 'Geen bij te werken velden meegegeven.')
+
+  const record = await updateRecord(TABLES.portaalgebruikers, id, fields)
+  return { portaalgebruiker: platteGebruiker(record), wachtwoord }
 }

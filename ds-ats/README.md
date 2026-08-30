@@ -39,7 +39,7 @@ Base: **`appSAz5sjFyPm4e0g`** — "Do Solutions ATS" in workspace `wsp624CfW8Eop
 
 | Tabel | Rol |
 |---|---|
-| `Opdrachtgevers` | Klanten. Bevat `Portal-token` voor `/rapport/{token}`. |
+| `Opdrachtgevers` | Klanten. `Portal-token` is een restant van het oude rapport en wordt niet meer gebruikt. |
 | `Contactpersonen` | Wie je spreekt bij de klant, met `Is hiring manager`. |
 | `Vacatures` | De opdracht. Salarisband, streefdatum shortlist, rollups. |
 | `Kandidaten` | Eén record per persoon. Nooit een stage. |
@@ -48,6 +48,7 @@ Base: **`appSAz5sjFyPm4e0g`** — "Do Solutions ATS" in workspace `wsp624CfW8Eop
 | `Stagelog` | Elke overgang. Levert doorlooptijd en conversie zonder handwerk. |
 | `Scorecards` | Vijf outcomes per vacature. |
 | `Beoordelingen` | Score per outcome per beoordelaar. |
+| `Portaalgebruikers` | Klantgebruikers voor `/klant`. Alleen een wachtwoord-hash, nooit het wachtwoord. |
 
 ### Formules die het werk doen
 
@@ -162,6 +163,120 @@ gevuld, zodat hij zichtbaar tussen Gesproken en Voorgesteld in valt.
 
 ---
 
+## Klantportaal
+
+Opdrachtgevers hebben een eigen ingang op `/klant`, strikt alleen-lezen, met
+een eigen wachtwoord per persoon. Dominique beheert die gebruikers vanuit de
+ATS; niemand vult de tabel met de hand.
+
+### Waarom een aparte functie
+
+`netlify/functions/portal.mjs` staat volledig los van `ats.mjs`. Geen gedeelde
+router met een rolvlag erin, want dan is één vergeten tak genoeg om een
+opdrachtgever schrijfrechten te geven. De portal kent drie routes — `login`,
+`logout`, `overzicht` — en verder niets. Er is geen code die ATS-data wijzigt.
+Geschreven wordt er op precies één plek: `login` werkt het loginlogboek van de
+gebruiker zelf bij.
+
+### Wat een opdrachtgever ziet
+
+| | |
+|---|---|
+| **Vacature** | titel, status, standplaats, startdatum, streefdatum shortlist, aantal aanmeldingen, funnel |
+| **Kandidaat, standaard** | initialen, huidige rol, fase, scoretotaal, dagen in fase |
+| **Kandidaat, na `Zichtbaar voor klant`** | plus naam, huidige werkgever, woonplaats |
+| **Afgevallen** | alleen geteld per reden, nooit als rij |
+
+Niet, in geen enkele stand: e-mail, telefoon, LinkedIn, Instagram, opleiding,
+bron, `Score-onderbouwing`, `Outreach-concept`, `Opmerkingen`, `Notities`,
+`Concurrent`, reistijd, salarisband, scoringsdrempel, `Validatie`, en alle
+AVG-velden.
+
+Elk veld dat naar buiten gaat staat met de hand in `bouwOverzicht`. Nergens een
+`...fields` — zet iemand morgen een veld `Interne notitie` op Aanmeldingen, dan
+komt dat niet vanzelf mee. Bij de kandidaten gaat het een stap verder: de
+verboden velden worden niet eens bij Airtable opgehaald.
+
+Een afvalreden is een oordeel over een persoon. Geteld laat het zien waar de
+search op stukloopt; per naam zou het iets heel anders zijn.
+
+### De dubbele grendel
+
+Een vacature komt alleen door als hij in de lijst `Vacatures` van die gebruiker
+staat **én** bij diens `Opdrachtgever` hoort. Belandt er per ongeluk een
+vacature van een andere klant in de lijst, dan valt die alsnog af. Een lege
+lijst geeft geen toegang, niet alle toegang — dat faalt de goede kant op.
+
+### Wachtwoorden
+
+De tabel `Portaalgebruikers` bevat **geen wachtwoorden**, alleen een
+scrypt-hash met een salt per gebruiker. Airtable is geen kluis: iedereen met
+toegang tot de base leest die tabel. Een vergeten wachtwoord is dus niet op te
+zoeken, ook niet door Dominique — alleen opnieuw te genereren. Het gegenereerde
+wachtwoord is vier groepen van vier tekens uit een alfabet zonder `l`, `I`,
+`1`, `O` en `0`, omdat het door de telefoon wordt doorgegeven.
+
+Vijf mislukte pogingen zetten het account een kwartier op slot. Het inlogscherm
+geeft dezelfde melding voor een onbekend adres als voor een fout wachtwoord, en
+draait ook zonder gevonden gebruiker één keer scrypt — anders is het
+antwoordtempo een klantenlijst.
+
+### De sessie
+
+Een HMAC-ondertekend cookie met `HttpOnly; Secure; SameSite=Strict;
+Path=/api/portal`. Dat pad is geen detail: de browser stuurt dit cookie
+daardoor fysiek nooit naar `/api/ats`. Het gebruikersrecord wordt bij elk
+verzoek opnieuw gelezen, dus `Status` op `Geblokkeerd` zetten werkt meteen, ook
+al loopt de sessie nog acht uur.
+
+Vereist op de Netlify-site: `PORTAL_SESSION_SECRET`, minimaal 32 tekens
+willekeurig.
+
+### Het scherm
+
+`/klant` staat in `src/klant/`, buiten `AtsProvider`, net als het rapport en de
+privacypagina. Dat is geen ordening maar een grens: `src/lib/klant.ts` kent geen
+sleutel, en de sessie zit in een cookie dat `HttpOnly` is — de frontend kan hem
+niet lezen en dus ook niet ergens anders naartoe sturen. `npm test` bewaakt dat
+`src/klant/` niets importeert uit `lib/api`, `store/AtsProvider` of `screens/`.
+
+Er is geen aparte "ben ik ingelogd"-vraag aan de server. Het portaal haalt
+gewoon het overzicht op; lukt dat niet, dan verschijnt het inlogscherm. Eén
+verzoek in plaats van twee, en geen tweede plek waar de frontend een eigen
+mening over de sessie kan krijgen.
+
+### Beheer
+
+Het scherm **Klanttoegang** hangt onder Opdrachtgevers, niet als vijfde tab in
+de balk: die vier zijn er voor wat dagelijks is, en op 390 pixels kost een
+vijfde ze allemaal ruimte. Daar maak je gebruikers aan, vink je hun vacatures
+aan, genereer je een nieuw wachtwoord, blokkeer je iemand of verwijder je hem.
+
+Het gegenereerde wachtwoord verschijnt **bovenaan** het scherm en haalt zichzelf
+in beeld. Dat is geen opsmuk: het stond eerst in de kaart van de gebruiker zelf,
+en omdat een nieuwe gebruiker onderaan de lijst kwam, verscheen het wachtwoord
+buiten beeld — het ene moment waarop het bestaat.
+
+De server weigert een vacature die niet bij de gekozen opdrachtgever hoort in
+plaats van hem stil te laten vallen. Stil laten vallen is de slechtste optie:
+dan vink je iets aan, zie je het aangevinkt staan, en belt de klant later dat
+hij die vacature niet ziet.
+
+### Toetsen
+
+`npm test` draait `scripts/test/portal.test.mjs` zonder netwerk en zonder de
+echte base. De kern van die toets is niet dat de goede velden erin zitten — dat
+zie je met het oog — maar dat de verboden waarden er niet uit komen. Er wordt
+gezocht op de **waarden** en niet op de veldnamen, zodat een veld hernoemen de
+toets niet stilzwijgend uitzet.
+
+Hetzelfde geldt voor het beheer: er is een toets die controleert dat
+`Wachtwoord-hash` en `Salt` nooit meegaan naar het beheerscherm. Die twee zeggen
+Dominique niets — een hash is niet terug te rekenen — maar ze zijn wel precies
+wat iemand nodig heeft om er offline op te gaan raden.
+
+---
+
 ## Toegang en privacy
 
 Dit systeem bevat gegevens van honderden mensen die zich nooit hebben aangemeld.
@@ -175,8 +290,14 @@ Dat is volgens 12 de grootste juridische blootstelling, dus:
 - **Bewaartermijn** is zichtbaar per kandidaat (`Bewaren tot`), en het
   kandidaatscherm heeft een verwijderknop die de kandidaat plus al zijn
   aanmeldingen, activiteiten, stagelog en beoordelingen wist.
-- **Het klantrapport filtert server-side.** `netlify/functions/rapport.mjs` bouwt
-  het antwoord op uit alleen wat de klant mag zien. Interne scores,
+- **Het klantportaal is alleen-lezen en filtert server-side.**
+  `netlify/functions/portal.mjs` staat los van `ats.mjs` en kent geen route die
+  ATS-data wijzigt. Wat een opdrachtgever ziet staat hierboven onder
+  Klantportaal, en `npm test` bewaakt het.
+- **Het oude tokenrapport is weg.** `/rapport/{token}` gaf toegang aan wie de
+  link had, zonder inlog. Dat is vervangen door het portaal met een wachtwoord
+  per persoon. Het veld `Portal-token` staat nog in de base maar wordt nergens
+  meer gelezen; er hangt geen route meer aan. Interne scores,
   concurrent-vlaggen, salarisinschattingen, outreach-concepten en namen van
   afgewezen kandidaten verlaten de server niet — ze worden niet in de frontend
   verborgen, ze worden niet verstuurd.
@@ -206,6 +327,7 @@ app hoort bij een **tweede Netlify-site**:
    | `AIRTABLE_API_KEY` | personal access token met `data.records:read` en `:write` op de ATS-base |
    | `AIRTABLE_BASE_ID` | `appSAz5sjFyPm4e0g` |
    | `ATS_APP_PASSWORD` | lang, willekeurig |
+   | `PORTAL_SESSION_SECRET` | minimaal 32 tekens willekeurig; ondertekent de sessies van het klantportaal |
 
 Een push naar `main` bouwt beide sites; ze raken elkaar niet.
 
@@ -219,6 +341,35 @@ netlify dev               # frontend plus functions op één poort
 ```
 
 `npm run dev` alleen werkt ook, maar dan draaien de functions niet.
+
+### "Op mijn computer zie ik het wel, op mijn telefoon niet"
+
+Dat is bijna nooit een fout in de code en bijna altijd de browsercache. De
+telefoon houdt de oude `index.html` vast, en die wijst naar de bundel van
+vorige week. De code zelf rendert bij 360, 390 en 1280 pixels breed identiek;
+dat is gemeten, niet aangenomen.
+
+Drie dingen vangen dat op, in deze volgorde:
+
+1. **Onderaan elk scherm staat het versiestempel** — de commit en het
+   bouwmoment. Wijkt dat af tussen twee apparaten, dan is het de cache en niet
+   de app. Zonder dat stempel zien "de knop is er nog niet" en "de knop werkt
+   niet" er voor de gebruiker precies hetzelfde uit.
+2. **De app kijkt zelf of er nieuw werk uitstaat** bij het openen en zodra het
+   tabblad weer op de voorgrond komt (`src/lib/versie.ts`). Staat er in de
+   `index.html` op de server een andere bundelnaam dan de draaiende, dan
+   verschijnt er een strook onder de kopbalk. Die vervangt zichzelf niet
+   automatisch: wie midden in een formulier zit, verliest anders wat er nog
+   niet bewaard is.
+3. **`netlify.toml` legt de caching expliciet vast.** `/assets/*` heeft een
+   hash in de bestandsnaam en mag een jaar blijven staan; `/index.html` is het
+   enige bestand met een vaste naam en moet elke keer opnieuw worden
+   nagevraagd. Verander die tweede regel nooit zonder de eerste erbij te
+   bedenken — dan wijst de browser naar een bundel die niet meer bestaat.
+
+Zit een toestel er nog steeds op vast, dan helpt één keer verversen met de
+cache leeg: op iOS de app sluiten en het tabblad opnieuw openen, op Android
+lang drukken op de verversknop.
 
 ---
 

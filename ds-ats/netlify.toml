@@ -25,6 +25,32 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
 
+# Caching, expliciet.
+#
+# Dit stond er niet, en dat kostte een dag zoeken: de bewerkknop stond op de
+# computer wel op het scherm en op de telefoon niet, terwijl de code bij 390 en
+# bij 1280 pixels identiek rendert. De telefoon had de oude `index.html` nog en
+# laadde daarmee de oude bundel.
+#
+# De regels hieronder maken die twee gevallen uit elkaar. Vite geeft alles in
+# /assets/ een hash in de bestandsnaam, dus die bestanden veranderen nooit van
+# inhoud en mogen een jaar blijven staan. De `index.html` is het enige bestand
+# met een vaste naam; die wijst de bundel aan en moet dus elke keer opnieuw bij
+# de server worden nagevraagd. Zonder die tweede regel is de rest zinloos: dan
+# blijft de browser naar de bundel van vorige week wijzen.
+#
+# Let op de volgorde. Netlify past de specifiekere regel toe, dus /assets/*
+# hoort ná /*.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # SPA-fallback. /api/* wordt door de functions afgevangen voordat deze regel geldt.
 [[redirects]]
   from = "/*"

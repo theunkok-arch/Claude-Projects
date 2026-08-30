@@ -11,11 +11,9 @@ interface Veld {
  * Precies de velden die de server accepteert (`OPDRACHTGEVER_VELDEN` in
  * netlify/functions/ats.mjs). Bewust niet erbij:
  *
- * - `Portal-token` is de sleutel waarmee een klant zijn rapport ziet — wie de
- *   link heeft, ziet het rapport. Een invoerveld nodigt uit tot een kort of
- *   raadbaar token, dus de server genereert hem zelf bij het aanmaken en
- *   accepteert hem nooit van de client. Hij hoort daarom ook niet in dit
- *   formulier te staan;
+ * - `Portal-token` hoorde bij het oude tokenrapport en wordt nergens meer
+ *   gelezen. Klanttoegang loopt nu via het scherm Klanttoegang, met een eigen
+ *   wachtwoord per persoon;
  * - `Vacatures` en `Contactpersonen` zijn koppelvelden; die worden vanaf de
  *   andere kant gezet, bij het aanmaken van de vacature of de contactpersoon.
  */

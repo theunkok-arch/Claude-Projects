@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useState, type ReactNode } from 'react'
 import { useAts } from '../store/AtsProvider'
 import Zoek from './Zoek'
+import VersieMelding from './VersieMelding'
 
 // `prefix` bepaalt wanneer de tab oplicht: de klantentab hoort ook actief te
 // zijn op /opdrachtgever/:id, en de vacaturetab op /vacature/:id.
@@ -48,9 +49,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </div>
+        <VersieMelding />
       </header>
 
       <main className="px-4 py-4">{children}</main>
+
+      <p className="px-4 pb-2 text-center text-xs text-navy-400">versie {__VERSIE__}</p>
 
       <Zoek open={zoeken} onSluit={() => setZoeken(false)} />
 
