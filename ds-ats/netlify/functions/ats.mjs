@@ -295,7 +295,20 @@ export async function wijzigStage(body) {
     'Reden afvallen': naarStage === 'Afgevallen' ? redenAfvallen : null,
   }
 
+  // Beide kanten op, en dat was het niet.
+  //
+  // Het vinkje ging alleen aan. Trok Dominique een kandidaat terug van
+  // Voorgesteld naar Gesproken — omdat de voordracht toch niet doorging —
+  // dan bleef zijn volledige naam voor de opdrachtgever zichtbaar op het
+  // portaal. Precies andersom dan bedoeld: iemand die juist uit beeld is
+  // gehaald, bleef in beeld.
+  //
+  // Afgevallen is de uitzondering. Die kandidaten worden in de portal sowieso
+  // niet als rij getoond, alleen geteld per reden, dus het vinkje doet daar
+  // niets. Het blijft staan zoals het stond: verliest de aanmelding zijn
+  // afvalstatus weer, dan klopt het nog.
   if (isKlantZichtbaar(naarStage)) fields['Zichtbaar voor klant'] = true
+  else if (naarStage !== 'Afgevallen') fields['Zichtbaar voor klant'] = false
 
   if (volgendeActie !== undefined) fields['Volgende actie'] = volgendeActie
   else if (naarStage === 'Geplaatst') fields['Volgende actie'] = `Ingewerkt-check op ${plusDays(30)}`

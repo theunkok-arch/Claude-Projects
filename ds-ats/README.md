@@ -247,6 +247,37 @@ gewoon het overzicht op; lukt dat niet, dan verschijnt het inlogscherm. Eén
 verzoek in plaats van twee, en geen tweede plek waar de frontend een eigen
 mening over de sessie kan krijgen.
 
+### Wie is er met naam zichtbaar
+
+Het veld `Zichtbaar voor klant` op een aanmelding bepaalt of de opdrachtgever
+een naam ziet of alleen initialen. Het staat op het **kandidaatscherm**, onder
+elke aanmelding, als een blok dat letterlijk toont wat de klant ziet — met een
+knop om het om te zetten.
+
+Dat blok gebruikt `shared/klantweergave.mjs`, dezelfde functie waarmee
+`portal.mjs` zijn antwoord opbouwt. Dat is geen nettigheid: stonden daar twee
+implementaties, dan zou op het scherm van Dominique iets anders kunnen staan
+dan bij de klant, en dat verschil ziet niemand tot een kandidaat belt. Er stond
+inderdaad een tweede `initialen` in `src/lib/format.ts` die van "Jan de Vries"
+JD maakte in plaats van J.V.; die werd nergens gebruikt en is verwijderd.
+
+Het vinkje gaat **twee kanten op**. Het gaat automatisch aan zodra een
+aanmelding `Voorgesteld` of verder bereikt, en weer uit zodra hij daaronder
+zakt. Dat laatste ontbrak: een kandidaat die werd teruggetrokken van
+Voorgesteld naar Gesproken bleef met naam en werkgever zichtbaar op het
+portaal. Precies andersom dan bedoeld.
+
+`Afgevallen` is de uitzondering en verandert het vinkje niet. Afgevallen
+kandidaten worden in het portaal sowieso niet als rij getoond, alleen geteld
+per reden, dus het vinkje doet daar niets — en verliest de aanmelding later
+zijn afvalstatus, dan klopt de oude stand nog.
+
+Het blok is bewust **niet oranje** als een naam is vrijgegeven. Oranje betekent
+in deze app dat iets aandacht vraagt; een vrijgegeven naam is een bewust
+besluit dat klopt. Het kandidaatscherm heeft al twee oranje knoppen, en een
+derde die iets anders bedoelt leert de lezer om oranje te negeren. Het verschil
+zit in de tekst: "T.W." naast "Tom Willems" vraagt geen uitleg.
+
 ### Beheer
 
 Het scherm **Klanttoegang** hangt onder Opdrachtgevers, niet als vijfde tab in

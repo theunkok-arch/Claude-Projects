@@ -416,3 +416,92 @@ test('elke ingang heeft zijn eigen sleutel en header', async () => {
   delete process.env.TOETS_SLEUTEL
   assert.throws(() => requireKey(verzoek({ 'x-toets': '' }), 'x-toets', 'TOETS_SLEUTEL'), /TOETS_SLEUTEL/)
 })
+
+// --- wat de klant van een kandidaat ziet --------------------------------------
+
+test('de initialen zijn overal dezelfde, en laten tussenvoegsels weg', async () => {
+  const { initialen } = await import('../../shared/klantweergave.mjs')
+
+  // Er stonden twee implementaties in de repo die het oneens waren: die in
+  // format.ts maakte van "Jan de Vries" JD en van "Jaap Jan van der Berg" JJ.
+  // Op het scherm van Dominique zou dan iets anders staan dan bij de klant.
+  assert.equal(initialen('Jan de Vries'), 'J.V.')
+  assert.equal(initialen('Jaap Jan van der Berg'), 'J.B.')
+  assert.equal(initialen('Yurita Yona Boodhram'), 'Y.B.')
+  assert.equal(initialen('Chen'), 'C.')
+  assert.equal(initialen('  fatima   yildiz '), 'F.Y.')
+  assert.equal(initialen(''), '?')
+  assert.equal(initialen(null), '?')
+  assert.equal(initialen(undefined), '?')
+})
+
+test('een niet-vrijgegeven kandidaat levert nergens een naam op', async () => {
+  const { klantZiet } = await import('../../shared/klantweergave.mjs')
+
+  const kandidaat = {
+    Naam: 'Jan de Vries',
+    'Huidige rol': 'Lab Technician',
+    'Huidige werkgever': 'Ander BV',
+    Woonplaats: 'Tilburg',
+  }
+
+  const anoniem = klantZiet(kandidaat, false)
+  const tekst = JSON.stringify(anoniem)
+  for (const verboden of ['Jan', 'Vries', 'Ander BV', 'Tilburg']) {
+    assert.equal(tekst.includes(verboden), false, `"${verboden}" staat in de anonieme weergave`)
+  }
+  assert.equal(anoniem.kop, 'J.V.')
+  assert.equal(anoniem.regel, 'Lab Technician')
+  assert.equal(anoniem.anoniem, true)
+
+  const vrij = klantZiet(kandidaat, true)
+  assert.equal(vrij.kop, 'Jan de Vries')
+  assert.equal(vrij.regel, 'Lab Technician · Ander BV · Tilburg')
+  assert.equal(vrij.anoniem, false)
+
+  // Een kandidaat die er niet is mag geen lege plek opleveren.
+  assert.equal(klantZiet(undefined, false).kop, '?')
+  assert.equal(klantZiet(null, true).kop, '?')
+})
+
+test('de portal en het ATS-scherm tonen dezelfde kop', async () => {
+  const { bouwOverzicht } = await import('../../netlify/functions/portal.mjs')
+  const { klantZiet } = await import('../../shared/klantweergave.mjs')
+
+  // Beide kanten met dezelfde gegevens voeden en de uitkomst vergelijken. Deze
+  // twee moeten het eens zijn; zo niet, dan staat er bij Dominique iets anders
+  // op het scherm dan bij haar klant.
+  const KLANT = 'recKlant000000001'
+  const kandidaat = { Naam: 'Jaap Jan van der Berg', 'Huidige rol': 'Formulator' }
+
+  for (const vrijgegeven of [false, true]) {
+    const payload = bouwOverzicht({
+      gebruiker: { id: 'recG', fields: { Opdrachtgever: [KLANT], Vacatures: ['recV'] } },
+      opdrachtgever: { id: KLANT, fields: { Naam: 'Royal Sanders' } },
+      vacatures: [{ id: 'recV', fields: { Titel: 'Rol', Opdrachtgever: [KLANT] } }],
+      aanmeldingen: [
+        {
+          id: 'recA',
+          fields: {
+            Vacature: ['recV'],
+            Kandidaat: ['recK'],
+            Stage: 'Voorgesteld',
+            'Zichtbaar voor klant': vrijgegeven,
+          },
+        },
+      ],
+      kandidaten: [{ id: 'recK', fields: kandidaat }],
+      vandaag: '2026-08-30',
+    })
+
+    const rij = payload.vacatures[0].kandidaten[0]
+    const opScherm = klantZiet(kandidaat, vrijgegeven)
+    const inPortal = rij.vrijgegeven && rij.naam ? rij.naam : rij.initialen
+
+    assert.equal(
+      inPortal,
+      opScherm.kop,
+      `portal toont "${inPortal}" en het ATS-scherm "${opScherm.kop}" (vrijgegeven: ${vrijgegeven})`,
+    )
+  }
+})

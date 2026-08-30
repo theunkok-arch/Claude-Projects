@@ -8,6 +8,7 @@ import Terug from '../components/Terug'
 import StageSheet from '../components/StageSheet'
 import KandidaatFormulier, { aantalLeeg } from '../components/KandidaatFormulier'
 import AanmeldingFormulier, { aantalLeeg as aantalLeegAanmelding } from '../components/AanmeldingFormulier'
+import Klantzicht from '../components/Klantzicht'
 import type { Regel } from '../lib/types'
 import BewerkKnop from '../components/BewerkKnop'
 
@@ -202,6 +203,15 @@ export default function KandidaatDetail() {
                     onClick={() => setBewerkteAanmelding(open ? null : aanmelding.id)}
                   />
                 </div>
+
+                <Klantzicht
+                  aanmelding={aanmelding}
+                  kandidaat={kandidaat}
+                  opdrachtgever={regel.opdrachtgever?.Naam}
+                  onZet={(zichtbaar) =>
+                    wijzigAanmelding(aanmelding.id, { 'Zichtbaar voor klant': zichtbaar })
+                  }
+                />
 
                 {open ? (
                   <AanmeldingFormulier
