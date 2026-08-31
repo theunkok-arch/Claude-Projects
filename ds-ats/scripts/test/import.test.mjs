@@ -10,7 +10,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { bouwKolomIndex, bouwPlan, dedupeSleutel, leesCsv } from '../import/lees.mjs'
-import { isIdentificerendeUrl, vertaalReden, vertaalStatus } from '../import/status-map.mjs'
+import {
+  isIdentificerendeUrl,
+  vertaalBron,
+  vertaalReden,
+  vertaalStatus,
+} from '../import/status-map.mjs'
 import { ALLE_AFVAL_REDENEN } from '../../shared/stages.mjs'
 
 const INDEED_ZOEK =
@@ -73,15 +78,26 @@ test('tien rijen met dezelfde zoek-URL blijven tien kandidaten', () => {
   assert.equal(new Set([...plan.kandidaten.values()].map(dedupeSleutel)).size, namen.length)
 })
 
-test('Achtergrondverificatie staat niet in de keuzelijst en valt terug op de profielcheck', () => {
-  assert.equal(vertaalReden('Achtergrondverificatie', ALLE_AFVAL_REDENEN), null)
+test('Achtergrondverificatie is een geldige afvalreden en blijft staan', () => {
+  assert.equal(
+    vertaalReden('Achtergrondverificatie', ALLE_AFVAL_REDENEN),
+    'Achtergrondverificatie',
+  )
   const rijen = leesCsv(
     'Naam,Status,Reden afvallen\nJohan Beaard,Afgewezen,Achtergrondverificatie\n',
   )
   const plan = bouwPlan(rijen, { vacatureTitel: 'X', vandaag: '2026-08-31' })
   assert.equal(plan.aanmeldingen[0].velden.Stage, 'Afgevallen')
-  assert.equal(plan.aanmeldingen[0].velden['Reden afvallen'], 'Afgewezen door ons (profielcheck)')
-  assert.deepEqual([...plan.onbekendeReden], [['Achtergrondverificatie', 1]])
+  assert.equal(plan.aanmeldingen[0].velden['Reden afvallen'], 'Achtergrondverificatie')
+  assert.deepEqual([...plan.onbekendeReden], [])
+})
+
+test('de bronkolom van deze lijst vouwt terug op de keuzelijst', () => {
+  assert.equal(vertaalBron('indeed-cv'), 'Indeed CV-database')
+  assert.equal(vertaalBron('Indeed CV-database'), 'Indeed CV-database')
+  assert.equal(vertaalBron('linkedin-salesnav-direct'), 'LinkedIn Sales Navigator')
+  // Sales Navigator wint van LinkedIn, en Indeed mag daar niet tussen komen.
+  assert.equal(vertaalBron('LinkedIn search junior RA (batch 17-07)'), 'LinkedIn regulier')
 })
 
 test('een reden bij een kandidaat die niet is afgevallen gaat niet mee', () => {

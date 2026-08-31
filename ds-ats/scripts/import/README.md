@@ -455,9 +455,26 @@ met 4 in plaats van 53 URL's — en meldde daar niets over.
 |---|---|---|
 | `Bron-URL (2)` leegmaken door de 4 URL's naar de eerste `Bron-URL`-kolom te verplaatsen, en de dubbele kop weghalen | 4 | Anders houden Nick Koks, Dianne Huijberts, Morris Arnst en Danique Meewis geen profiel-URL over. |
 | Rol en werkgever invullen, of de rij weglaten | 2 | Morris Arnst en Danique Meewis hebben alleen een naam, een URL en status `Benaderd`. Ze komen er als lege kandidaat in. |
-| `Achtergrondverificatie` vervangen door een reden uit de keuzelijst | 2 | Johan Beaard en Robbert Huisman. De reden staat niet in `ALLE_AFVAL_REDENEN`, dus vallen ze terug op "Afgewezen door ons (profielcheck)". Dat wordt gemeld, niet verzwegen — maar de echte reden (geen goede referentie) staat dan alleen nog in Opmerkingen. |
-| Job van der Velden: status `Benaderd` mét reden `Timing` | 1 | Dat spreekt elkaar tegen. Een reden hoort alleen bij een afvaller, dus de reden gaat niet mee. Kies er één. |
-| Score invullen of accepteren dat hij leeg is | 4 | De vier handmatig toegevoegde rijen hebben geen score. Ze tellen niet mee in de scoringsdrempel van 70. |
+| Kolom C (`Bron`) invullen | 4 | Bij dezelfde vier rijen is de bronkolom leeg, dus vallen ze terug op wat je bij `--bron` meegeeft. Drie zijn Sales Navigator-links, één (Dianne Huijberts) een gewoon `/in/`-profiel. |
+| Score invullen of accepteren dat hij leeg is | 4 | De vier handmatig toegevoegde rijen hebben geen score. Ze tellen niet mee in de scoringsdrempel van 70. Ze staan alle vier al op `Benaderd`, dus de score stuurt geen beslissing meer aan. |
+
+Afgehandeld op 31-08-2026:
+
+- **`Achtergrondverificatie`** is toegevoegd aan `AFVAL_REDENEN` in
+  `shared/stages.mjs`, groep "Afgewezen door ons of de klant". Het is een ander
+  moment in het proces dan de profielcheck, en dus een ander gesprek met de
+  klant. Johan Beaard en Robbert Huisman houden hun eigen reden.
+- **`indeed-cv` → `Indeed CV-database`** via een regel in `BRON_REGELS`. Het
+  onderscheid tussen de 43 Sales Navigator-vondsten en de 10 Indeed-vondsten
+  blijft daarmee staan.
+- **Job van der Velden** stond op `Benaderd` mét reden `Timing`; de reden is uit
+  de sheet gehaald.
+
+Beide keuzelijst-opties bestaan nog niet in Airtable. Ze ontstaan bij de eerste
+schrijfactie: het script en de app schrijven met `typecast: true`, dus Airtable
+maakt de optie zelf aan. In de app ziet Dominique `Achtergrondverificatie` wel
+meteen staan, want `StageSheet.tsx` leest `AFVAL_REDENEN` uit
+`shared/stages.mjs`.
 
 Wat je niet hoeft te doen: `naar-v11.mjs` draaien. Dat script verwacht de vijf
 losse core-dimensies (`Senioriteit (15)` enzovoort) als aparte kolommen. Deze
@@ -481,12 +498,9 @@ schrijven. De importer leest deze kopregel rechtstreeks.
   ("Waalwijk, ca. 10 min"). `Reistijd minuten` blijft leeg; de sheet noteert
   minuten in vrije tekst en die niet-omgerekend overnemen is beter dan raden.
 
-### Voorwaarde vooraf
+### De vacature
 
-De vacature **bestaat nog niet in de base** — er staan zes vacatures, waarvan
-vier bij Royal Sanders (RA Officer, Brand Manager, en twee Formulation
-Technologist-rollen). Het importscript maakt geen vacature aan; dat hoort bij de
-intake. Uit `intake_briefing_final`:
+Aangemaakt op 31-08-2026, `recu0FNnpbUtVL1QG`, uit `intake_briefing_final`:
 
 | Veld | Waarde |
 |---|---|
@@ -497,7 +511,24 @@ intake. Uit `intake_briefing_final`:
 | Scoringsdrempel | 70 |
 | Startdatum | zsm (intake 13 juli 2026) |
 
-Salarisbandbreedte is verplicht voordat de status op Actief mag; die staat er
-dus meteen goed in.
+Status staat op Actief; de salarisbandbreedte is ingevuld, dus de validatieregel
+laat dat toe. **Portaalgebruikers is bewust leeg**: wie deze vacature bij de
+klant mag zien is een keuze van Dominique in de ATS, niet iets om bij het
+aanmaken alvast goed te gokken.
 
 Daarna, 57 rijen × 3 records = **171 records** erbij.
+
+### Zo draait hij
+
+```bash
+node scripts/import/import.mjs \
+  --bestand ~/Downloads/kandidaten.csv \
+  --vacature "Account Assistant Sales" \
+  --opdrachtgever "Royal Sanders" \
+  --bron "LinkedIn Sales Navigator"
+```
+
+Zonder `--echt` schrijft hij niets. Wat de droge run op de sheet van 31-08-2026
+oplevert: 57 rijen, 57 kandidaten, 0 overgeslagen, 0 onbekende statussen, 0
+onbekende redenen, 53 met profiel-URL. De enige melding die overblijft is
+`Bron-URL (2)` met 4 gevulde cellen — de vier URL's uit kolom D.

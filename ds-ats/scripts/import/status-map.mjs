@@ -135,6 +135,7 @@ const BRON_REGELS = [
   [/salesnav|sales navigator|sales nav/, 'LinkedIn Sales Navigator'],
   [/alumni/, 'Alumni-netwerk'],
   [/\bncv\b|branchevereniging|brancheorganisatie/, 'Brancheorganisatie'],
+  [/\bindeed\b/, 'Indeed CV-database'],
   [/instagram/, 'Instagram'],
   [/referral|doorverwijz|aanbevol/, 'Referral'],
   [/eigen search|eigen netwerk|dominique/, 'Eigen netwerk'],
