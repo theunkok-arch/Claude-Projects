@@ -42,5 +42,12 @@ export const AANMELDING_VELDEN = {
   Concurrent: 'fldBrXKLqvGelxUDl',
 }
 
+export const STAGELOG_VELDEN = {
+  Omschrijving: 'fldRbqdQXuSZv9sGA',
+  'Naar stage': 'fld4OfMGt3ejTnfZL',
+  Datum: 'fld7GeDZkjC3mCWQe',
+}
+
 export const LINK_KANDIDAAT = 'fldEdzzoV2QZ0B1hC'
 export const LINK_VACATURE = 'fldrGEsSZZrZPmJCL'
+export const LINK_AANMELDING = 'fldvjMTnid9PVRCUf'

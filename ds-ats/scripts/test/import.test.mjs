@@ -78,6 +78,26 @@ test('tien rijen met dezelfde zoek-URL blijven tien kandidaten', () => {
   assert.equal(new Set([...plan.kandidaten.values()].map(dedupeSleutel)).size, namen.length)
 })
 
+test('een zoek-URL komt niet in het veld dat Airtable als dedupe-sleutel leest', () => {
+  const rijen = leesCsv(
+    'Naam,Bron-URL,Locatie + reisafstand,Status\n' +
+      `Derya Demiral,${INDEED_ZOEK},Waalwijk\\, ca. 10 min,Benaderd\n` +
+      `Mariette Cabannes,${INDEED_ZOEK},Hurwenen\\, ca. 15 min,Benaderd\n` +
+      'Chelsea Kuijper,https://www.linkedin.com/sales/lead/ACwAABvf1d4,Tiel,Benaderd\n',
+  )
+  const plan = bouwPlan(rijen, { vacatureTitel: 'X', vandaag: '2026-08-31' })
+  const kandidaten = [...plan.kandidaten.values()]
+
+  // Twee zonder URL, één met. Anders zouden die twee in Airtable dezelfde
+  // Dedupe-sleutel krijgen: die formule kent isIdentificerendeUrl niet.
+  assert.deepEqual(
+    kandidaten.map((k) => k['LinkedIn-URL']),
+    [undefined, undefined, 'https://www.linkedin.com/sales/lead/ACwAABvf1d4'],
+  )
+  assert.deepEqual([...plan.nietIdentificerendeUrls], [[INDEED_ZOEK, 2]])
+  assert.equal(plan.kandidaten.size, 3)
+})
+
 test('Achtergrondverificatie is een geldige afvalreden en blijft staan', () => {
   assert.equal(
     vertaalReden('Achtergrondverificatie', ALLE_AFVAL_REDENEN),

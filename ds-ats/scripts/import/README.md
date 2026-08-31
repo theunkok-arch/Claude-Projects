@@ -451,10 +451,19 @@ met 4 in plaats van 53 URL's — en meldde daar niets over.
 
 ### Wat nog met de hand moet
 
+Afgehandeld vóór de import:
+
+- De 4 URL's zijn uit kolom D naar kolom B verplaatst. Alle 57 hebben nu een
+  profiel-URL.
+- De tegenstrijdige reden bij Job van der Velden (status `Benaderd` mét reden
+  `Timing`) is uit de sheet gehaald.
+
+Wat nog openstaat:
+
 | Wat | Rijen | Waarom |
 |---|---|---|
-| `Bron-URL (2)` leegmaken door de 4 URL's naar de eerste `Bron-URL`-kolom te verplaatsen, en de dubbele kop weghalen | 4 | Anders houden Nick Koks, Dianne Huijberts, Morris Arnst en Danique Meewis geen profiel-URL over. |
-| Rol en werkgever invullen, of de rij weglaten | 2 | Morris Arnst en Danique Meewis hebben alleen een naam, een URL en status `Benaderd`. Ze komen er als lege kandidaat in. |
+| De dubbele kop `Bron-URL` in kolom D weghalen | — | Kolom D is nu leeg maar heet nog steeds `Bron-URL`. Bij een volgende import wordt hij weer als `Bron-URL (2)` gemeld. |
+| Rol, werkgever en woonplaats invullen | 2 | Morris Arnst en Danique Meewis staan in de base met alleen een naam en een URL. |
 | Kolom C (`Bron`) invullen | 4 | Bij dezelfde vier rijen is de bronkolom leeg, dus vallen ze terug op wat je bij `--bron` meegeeft. Drie zijn Sales Navigator-links, één (Dianne Huijberts) een gewoon `/in/`-profiel. |
 | Score invullen of accepteren dat hij leeg is | 4 | De vier handmatig toegevoegde rijen hebben geen score. Ze tellen niet mee in de scoringsdrempel van 70. Ze staan alle vier al op `Benaderd`, dus de score stuurt geen beslissing meer aan. |
 
@@ -518,17 +527,34 @@ aanmaken alvast goed te gokken.
 
 Daarna, 57 rijen × 3 records = **171 records** erbij.
 
-### Zo draait hij
+### Gedraaid op 31-08-2026
+
+Er stond geen Airtable-token in deze omgeving, dus via `mcp-batches.mjs` en de
+Airtable-koppeling. Met een token is `import.mjs` sneller:
 
 ```bash
 node scripts/import/import.mjs \
   --bestand ~/Downloads/kandidaten.csv \
   --vacature "Account Assistant Sales" \
   --opdrachtgever "Royal Sanders" \
-  --bron "LinkedIn Sales Navigator"
+  --bron "LinkedIn Sales Navigator" --echt
 ```
 
-Zonder `--echt` schrijft hij niets. Wat de droge run op de sheet van 31-08-2026
-oplevert: 57 rijen, 57 kandidaten, 0 overgeslagen, 0 onbekende statussen, 0
-onbekende redenen, 53 met profiel-URL. De enige melding die overblijft is
-`Bron-URL (2)` met 4 gevulde cellen — de vier URL's uit kolom D.
+Wat erin ging: 57 rijen, 57 kandidaten, 57 aanmeldingen, 57 stagelog-regels,
+0 overgeslagen, 0 onbekende statussen, 0 onbekende redenen, 0 dubbelen tegen
+de 508 kandidaten die er al stonden (gematcht op dedupe-sleutel).
+
+Wat eruit kwam, nagerekend in de base: 565 kandidaten (508 + 57), en op de
+vacature 57 aanmeldingen — 25 actief, 32 afgevallen, 0 zonder afvalreden,
+0 over de servicenorm.
+
+De vier handmatig toegevoegde rijen zijn ongescoord meegegaan, op verzoek van
+Dominique. Ze staan alle vier op `Benaderd`; de score bestaat om te beslissen
+*of* je iemand benadert en die beslissing is genomen. Een leeg scoreveld is
+zichtbaar, een verzonnen 65 niet.
+
+Voor de import zijn in de sheet de vier URL's uit kolom D naar kolom B
+verplaatst en is de tegenstrijdige reden bij Job van der Velden weggehaald.
+Kolom `Bron` bleef bij die vier leeg; ze vielen daarmee terug op
+`--bron "LinkedIn Sales Navigator"`, wat voor drie van de vier klopt (Dianne
+Huijberts heeft een gewoon `/in/`-profiel).

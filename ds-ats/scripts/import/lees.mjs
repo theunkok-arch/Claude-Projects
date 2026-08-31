@@ -295,6 +295,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
   const onbeslist = []
   const overgeslagen = []
   const onleesbareDatums = new Map()
+  const nietIdentificerendeUrls = new Map()
 
   for (const [nummer, rij] of rijen.entries()) {
     const naam = waarde(rij, index, 'Naam')
@@ -309,9 +310,20 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
       onleesbareDatums.set(ruweDatum, (onleesbareDatums.get(ruweDatum) ?? 0) + 1)
     }
 
+    // Alleen een URL die een persoon aanwijst hoort in dit veld. Airtable
+    // berekent Dedupe-sleutel er zelf uit, en die formule kent
+    // isIdentificerendeUrl niet: een zoekopdracht in dit veld geeft tien
+    // verschillende mensen dezelfde sleutel in de base, ook al houdt de import
+    // ze hier keurig uit elkaar. Liever leeg dan een sleutel die liegt; de
+    // zoekopdracht staat toch al in de sheet.
+    const ruweUrl = waarde(rij, index, 'LinkedIn-URL')
+    if (ruweUrl && !isIdentificerendeUrl(ruweUrl)) {
+      nietIdentificerendeUrls.set(ruweUrl, (nietIdentificerendeUrls.get(ruweUrl) ?? 0) + 1)
+    }
+
     const kandidaat = schoon({
       Naam: naam,
-      'LinkedIn-URL': waarde(rij, index, 'LinkedIn-URL'),
+      'LinkedIn-URL': ruweUrl && isIdentificerendeUrl(ruweUrl) ? ruweUrl : undefined,
       'E-mail': waarde(rij, index, 'E-mail'),
       Telefoon: waarde(rij, index, 'Telefoon'),
       Instagram: waarde(rij, index, 'Instagram'),
@@ -405,6 +417,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
     onbeslist,
     overgeslagen,
     onleesbareDatums,
+    nietIdentificerendeUrls,
     genegeerdMetInhoud: gevuldeGenegeerdeKolommen(rijen, genegeerd),
     naamBotsingen: naamBotsingen(kandidaten),
   }
