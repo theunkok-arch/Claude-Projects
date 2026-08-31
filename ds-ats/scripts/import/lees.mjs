@@ -120,12 +120,38 @@ function naarObjecten(matrix) {
     )
   }
 
-  const koppen = matrix[kopIndex].map((cel) => String(cel ?? '').trim())
+  const koppen = uniekeKoppen(matrix[kopIndex].map((cel) => String(cel ?? '').trim()))
   return matrix
     .slice(kopIndex + 1)
     .map((rij) => Object.fromEntries(koppen.map((kop, i) => [kop, rij[i] ?? ''])))
     // Lege regels en losse toelichtingen onderaan het blad horen er niet bij.
     .filter((rij) => Object.values(rij).some((waarde) => String(waarde).trim().length > 0))
+}
+
+/**
+ * Twee kolommen met dezelfde kop overschrijven elkaar zodra je er een object
+ * van maakt: de laatste wint, de eerste verdwijnt zonder spoor. De lijst voor
+ * Account Assistant Sales heeft twee kolommen "Bron-URL". De tweede is bij 4
+ * van de 57 rijen gevuld, de eerste bij 53 — dus importeerde die lijst 53 lege
+ * profiel-URL's, en meldde daar niets over: de kolomnaam kwam immers voor, dus
+ * kwam hij niet in `genegeerd` terecht.
+ *
+ * Hernoemen, niet samenvoegen. Twee kolommen met dezelfde naam hoeven niet
+ * hetzelfde te betekenen, en dat is niet aan dit script om te raden. De
+ * hernoemde kolom valt buiten de synoniemenlijst, belandt in `genegeerd` en
+ * wordt vervolgens mét inhoud gemeld — dan zie je zelf wat er te kiezen valt.
+ *
+ * Naamloze kolommen blijven ongemoeid: die zijn al een verzamelbak en een kop
+ * die " (2)" heet, leest nergens als iets waar je iets mee moet.
+ */
+function uniekeKoppen(koppen) {
+  const gezien = new Map()
+  return koppen.map((kop) => {
+    if (kop.length === 0) return kop
+    const aantal = (gezien.get(kop) ?? 0) + 1
+    gezien.set(kop, aantal)
+    return aantal === 1 ? kop : `${kop} (${aantal})`
+  })
 }
 
 /**
