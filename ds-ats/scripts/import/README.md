@@ -454,18 +454,38 @@ met 4 in plaats van 53 URL's — en meldde daar niets over.
 Afgehandeld vóór de import:
 
 - De 4 URL's zijn uit kolom D naar kolom B verplaatst. Alle 57 hebben nu een
-  profiel-URL.
+  profiel-URL in de sheet.
 - De tegenstrijdige reden bij Job van der Velden (status `Benaderd` mét reden
   `Timing`) is uit de sheet gehaald.
+- De dubbele kop is weg: de sheet heeft sinds 31-08-2026 achttien kolommen met
+  één `Bron-URL`. Nagerekend op de export — `Bron-URL (2)` komt niet meer voor.
+- De score van de vier handmatige rijen blijft leeg, op verzoek van Dominique.
+  Ze staan alle vier op `Benaderd`, dus de score stuurt geen beslissing meer
+  aan, en een leeg veld is zichtbaar waar een verzonnen getal dat niet is.
 
 Wat nog openstaat:
 
 | Wat | Rijen | Waarom |
 |---|---|---|
-| De dubbele kop `Bron-URL` in kolom D weghalen | — | Kolom D is nu leeg maar heet nog steeds `Bron-URL`. Bij een volgende import wordt hij weer als `Bron-URL (2)` gemeld. |
-| Rol, werkgever en woonplaats invullen | 2 | Morris Arnst en Danique Meewis staan in de base met alleen een naam en een URL. |
-| Kolom C (`Bron`) invullen | 4 | Bij dezelfde vier rijen is de bronkolom leeg, dus vallen ze terug op wat je bij `--bron` meegeeft. Drie zijn Sales Navigator-links, één (Dianne Huijberts) een gewoon `/in/`-profiel. |
-| Score invullen of accepteren dat hij leeg is | 4 | De vier handmatig toegevoegde rijen hebben geen score. Ze tellen niet mee in de scoringsdrempel van 70. Ze staan alle vier al op `Benaderd`, dus de score stuurt geen beslissing meer aan. |
+| Rol, werkgever en woonplaats invullen | 2 | Morris Arnst en Danique Meewis staan in de base met alleen een naam en een URL. Zie hieronder waarom die URL niet genoeg is. |
+| Kolom C (`Bron`) invullen | 4 | Bij de vier handmatige rijen is de bronkolom leeg, dus vallen ze terug op wat je bij `--bron` meegeeft. Drie zijn Sales Navigator-links, één (Dianne Huijberts) een gewoon `/in/`-profiel. |
+
+### Een Sales Navigator-URL is hier geen bron
+
+Een `linkedin.com/sales/lead/...`-link is voor dit script niet te openen, en dat
+is geen kwestie van inloggen: `linkedin.com` staat niet in de egress-allowlist
+van de omgeving waarin dit draait. Een verzoek eindigt op
+`EGRESS_BLOCKED`, niet op een loginmuur.
+
+Een URL identificeert een kandidaat dus wel — hij is een prima dedupe-sleutel —
+maar hij levert geen profielgegevens op. Wie een kandidaat wil laten scoren,
+levert de velden zelf aan: huidige rol, tenure, werkgever en woonplaats. Dat is
+precies wat de vijf core-dimensies en de drie custom-dimensies nodig hebben, en
+zonder woonplaats mist het schema al 25 van de 100 punten (Locatie 15 plus
+Regio 10).
+
+De skill `search-uitvoering` haalt die gegevens wél op, want die draait Chrome
+met een ingelogde sessie op de machine van Dominique.
 
 Afgehandeld op 31-08-2026:
 
@@ -557,4 +577,5 @@ Voor de import zijn in de sheet de vier URL's uit kolom D naar kolom B
 verplaatst en is de tegenstrijdige reden bij Job van der Velden weggehaald.
 Kolom `Bron` bleef bij die vier leeg; ze vielen daarmee terug op
 `--bron "LinkedIn Sales Navigator"`, wat voor drie van de vier klopt (Dianne
-Huijberts heeft een gewoon `/in/`-profiel).
+Huijberts heeft een gewoon `/in/`-profiel). Na de import is kolom D zelf
+verwijderd.
