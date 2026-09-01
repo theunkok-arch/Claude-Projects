@@ -81,11 +81,19 @@ export function funnel(regels: Regel[]): FunnelTrede[] {
   }))
 }
 
+/**
+ * Waaronder een afvaller zonder ingevulde reden wordt geteld — en waarop het
+ * scherm erachter filtert. Eén constante, om dezelfde reden als BRON_ONBEKEND
+ * hieronder: zouden de telling en het filter uiteenlopen, dan klopt het getal
+ * in de lijst niet meer met de namen die je eronder krijgt.
+ */
+export const REDEN_ONTBREEKT = 'Reden ontbreekt'
+
 export function afvalRedenen(regels: Regel[]): Array<{ reden: string; aantal: number }> {
   const tellingen = new Map<string, number>()
   for (const regel of regels) {
     if (regel.aanmelding.Stage !== 'Afgevallen') continue
-    const reden = regel.aanmelding['Reden afvallen'] ?? 'Reden ontbreekt'
+    const reden = regel.aanmelding['Reden afvallen'] ?? REDEN_ONTBREEKT
     tellingen.set(reden, (tellingen.get(reden) ?? 0) + 1)
   }
   return [...tellingen].map(([reden, aantal]) => ({ reden, aantal })).sort((a, b) => b.aantal - a.aantal)
