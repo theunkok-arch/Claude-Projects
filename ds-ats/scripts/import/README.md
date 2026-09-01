@@ -399,3 +399,183 @@ kandidatentab loopt daarop achter zodra iemand vergeet hem bij te werken.
 Dit is ook de reden dat `Datum status` als kolom in het framework-schema hoort:
 zolang die er niet is, staat na elke import iedereen op de importdatum en zegt
 "dagen in stage" niets.
+
+## Account Assistant Sales (Royal Sanders) — 31-08-2026
+
+Zevende vacature, in de Drive-map
+`Account Assistant Sales`, blad `kandidaten` (schema-versie 1.0).
+Geteld op de echte CSV-export, niet op de tekstweergave:
+
+| | Aantal |
+|---|---|
+| Rijen | **57** |
+| Unieke kandidaten | 57 |
+| Naambotsingen | 0 |
+| Onbekende statussen | 0 |
+| Rijen op `In gesprek` | 0 |
+
+Stageverdeling na vertaling: Afgevallen 32, Benaderd 22, Shortlist 1,
+Gesproken 1, Interview klant 1.
+
+De rol heet in de intake-briefing **Account Assistant Sales**, niet "Sales
+Assistent". In dezelfde map staat ook een Duitse variant (`DE Account
+Assistant Sales_intake_briefing`, Royal Sanders Duitsland). Dat is een andere
+vacature en er hoort geen kandidatenlijst bij; die valt buiten deze import.
+
+### Twee dingen die deze lijst stil kapotmaakte
+
+Beide zijn gerepareerd in de code, met tests in `scripts/test/import.test.mjs`.
+Ze staan hier omdat ze niet uniek zijn voor deze sheet.
+
+**1. Twee kolommen met dezelfde kop.** De kopregel is
+`Naam | Bron-URL | Bron | Bron-URL | Huidige rol | Source | …` — "Bron-URL"
+staat er twee keer. Zodra je van een rij een object maakt wint de laatste, en
+die tweede kolom is bij 4 van de 57 rijen gevuld. **53 van de 57 profiel-URL's
+verdwenen dus, zonder één melding**: de kolomnaam kwam voor, dus belandde er
+niets in `genegeerd`. De lezer hernoemt de tweede nu naar `Bron-URL (2)`, zodat
+hij als genegeerde kolom mét inhoud wordt gemeld. Na de reparatie: 53 van 57.
+
+Hernoemen, niet samenvoegen: twee kolommen met dezelfde naam hoeven niet
+hetzelfde te betekenen, en dat is niet aan het script om te raden.
+
+**2. Een zoekopdracht als dedupe-sleutel.** De tien `indeed-cv`-rijen dragen
+alle tien exact dezelfde URL: de Smart Sourcing-zoekopdracht
+(`resumes.indeed.com/search?q=…`), niet een profiel. `isIdentificerendeUrl`
+liet elke niet-LinkedIn-URL met `://` door als sleutel, dus vielen die tien tot
+**één** kandidaat samen: negen mensen weg, en een verdwenen rij ziet er niet uit
+als een fout. Een URL met `/search` of een `q=`-parameter telt nu niet meer als
+sleutel; die rijen dedupen op naam plus woonplaats.
+
+Zonder deze twee reparaties liep de import op 48 in plaats van 57 kandidaten,
+met 4 in plaats van 53 URL's — en meldde daar niets over.
+
+### Wat nog met de hand moet
+
+Afgehandeld vóór de import:
+
+- De 4 URL's zijn uit kolom D naar kolom B verplaatst. Alle 57 hebben nu een
+  profiel-URL in de sheet.
+- De tegenstrijdige reden bij Job van der Velden (status `Benaderd` mét reden
+  `Timing`) is uit de sheet gehaald.
+- De dubbele kop is weg: de sheet heeft sinds 31-08-2026 achttien kolommen met
+  één `Bron-URL`. Nagerekend op de export — `Bron-URL (2)` komt niet meer voor.
+- De score van de vier handmatige rijen blijft leeg, op verzoek van Dominique.
+  Ze staan alle vier op `Benaderd`, dus de score stuurt geen beslissing meer
+  aan, en een leeg veld is zichtbaar waar een verzonnen getal dat niet is.
+
+Wat nog openstaat:
+
+| Wat | Rijen | Waarom |
+|---|---|---|
+| Rol, werkgever en woonplaats invullen | 2 | Morris Arnst en Danique Meewis staan in de base met alleen een naam en een URL. Zie hieronder waarom die URL niet genoeg is. |
+| Kolom C (`Bron`) invullen | 4 | Bij de vier handmatige rijen is de bronkolom leeg, dus vallen ze terug op wat je bij `--bron` meegeeft. Drie zijn Sales Navigator-links, één (Dianne Huijberts) een gewoon `/in/`-profiel. |
+
+### Een Sales Navigator-URL is hier geen bron
+
+Een `linkedin.com/sales/lead/...`-link is voor dit script niet te openen, en dat
+is geen kwestie van inloggen: `linkedin.com` staat niet in de egress-allowlist
+van de omgeving waarin dit draait. Een verzoek eindigt op
+`EGRESS_BLOCKED`, niet op een loginmuur.
+
+Een URL identificeert een kandidaat dus wel — hij is een prima dedupe-sleutel —
+maar hij levert geen profielgegevens op. Wie een kandidaat wil laten scoren,
+levert de velden zelf aan: huidige rol, tenure, werkgever en woonplaats. Dat is
+precies wat de vijf core-dimensies en de drie custom-dimensies nodig hebben, en
+zonder woonplaats mist het schema al 25 van de 100 punten (Locatie 15 plus
+Regio 10).
+
+De skill `search-uitvoering` haalt die gegevens wél op, want die draait Chrome
+met een ingelogde sessie op de machine van Dominique.
+
+Afgehandeld op 31-08-2026:
+
+- **`Achtergrondverificatie`** is toegevoegd aan `AFVAL_REDENEN` in
+  `shared/stages.mjs`, groep "Afgewezen door ons of de klant". Het is een ander
+  moment in het proces dan de profielcheck, en dus een ander gesprek met de
+  klant. Johan Beaard en Robbert Huisman houden hun eigen reden.
+- **`indeed-cv` → `Indeed CV-database`** via een regel in `BRON_REGELS`. Het
+  onderscheid tussen de 43 Sales Navigator-vondsten en de 10 Indeed-vondsten
+  blijft daarmee staan.
+- **Job van der Velden** stond op `Benaderd` mét reden `Timing`; de reden is uit
+  de sheet gehaald.
+
+Beide keuzelijst-opties bestaan nog niet in Airtable. Ze ontstaan bij de eerste
+schrijfactie: het script en de app schrijven met `typecast: true`, dus Airtable
+maakt de optie zelf aan. In de app ziet Dominique `Achtergrondverificatie` wel
+meteen staan, want `StageSheet.tsx` leest `AFVAL_REDENEN` uit
+`shared/stages.mjs`.
+
+Wat je niet hoeft te doen: `naar-v11.mjs` draaien. Dat script verwacht de vijf
+losse core-dimensies (`Senioriteit (15)` enzovoort) als aparte kolommen. Deze
+sheet heeft ze al opgeteld tot `Score core (60)` en `Score custom (40)`, dus zou
+het script bij alle 53 gescoorde rijen "score telt niet op" melden en nullen
+schrijven. De importer leest deze kopregel rechtstreeks.
+
+### Wat er sowieso niet in past
+
+- **`Tenure`** (53 rijen gevuld) — de base heeft geen veld voor dienstjaren.
+  Wordt gemeld als genegeerde kolom met inhoud.
+- **`Source`** (57 rijen) — tweede bronkolom naast `Bron`. `Bron` wint; `Source`
+  bevat het kanaal waarlangs is benaderd (Indeed, LinkedIn, Whatsapp,
+  Instagram), niet de vindplaats.
+- **`indeed-cv` → `Overig`** (10 rijen) — de keuzelijst `Bron` op Kandidaten
+  kent geen Indeed-optie. Wil je de bronattributie kloppend houden, voeg dan
+  eerst een optie "Indeed CV-database" toe aan dat veld en een regel aan
+  `BRON_REGELS`. Nu gaat het onderscheid tussen de 43 Sales Navigator-vondsten
+  en de 10 Indeed-vondsten in de base verloren.
+- **`Locatie + reisafstand`** gaat ongesplitst naar Woonplaats
+  ("Waalwijk, ca. 10 min"). `Reistijd minuten` blijft leeg; de sheet noteert
+  minuten in vrije tekst en die niet-omgerekend overnemen is beter dan raden.
+
+### De vacature
+
+Aangemaakt op 31-08-2026, `recu0FNnpbUtVL1QG`, uit `intake_briefing_final`:
+
+| Veld | Waarde |
+|---|---|
+| Titel | Account Assistant Sales |
+| Opdrachtgever | Royal Sanders |
+| Standplaats | Vlijmen |
+| Salaris min / max | 3000 / 5000 |
+| Scoringsdrempel | 70 |
+| Startdatum | zsm (intake 13 juli 2026) |
+
+Status staat op Actief; de salarisbandbreedte is ingevuld, dus de validatieregel
+laat dat toe. **Portaalgebruikers is bewust leeg**: wie deze vacature bij de
+klant mag zien is een keuze van Dominique in de ATS, niet iets om bij het
+aanmaken alvast goed te gokken.
+
+Daarna, 57 rijen × 3 records = **171 records** erbij.
+
+### Gedraaid op 31-08-2026
+
+Er stond geen Airtable-token in deze omgeving, dus via `mcp-batches.mjs` en de
+Airtable-koppeling. Met een token is `import.mjs` sneller:
+
+```bash
+node scripts/import/import.mjs \
+  --bestand ~/Downloads/kandidaten.csv \
+  --vacature "Account Assistant Sales" \
+  --opdrachtgever "Royal Sanders" \
+  --bron "LinkedIn Sales Navigator" --echt
+```
+
+Wat erin ging: 57 rijen, 57 kandidaten, 57 aanmeldingen, 57 stagelog-regels,
+0 overgeslagen, 0 onbekende statussen, 0 onbekende redenen, 0 dubbelen tegen
+de 508 kandidaten die er al stonden (gematcht op dedupe-sleutel).
+
+Wat eruit kwam, nagerekend in de base: 565 kandidaten (508 + 57), en op de
+vacature 57 aanmeldingen — 25 actief, 32 afgevallen, 0 zonder afvalreden,
+0 over de servicenorm.
+
+De vier handmatig toegevoegde rijen zijn ongescoord meegegaan, op verzoek van
+Dominique. Ze staan alle vier op `Benaderd`; de score bestaat om te beslissen
+*of* je iemand benadert en die beslissing is genomen. Een leeg scoreveld is
+zichtbaar, een verzonnen 65 niet.
+
+Voor de import zijn in de sheet de vier URL's uit kolom D naar kolom B
+verplaatst en is de tegenstrijdige reden bij Job van der Velden weggehaald.
+Kolom `Bron` bleef bij die vier leeg; ze vielen daarmee terug op
+`--bron "LinkedIn Sales Navigator"`, wat voor drie van de vier klopt (Dianne
+Huijberts heeft een gewoon `/in/`-profiel). Na de import is kolom D zelf
+verwijderd.

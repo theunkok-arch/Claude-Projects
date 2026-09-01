@@ -35,6 +35,12 @@ export const AFVAL_REDENEN = {
     'Geen match met team of cultuur',
     'Salariswens te hoog',
     'Afgewezen door ons (profielcheck)',
+    // Afgewezen na een referentie- of achtergrondcheck. Toegevoegd 31-08-2026
+    // op verzoek van Dominique: twee kandidaten op de lijst voor Account
+    // Assistant Sales vielen hierop af, en zonder deze regel vielen ze terug op
+    // de profielcheck hierboven — dat is een ander moment in het proces en een
+    // ander gesprek met de klant.
+    'Achtergrondverificatie',
   ],
   'Afgehaakt door de kandidaat': [
     'Geen interesse',

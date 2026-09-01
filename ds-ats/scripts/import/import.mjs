@@ -234,6 +234,13 @@ function rapporteer(plan, aantalNieuw) {
     console.log('  → alleen geantwoord = Gereageerd, echt gesproken = Gesproken.')
   }
 
+  if (plan.nietIdentificerendeUrls.size > 0) {
+    console.log('\nURL\'s die geen persoon aanwijzen (niet overgenomen, dedupe op naam):')
+    for (const [url, aantal] of [...plan.nietIdentificerendeUrls].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${aantal}x  ${url.slice(0, 64)}`)
+    }
+  }
+
   if (plan.naamBotsingen.length > 0) {
     console.log('\nZelfde naam, andere sleutel — zelf nakijken, niet samengevoegd:')
     for (const botsing of plan.naamBotsingen) {

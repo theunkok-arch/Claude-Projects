@@ -135,6 +135,7 @@ const BRON_REGELS = [
   [/salesnav|sales navigator|sales nav/, 'LinkedIn Sales Navigator'],
   [/alumni/, 'Alumni-netwerk'],
   [/\bncv\b|branchevereniging|brancheorganisatie/, 'Brancheorganisatie'],
+  [/\bindeed\b/, 'Indeed CV-database'],
   [/instagram/, 'Instagram'],
   [/referral|doorverwijz|aanbevol/, 'Referral'],
   [/eigen search|eigen netwerk|dominique/, 'Eigen netwerk'],
@@ -184,8 +185,19 @@ export const KOLOM_SYNONIEMEN = {
  * "https://www.linkedin.com/sales/" zonder lead-id doet dat niet, en zou
  * meerdere kandidaten tot één record samenvouwen.
  */
+const ZOEK_URL = /[?&](q|query|keywords|search)=|\/search(\b|\/)/
+
 export function isIdentificerendeUrl(url) {
   const tekst = normaliseer(url)
-  if (!tekst.includes('linkedin.com')) return tekst.length > 0 && tekst.includes('://')
+  if (!tekst.includes('linkedin.com')) {
+    if (!tekst.includes('://')) return false
+    // Een zoekresultaten-URL wijst een verzameling aan, geen persoon. Dezelfde
+    // reden als hierboven, maar buiten LinkedIn stond die deur nog open: de
+    // Account Assistant Sales-lijst zet bij tien indeed-cv-rijen exact dezelfde
+    // zoekopdracht in de URL-kolom ("resumes.indeed.com/search?q=..."), en die
+    // tien vielen daarmee tot één kandidaat samen. Negen mensen weg, zonder
+    // melding, want een rij die er niet meer is ziet er niet uit als een fout.
+    return !ZOEK_URL.test(tekst)
+  }
   return /linkedin\.com\/(in\/[^/\s]+|sales\/lead\/[^/\s?]+)/.test(tekst)
 }

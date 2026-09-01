@@ -120,12 +120,38 @@ function naarObjecten(matrix) {
     )
   }
 
-  const koppen = matrix[kopIndex].map((cel) => String(cel ?? '').trim())
+  const koppen = uniekeKoppen(matrix[kopIndex].map((cel) => String(cel ?? '').trim()))
   return matrix
     .slice(kopIndex + 1)
     .map((rij) => Object.fromEntries(koppen.map((kop, i) => [kop, rij[i] ?? ''])))
     // Lege regels en losse toelichtingen onderaan het blad horen er niet bij.
     .filter((rij) => Object.values(rij).some((waarde) => String(waarde).trim().length > 0))
+}
+
+/**
+ * Twee kolommen met dezelfde kop overschrijven elkaar zodra je er een object
+ * van maakt: de laatste wint, de eerste verdwijnt zonder spoor. De lijst voor
+ * Account Assistant Sales heeft twee kolommen "Bron-URL". De tweede is bij 4
+ * van de 57 rijen gevuld, de eerste bij 53 — dus importeerde die lijst 53 lege
+ * profiel-URL's, en meldde daar niets over: de kolomnaam kwam immers voor, dus
+ * kwam hij niet in `genegeerd` terecht.
+ *
+ * Hernoemen, niet samenvoegen. Twee kolommen met dezelfde naam hoeven niet
+ * hetzelfde te betekenen, en dat is niet aan dit script om te raden. De
+ * hernoemde kolom valt buiten de synoniemenlijst, belandt in `genegeerd` en
+ * wordt vervolgens mét inhoud gemeld — dan zie je zelf wat er te kiezen valt.
+ *
+ * Naamloze kolommen blijven ongemoeid: die zijn al een verzamelbak en een kop
+ * die " (2)" heet, leest nergens als iets waar je iets mee moet.
+ */
+function uniekeKoppen(koppen) {
+  const gezien = new Map()
+  return koppen.map((kop) => {
+    if (kop.length === 0) return kop
+    const aantal = (gezien.get(kop) ?? 0) + 1
+    gezien.set(kop, aantal)
+    return aantal === 1 ? kop : `${kop} (${aantal})`
+  })
 }
 
 /**
@@ -269,6 +295,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
   const onbeslist = []
   const overgeslagen = []
   const onleesbareDatums = new Map()
+  const nietIdentificerendeUrls = new Map()
 
   for (const [nummer, rij] of rijen.entries()) {
     const naam = waarde(rij, index, 'Naam')
@@ -283,9 +310,20 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
       onleesbareDatums.set(ruweDatum, (onleesbareDatums.get(ruweDatum) ?? 0) + 1)
     }
 
+    // Alleen een URL die een persoon aanwijst hoort in dit veld. Airtable
+    // berekent Dedupe-sleutel er zelf uit, en die formule kent
+    // isIdentificerendeUrl niet: een zoekopdracht in dit veld geeft tien
+    // verschillende mensen dezelfde sleutel in de base, ook al houdt de import
+    // ze hier keurig uit elkaar. Liever leeg dan een sleutel die liegt; de
+    // zoekopdracht staat toch al in de sheet.
+    const ruweUrl = waarde(rij, index, 'LinkedIn-URL')
+    if (ruweUrl && !isIdentificerendeUrl(ruweUrl)) {
+      nietIdentificerendeUrls.set(ruweUrl, (nietIdentificerendeUrls.get(ruweUrl) ?? 0) + 1)
+    }
+
     const kandidaat = schoon({
       Naam: naam,
-      'LinkedIn-URL': waarde(rij, index, 'LinkedIn-URL'),
+      'LinkedIn-URL': ruweUrl && isIdentificerendeUrl(ruweUrl) ? ruweUrl : undefined,
       'E-mail': waarde(rij, index, 'E-mail'),
       Telefoon: waarde(rij, index, 'Telefoon'),
       Instagram: waarde(rij, index, 'Instagram'),
@@ -379,6 +417,7 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
     onbeslist,
     overgeslagen,
     onleesbareDatums,
+    nietIdentificerendeUrls,
     genegeerdMetInhoud: gevuldeGenegeerdeKolommen(rijen, genegeerd),
     naamBotsingen: naamBotsingen(kandidaten),
   }
