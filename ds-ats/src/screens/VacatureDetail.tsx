@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
-import { afvalRedenen, funnel, opUrgentie } from '../lib/metrics'
+import { REDEN_ONTBREEKT, afvalRedenen, funnel, opUrgentie } from '../lib/metrics'
 import { band, datum } from '../lib/format'
 import { useHerkomst } from '../lib/herkomst'
 import { FUNNEL_STAGES } from '../../shared/stages.mjs'
@@ -31,12 +31,27 @@ export default function VacatureDetail() {
   // in de URL betekent: toon de cijfers, nog niet de namen.
   const [zoek, setZoek] = useSearchParams()
   const stage = zoek.get('stage')
+  // Het sub-filter op afvalreden. Alleen zinnig binnen Afgevallen: rijen in een
+  // andere stage hebben per definitie geen reden, dus zouden ze allemaal onder
+  // "Reden ontbreekt" vallen en zou dat filter juist de lopende kandidaten
+  // opleveren. Vandaar dat kiezen altijd Afgevallen meezet, en dat de lijst
+  // hieronder er ook op controleert.
+  const reden = stage === 'Afgevallen' ? zoek.get('reden') : null
   const kiesStage = (keuze: string | null) => {
     const volgende = new URLSearchParams(zoek)
     if (keuze === null) volgende.delete('stage')
     else volgende.set('stage', keuze)
+    // Een andere trede kiezen laat het sub-filter niet staan: anders krijg je
+    // een lijst met een reden in de kop die op niets meer slaat.
+    volgende.delete('reden')
     // De herkomst blijft meelopen: het filter wisselen is geen nieuw scherm, en
     // zonder dit zou de terugknop na één filterwissel weer gaan gokken.
+    setZoek(volgende, { state })
+  }
+  const kiesReden = (keuze: string) => {
+    const volgende = new URLSearchParams(zoek)
+    volgende.set('stage', 'Afgevallen')
+    volgende.set('reden', keuze)
     setZoek(volgende, { state })
   }
 
@@ -46,8 +61,11 @@ export default function VacatureDetail() {
 
   const lijst = useMemo(() => {
     if (!stage) return []
-    const selectie =
+    const opStage =
       stage === 'lopend' ? lopend : stage === 'alles' ? eigen : eigen.filter((r) => r.aanmelding.Stage === stage)
+    const selectie = reden
+      ? opStage.filter((r) => (r.aanmelding['Reden afvallen'] ?? REDEN_ONTBREEKT) === reden)
+      : opStage
 
     return [...selectie].sort((a, b) => {
       const verschil =
@@ -55,7 +73,7 @@ export default function VacatureDetail() {
         FUNNEL_STAGES.indexOf(a.aanmelding.Stage as never)
       return verschil !== 0 ? verschil : opUrgentie(a, b)
     })
-  }, [eigen, lopend, stage])
+  }, [eigen, lopend, stage, reden])
 
   if (!data) return null
   if (!vacature) return <p className="text-navy-400">Deze vacature bestaat niet (meer).</p>
@@ -76,11 +94,27 @@ export default function VacatureDetail() {
       <div>
         <FilterTerug onWis={() => kiesStage(null)} />
 
-        <div className="mt-1 flex items-center gap-3">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
           {kop ? (
             <h1 className="text-2xl font-semibold">{kop}</h1>
           ) : (
             <StageBadge stage={stage as StageId} />
+          )}
+          {/*
+            De reden staat naast de badge en niet in de regel eronder: hij is
+            hier de kop van de lijst, niet de context erbij. Op 390px valt hij
+            desnoods op een eigen regel, vandaar flex-wrap.
+          */}
+          {reden && (
+            <span
+              className={`rounded-full border px-2 py-0.5 text-sm ${
+                reden === REDEN_ONTBREEKT
+                  ? 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-lijn bg-white'
+              }`}
+            >
+              {reden}
+            </span>
           )}
           <span className="text-2xl font-semibold tabular-nums">{lijst.length}</span>
         </div>
@@ -204,11 +238,23 @@ export default function VacatureDetail() {
               {afgevallen} bekijken
             </button>
           </div>
-          <ul className="flex flex-col gap-1 text-sm">
+          {/*
+            Elke reden is een knop naar precies die afvallers. Een getal waar je
+            niet doorheen kunt is een dood eind: je ziet dat er zes op Timing
+            afvielen en moet vervolgens de hele lijst Afgevallen doorzoeken om te
+            weten wie. De hele regel is het raakvlak, niet alleen het woord.
+          */}
+          <ul className="flex flex-col text-sm">
             {redenen.map((rij) => (
-              <li key={rij.reden} className="flex justify-between gap-3">
-                <span className={rij.reden === 'Reden ontbreekt' ? 'text-red-700' : ''}>{rij.reden}</span>
-                <span className="tabular-nums text-navy-400">{rij.aantal}</span>
+              <li key={rij.reden}>
+                <button
+                  type="button"
+                  onClick={() => kiesReden(rij.reden)}
+                  className="tik flex w-full items-center justify-between gap-3 text-left"
+                >
+                  <span className={rij.reden === REDEN_ONTBREEKT ? 'text-red-700' : ''}>{rij.reden}</span>
+                  <span className="tabular-nums text-navy-400">{rij.aantal}</span>
+                </button>
               </li>
             ))}
           </ul>
