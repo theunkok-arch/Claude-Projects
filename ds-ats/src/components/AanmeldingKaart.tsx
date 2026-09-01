@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import type { Regel } from '../lib/types'
-import { dagen } from '../lib/format'
+import { dagen, scoringKern } from '../lib/format'
 import { useHerkomst } from '../lib/herkomst'
 import StageBadge from './StageBadge'
 
@@ -15,15 +15,29 @@ interface Props {
    * informatie meer, terwijl hij wel de opvallendste kleur op het scherm is.
    */
   toonStage?: boolean
+  /**
+   * Uit op een lijst die al op één vacature filtert. Dezelfde afweging als
+   * hierboven: daar herhaalt "vacature · opdrachtgever" alleen de kop, en die
+   * regel is beter besteed aan waaróm deze kandidaat op de lijst staat. Op het
+   * maandagoverzicht staat hij wel aan — daar lopen alle vacatures door elkaar
+   * en is het het enige dat de kaarten uit elkaar houdt.
+   */
+  toonVacature?: boolean
   onStage?: () => void
 }
 
-export default function AanmeldingKaart({ regel, toonStage = true, onStage }: Props) {
+export default function AanmeldingKaart({
+  regel,
+  toonStage = true,
+  toonVacature = true,
+  onStage,
+}: Props) {
   const { aanmelding, kandidaat, vacature, opdrachtgever, dagenInStage, overschreden, standaardActie } =
     regel
   const herkomst = useHerkomst()
   const opvallend = (dagenInStage ?? 0) > RANDGRENS_DAGEN
   const score = aanmelding['Score totaal']
+  const kern = toonVacature ? null : scoringKern(aanmelding['Score-onderbouwing'])
 
   /*
     Een kaart zonder kandidaat linkte naar `/kandidaat/` en dus naar "Pagina
@@ -59,14 +73,19 @@ export default function AanmeldingKaart({ regel, toonStage = true, onStage }: Pr
                 'Rol onbekend'}
             </p>
             {/*
-              Waar de aanmelding bij hoort staat er altijd bij, ook in een lijst die
-              al op één vacature filtert: zonder die regel zijn honderd kaarten niet
-              uit elkaar te houden. De klantnaam hangt achter de vacaturetitel in
-              plaats van bovenaan te staan, want hij is context, geen kop.
+              Waar de aanmelding bij hoort, of — op een lijst die daar al op
+              filtert — de kern van de score-onderbouwing. De klantnaam hangt
+              achter de vacaturetitel in plaats van bovenaan te staan, want hij
+              is context, geen kop. Twee regels ruimte: acht woorden passen op
+              390px niet altijd op één.
             */}
-            <p className="mt-0.5 truncate text-xs text-navy-400">
-              {[vacature?.Titel, opdrachtgever?.Naam].filter(Boolean).join(' · ') || 'Geen vacature'}
-            </p>
+            {toonVacature ? (
+              <p className="mt-0.5 truncate text-xs text-navy-400">
+                {[vacature?.Titel, opdrachtgever?.Naam].filter(Boolean).join(' · ') || 'Geen vacature'}
+              </p>
+            ) : (
+              kern && <p className="mt-0.5 line-clamp-2 text-xs text-navy-400">{kern}</p>
+            )}
           </>,
         )}
         {toonStage ? (

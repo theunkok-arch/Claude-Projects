@@ -129,6 +129,7 @@ export default function VacatureDetail() {
               key={regel.aanmelding.id}
               regel={regel}
               toonStage={gemengd}
+              toonVacature={false}
               onStage={() => setSheetVoor(regel)}
             />
           ))}
