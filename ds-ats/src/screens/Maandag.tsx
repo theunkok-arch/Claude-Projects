@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
+import { AuthFout } from '../lib/api'
 import { actieveRegels, bronVan, opUrgentie } from '../lib/metrics'
 import { FUNNEL_STAGES, dagenTussen } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
@@ -43,6 +44,15 @@ export default function Maandag() {
   const vandaag = data?.vandaag ?? ''
   const [zoek, setZoek] = useSearchParams()
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
+  /*
+    Selectiemodus. Na een outreach-ronde staan er veertien mensen op Benaderd
+    die allemaal dezelfde kant op moeten; die stuk voor stuk aantikken is waarom
+    het in de praktijk achteraf in Airtable werd rechtgezet.
+  */
+  const [selectieAan, setSelectieAan] = useState(false)
+  const [gekozen, setGekozen] = useState<Set<string>>(new Set())
+  const [groepSheet, setGroepSheet] = useState(false)
+  const [voortgang, setVoortgang] = useState<string | null>(null)
 
   const klantFilter = zoek.get('klant') ?? 'alle'
   const vacatureFilter = zoek.get('vacature') ?? 'alle'
@@ -90,6 +100,16 @@ export default function Maandag() {
 
   const teLang = useMemo(() => inScope.filter((r) => r.overschreden), [inScope])
 
+  /*
+    Een andere stage of een ander filter betekent andere kaarten. Een selectie
+    die dat overleeft, verwijst naar rijen die niet meer op het scherm staan, en
+    "Verplaats naar" zou dan mensen raken die je niet ziet.
+  */
+  useEffect(() => {
+    setSelectieAan(false)
+    setGekozen(new Set())
+  }, [stage, klantFilter, vacatureFilter, bronFilter, sindsFilter])
+
   const tellingen: StageTelling[] = useMemo(
     () =>
       (FUNNEL_STAGES as StageId[])
@@ -101,6 +121,9 @@ export default function Maandag() {
         .filter((rij) => rij.aantal > 0),
     [inScope],
   )
+
+  /** Wat er op het beginscherm onder de tellingen staat, in dezelfde volgorde. */
+  const werklijst = useMemo(() => [...teLang].sort(opUrgentie), [teLang])
 
   const lijst = useMemo(() => {
     if (!stage) return []
@@ -148,6 +171,74 @@ export default function Maandag() {
     return `/?${volgende.toString()}`
   }
 
+  const zetSelectie = (id: string) =>
+    setGekozen((huidig) => {
+      const volgende = new Set(huidig)
+      if (volgende.has(id)) volgende.delete(id)
+      else volgende.add(id)
+      return volgende
+    })
+
+  /**
+   * De groepsverplaatsing. Eén voor één en niet parallel: Airtable knijpt op
+   * vijf verzoeken per seconde, en veertien tegelijk levert daar een handvol
+   * mislukte wijzigingen op zonder dat je ziet welke.
+   *
+   * Faalt er een, dan gaat de rest wél door. Halverwege stoppen laat de lijst
+   * achter in een toestand die niemand kan overzien; nu is de uitkomst altijd
+   * "deze zijn verplaatst, deze niet, en die staan nog aangevinkt".
+   */
+  async function verplaatsGroep(naar: StageId, reden?: string) {
+    const rijen = lijst.filter((r) => gekozen.has(r.aanmelding.id))
+    const mislukt: Regel[] = []
+
+    try {
+      for (const [index, regel] of rijen.entries()) {
+        setVoortgang(`${index + 1} van ${rijen.length}`)
+        try {
+          await wijzigStage(regel.aanmelding.id, naar, { redenAfvallen: reden })
+        } catch (error) {
+          // Een verlopen sessie treft niet deze ene aanmelding maar alle
+          // volgende. Doorgaan levert dertien keer dezelfde fout op en zou hem
+          // hier melden als "deze kandidaten zijn niet gelukt", terwijl het
+          // inlogscherm het echte antwoord is.
+          if (error instanceof AuthFout) throw error
+          mislukt.push(regel)
+        }
+      }
+    } finally {
+      setVoortgang(null)
+    }
+
+    if (mislukt.length > 0) {
+      const namen = mislukt.map((r) => r.kandidaat?.Naam ?? 'kandidaat zonder naam').join(', ')
+      setGekozen(new Set(mislukt.map((r) => r.aanmelding.id)))
+      throw new Error(
+        `${mislukt.length} van de ${rijen.length} niet gelukt: ${namen}. Ze staan nog geselecteerd, dus je kunt het opnieuw proberen.`,
+      )
+    }
+
+    setSelectieAan(false)
+    setGekozen(new Set())
+  }
+
+  /*
+    Dezelfde bottom sheet op allebei de schermen: het beginscherm toont nu ook
+    kaarten, en die moeten net zo goed te verplaatsen zijn als in de
+    doorgeklikte lijst.
+  */
+  const kandidaatSheet = (
+    <StageSheet
+      open={sheetVoor !== null}
+      huidigeStage={sheetVoor?.aanmelding.Stage}
+      naam={sheetVoor?.kandidaat?.Naam ?? ''}
+      onSluit={() => setSheetVoor(null)}
+      onKies={async (naar, reden) => {
+        if (sheetVoor) await wijzigStage(sheetVoor.aanmelding.id, naar, { redenAfvallen: reden })
+      }}
+    />
+  )
+
   // ── Doorgeklikt: de kandidaten van één stage ────────────────────────────────
   if (stage) {
     return (
@@ -161,6 +252,18 @@ export default function Maandag() {
             <StageBadge stage={stage as StageId} />
           )}
           <span className="text-2xl font-semibold tabular-nums">{lijst.length}</span>
+          {lijst.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (selectieAan) setGekozen(new Set(lijst.map((r) => r.aanmelding.id)))
+                else setSelectieAan(true)
+              }}
+              className="tik ml-auto shrink-0 rounded-xl border border-lijn bg-white px-3 text-sm"
+            >
+              {selectieAan ? 'Alles selecteren' : 'Selecteren'}
+            </button>
+          )}
         </div>
         {(klantNaam || vacatureNaam || bronFilter || periodeNaam) && (
           <p className="text-sm text-navy-400">
@@ -179,19 +282,74 @@ export default function Maandag() {
               // al boven het scherm en zou elke kaart dezelfde badge dragen.
               toonStage={stage === NORM}
               onStage={() => setSheetVoor(regel)}
+              onVolgende={(naar, reden) =>
+                wijzigStage(regel.aanmelding.id, naar, { redenAfvallen: reden })
+              }
+              selecteerbaar={selectieAan}
+              gekozen={gekozen.has(regel.aanmelding.id)}
+              onKiesSelectie={() => zetSelectie(regel.aanmelding.id)}
             />
           ))}
           {lijst.length === 0 && <p className="mt-4 text-navy-400">Niemand in deze weergave.</p>}
         </div>
 
+        {/* Ruimte onder de laatste kaart, zodat de actiebalk hem niet afdekt. */}
+        {selectieAan && <div aria-hidden className="h-16" />}
+
+        {selectieAan && (
+          /*
+            Boven de tabbalk en niet erover: die vier tabs blijven bereikbaar,
+            en de duim komt hier toch al langs. 2,75rem is de hoogte van de
+            tabbalk zelf (`tik`), de veilige zone van de telefoon komt daar
+            bovenop. Dezelfde vorm als de foutbanner in App.tsx, inclusief de
+            `0px`-fallback: zonder die fallback laat een browser zonder env()
+            de hele calc vallen, en dan zweeft de balk ergens midden op de
+            pagina in plaats van onderaan.
+          */
+          <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+2.75rem)] z-40 border-t border-lijn bg-white px-4 py-2">
+            <div className="mx-auto flex max-w-2xl items-center gap-2">
+              {/*
+                Drie dingen op 390px. Zonder nowrap en de krappere padding brak
+                "5 geselecteerd" over twee regels.
+              */}
+              <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums">
+                {gekozen.size} geselecteerd
+              </span>
+              <button
+                type="button"
+                disabled={gekozen.size === 0}
+                onClick={() => setGroepSheet(true)}
+                className="tik ml-auto shrink-0 rounded-xl bg-navy px-3 text-sm font-medium text-cream disabled:opacity-40"
+              >
+                Verplaats naar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectieAan(false)
+                  setGekozen(new Set())
+                }}
+                className="tik shrink-0 rounded-xl border border-lijn px-3 text-sm text-navy-400"
+              >
+                Annuleren
+              </button>
+            </div>
+          </div>
+        )}
+
+        {kandidaatSheet}
+
+        {/*
+          Hetzelfde paneel, dezelfde stagelijst, dezelfde redenlijst. Geen
+          huidige stage: een selectie kan uit meerdere stages komen, en dan valt
+          er niets uit te grijzen.
+        */}
         <StageSheet
-          open={sheetVoor !== null}
-          huidigeStage={sheetVoor?.aanmelding.Stage}
-          naam={sheetVoor?.kandidaat?.Naam ?? ''}
-          onSluit={() => setSheetVoor(null)}
-          onKies={async (naar, reden) => {
-            if (sheetVoor) await wijzigStage(sheetVoor.aanmelding.id, naar, { redenAfvallen: reden })
-          }}
+          open={groepSheet}
+          naam={`${gekozen.size} ${gekozen.size === 1 ? 'kandidaat' : 'kandidaten'}`}
+          voortgang={voortgang}
+          onSluit={() => setGroepSheet(false)}
+          onKies={(naar, reden) => verplaatsGroep(naar, reden)}
         />
       </div>
     )
@@ -296,6 +454,12 @@ export default function Maandag() {
         })}
       </div>
 
+      {/*
+        De telling van wat te lang stilstaat, met de link naar ?stage=norm waar
+        selecteren zit. Hij staat hier en niet bij de lijst verderop: met vijf
+        stages duwen de tegels die lijst voorbij het eerste scherm, en dan zou
+        het dringendste getal van de app pas na scrollen te zien zijn.
+      */}
       {teLang.length > 0 && (
         <Link
           to={linkNaarStage(NORM)}
@@ -315,6 +479,39 @@ export default function Maandag() {
       ) : (
         <StageTegels tellingen={tellingen} hrefVoor={linkNaarStage} />
       )}
+
+      {/*
+        De werklijst zelf, direct onder de tellingen. Je landde hier op cijfers
+        en moest altijd eerst een stage of "Over de norm" aantikken voordat er
+        iemand in beeld kwam die je kon bijwerken. Nu staat de eerste kandidaat
+        er al, met de knop van de standaardactie eronder.
+
+        Dezelfde volgorde als de doorgeklikte lijst, want het is dezelfde
+        selectie door dezelfde sortering: het langst over de norm bovenaan.
+      */}
+      {tellingen.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-2 font-semibold text-oranje">Over de norm</h2>
+          {teLang.length === 0 ? (
+            <p className="text-navy-400">Niemand over de norm.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {werklijst.map((regel) => (
+                <AanmeldingKaart
+                  key={regel.aanmelding.id}
+                  regel={regel}
+                  onStage={() => setSheetVoor(regel)}
+                  onVolgende={(naar, redenAfvallen) =>
+                    wijzigStage(regel.aanmelding.id, naar, { redenAfvallen })
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {kandidaatSheet}
     </div>
   )
 }

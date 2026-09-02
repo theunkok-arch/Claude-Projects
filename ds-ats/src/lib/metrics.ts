@@ -29,7 +29,6 @@ export function bouwRegels(data: Bootstrap): Regel[] {
       werkdagenInStage: werkdagenTussen(datumInStage, data.vandaag),
       overschreden: normOverschreden(aanmelding.Stage, datumInStage, data.vandaag),
       norm: config?.norm ?? 0,
-      standaardActie: config?.actie ?? '',
     }
   })
 }

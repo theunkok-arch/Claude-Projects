@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AFVAL_REDENEN, STAGES } from '../../shared/stages.mjs'
+import { AFVAL_REDENEN, MEEST_GEBRUIKTE_REDENEN, STAGES } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import StageBadge from './StageBadge'
 
@@ -9,13 +9,20 @@ interface Props {
   open: boolean
   onSluit: () => void
   onKies: (stage: StageId, redenAfvallen?: string) => Promise<void>
+  /**
+   * "3 van 14" tijdens een groepsverplaatsing. De aanroeper telt, want die
+   * doet de aanmeldingen één voor één. Bij één kandidaat blijft dit leeg: daar
+   * is de knop die op "Bezig…" springt genoeg, en zou een teller "1 van 1"
+   * alleen ruis zijn.
+   */
+  voortgang?: string | null
 }
 
 /**
  * Twee taps: stage kiezen en klaar. Kiest de gebruiker Afgevallen, dan komt de
  * redenlijst er direct achteraan en is die verplicht — geen afvaller zonder reden.
  */
-export default function StageSheet({ huidigeStage, naam, open, onSluit, onKies }: Props) {
+export default function StageSheet({ huidigeStage, naam, open, onSluit, onKies, voortgang }: Props) {
   const [redenVoor, setRedenVoor] = useState<StageId | null>(null)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
@@ -61,17 +68,35 @@ export default function StageSheet({ huidigeStage, naam, open, onSluit, onKies }
           <p className="truncate font-semibold">{naam}</p>
         </div>
 
+        {/*
+          Tijdens het wegschrijven blijft het paneel staan met de teller erin.
+          Sluiten en later melden hoe het afliep zou betekenen dat je terugkijkt
+          naar een lijst die halverwege is bijgewerkt zonder te weten hoe ver.
+        */}
+        {voortgang && (
+          <p className="mx-5 mt-3 rounded-lg bg-cream px-3 py-2 text-sm tabular-nums">{voortgang}</p>
+        )}
+
         {fout && <p className="mx-5 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{fout}</p>}
 
         {redenVoor ? (
           <div className="px-5 py-3">
-            {Object.entries(AFVAL_REDENEN).map(([kop, redenen]) => (
+            {/*
+              Drie redenen doen het meeste werk. Ze staan hier bovenaan als
+              eigen blok en verderop nog een keer in hun eigen groep: die
+              herhaling kost een regel, terwijl scrollen door veertien opties
+              op een telefoon elke afwijzing een tik duurder maakt.
+            */}
+            {[
+              ['Meest gebruikt', MEEST_GEBRUIKTE_REDENEN] as [string, string[]],
+              ...Object.entries(AFVAL_REDENEN),
+            ].map(([kop, redenen]) => (
               <div key={kop} className="mb-4">
                 <p className="mb-2 text-xs font-semibold tracking-wide text-navy-400 uppercase">{kop}</p>
                 <div className="flex flex-col gap-1">
                   {redenen.map((reden) => (
                     <button
-                      key={reden}
+                      key={`${kop}-${reden}`}
                       type="button"
                       disabled={bezig}
                       onClick={() => kies('Afgevallen', reden)}

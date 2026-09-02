@@ -124,5 +124,4 @@ export interface Regel {
   werkdagenInStage: number | null
   overschreden: boolean
   norm: number
-  standaardActie: string
 }
