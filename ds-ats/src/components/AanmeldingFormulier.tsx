@@ -29,7 +29,11 @@ interface Veld {
 const VELDEN: readonly Veld[] = [
   { sleutel: 'Volgende actie', label: 'Volgende actie', soort: 'tekst' },
   { sleutel: 'Score totaal', label: 'Score totaal', soort: 'getal', max: 100 },
-  { sleutel: 'Reistijd minuten', label: 'Reistijd in minuten', soort: 'getal', heel: true },
+  // Reisafstand is bij meerdere opdrachten een hard criterium, en het is typisch
+  // iets wat je tijdens een telefoontje hoort. Vijf uur enkele reis is de
+  // bovengrens: daarboven is het geen reistijd meer maar een typefout, en zonder
+  // grens belandt een verdwaalde 3000 ongemerkt in de base.
+  { sleutel: 'Reistijd minuten', label: 'Reistijd in minuten', soort: 'getal', heel: true, max: 300 },
   { sleutel: 'Score-onderbouwing', label: 'Score-onderbouwing', soort: 'alinea' },
   { sleutel: 'Opmerkingen', label: 'Opmerkingen', soort: 'alinea' },
 ]
