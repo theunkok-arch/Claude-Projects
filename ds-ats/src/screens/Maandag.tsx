@@ -308,12 +308,18 @@ export default function Maandag() {
           */
           <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+2.75rem)] z-40 border-t border-lijn bg-white px-4 py-2">
             <div className="mx-auto flex max-w-2xl items-center gap-2">
-              <span className="text-sm font-medium tabular-nums">{gekozen.size} geselecteerd</span>
+              {/*
+                Drie dingen op 390px. Zonder nowrap en de krappere padding brak
+                "5 geselecteerd" over twee regels.
+              */}
+              <span className="shrink-0 whitespace-nowrap text-sm font-medium tabular-nums">
+                {gekozen.size} geselecteerd
+              </span>
               <button
                 type="button"
                 disabled={gekozen.size === 0}
                 onClick={() => setGroepSheet(true)}
-                className="tik ml-auto shrink-0 rounded-xl bg-navy px-4 text-sm font-medium text-cream disabled:opacity-40"
+                className="tik ml-auto shrink-0 rounded-xl bg-navy px-3 text-sm font-medium text-cream disabled:opacity-40"
               >
                 Verplaats naar
               </button>
@@ -323,7 +329,7 @@ export default function Maandag() {
                   setSelectieAan(false)
                   setGekozen(new Set())
                 }}
-                className="tik shrink-0 rounded-xl border border-lijn px-4 text-sm text-navy-400"
+                className="tik shrink-0 rounded-xl border border-lijn px-3 text-sm text-navy-400"
               >
                 Annuleren
               </button>
@@ -448,6 +454,25 @@ export default function Maandag() {
         })}
       </div>
 
+      {/*
+        De telling van wat te lang stilstaat, met de link naar ?stage=norm waar
+        selecteren zit. Hij staat hier en niet bij de lijst verderop: met vijf
+        stages duwen de tegels die lijst voorbij het eerste scherm, en dan zou
+        het dringendste getal van de app pas na scrollen te zien zijn.
+      */}
+      {teLang.length > 0 && (
+        <Link
+          to={linkNaarStage(NORM)}
+          className="tik mt-4 flex items-center gap-3 rounded-2xl border border-oranje bg-oranje/10 px-4 py-3"
+        >
+          <span className="flex-1 font-semibold text-oranje">Over de norm</span>
+          <span className="text-2xl font-semibold tabular-nums text-oranje">{teLang.length}</span>
+          <span aria-hidden className="text-oranje">
+            ›
+          </span>
+        </Link>
+      )}
+
       <h2 className="mt-6 mb-2 font-semibold">Per stage</h2>
       {tellingen.length === 0 ? (
         <p className="mt-8 text-center text-navy-400">Nog geen actieve aanmeldingen.</p>
@@ -466,43 +491,22 @@ export default function Maandag() {
       */}
       {tellingen.length > 0 && (
         <section className="mt-6">
+          <h2 className="mb-2 font-semibold text-oranje">Over de norm</h2>
           {teLang.length === 0 ? (
-            <>
-              <h2 className="mb-2 font-semibold">Over de norm</h2>
-              <p className="text-navy-400">Niemand over de norm.</p>
-            </>
+            <p className="text-navy-400">Niemand over de norm.</p>
           ) : (
-            <>
-              {/*
-                De oranje balk stond hierboven als losse doorverwijzing en zou
-                naast een kop "Over de norm" twee keer hetzelfde zeggen. Hij is
-                nu de kop van zijn eigen lijst: hetzelfde getal, dezelfde link
-                naar ?stage=norm (waar selecteren zit), maar direct boven de
-                kaarten waar hij over gaat.
-              */}
-              <Link
-                to={linkNaarStage(NORM)}
-                className="tik flex items-center gap-3 rounded-2xl border border-oranje bg-oranje/10 px-4 py-3"
-              >
-                <span className="flex-1 font-semibold text-oranje">Over de norm</span>
-                <span className="text-2xl font-semibold tabular-nums text-oranje">{teLang.length}</span>
-                <span aria-hidden className="text-oranje">
-                  ›
-                </span>
-              </Link>
-              <div className="mt-2 flex flex-col gap-2">
-                {werklijst.map((regel) => (
-                  <AanmeldingKaart
-                    key={regel.aanmelding.id}
-                    regel={regel}
-                    onStage={() => setSheetVoor(regel)}
-                    onVolgende={(naar, redenAfvallen) =>
-                      wijzigStage(regel.aanmelding.id, naar, { redenAfvallen })
-                    }
-                  />
-                ))}
-              </div>
-            </>
+            <div className="flex flex-col gap-2">
+              {werklijst.map((regel) => (
+                <AanmeldingKaart
+                  key={regel.aanmelding.id}
+                  regel={regel}
+                  onStage={() => setSheetVoor(regel)}
+                  onVolgende={(naar, redenAfvallen) =>
+                    wijzigStage(regel.aanmelding.id, naar, { redenAfvallen })
+                  }
+                />
+              ))}
+            </div>
           )}
         </section>
       )}

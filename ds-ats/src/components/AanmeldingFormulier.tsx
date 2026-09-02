@@ -125,7 +125,13 @@ export default function AanmeldingFormulier({
   }
 
   return (
-    <form onSubmit={bewaar} className="mt-3 border-t border-lijn pt-3">
+    /*
+      noValidate: zonder dit blokkeert de browser het opslaan zelf bij een getal
+      boven de max, met een Engelse ballon ("Value must be less than or equal to
+      300"). De hele app is Nederlands, en de controle hieronder zegt bovendien
+      welk veld het betreft. Nu komt die melding er ook echt uit.
+    */
+    <form onSubmit={bewaar} noValidate className="mt-3 border-t border-lijn pt-3">
       <div className="flex flex-col gap-3">
         {VELDEN.map((veld) => {
           const waarde = concept[veld.sleutel] ?? ''

@@ -193,9 +193,22 @@ export default function KandidaatDetail() {
                   <StageBadge stage={aanmelding.Stage} klein onClick={() => setSheetVoor(regel)} />
                 </div>
                 <div className="mt-2 flex items-baseline justify-between gap-3">
+                  {/*
+                    De reistijd stond alleen in het bewerkformulier, en een hard
+                    criterium dat je pas ziet nadat je op bewerken hebt getikt,
+                    kun je tijdens een telefoontje niet nakijken. Hij hangt hier
+                    achter de dagen in stage, op dezelfde regel.
+                  */}
                   <p className="text-sm text-navy-400">
-                    {dagen(regel.dagenInStage)} in stage
-                    {aanmelding['Reden afvallen'] ? ` · ${aanmelding['Reden afvallen']}` : ''}
+                    {[
+                      `${dagen(regel.dagenInStage)} in stage`,
+                      typeof aanmelding['Reistijd minuten'] === 'number'
+                        ? `${aanmelding['Reistijd minuten']} min reizen`
+                        : null,
+                      aanmelding['Reden afvallen'],
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
                   <BewerkKnop
                     open={open}

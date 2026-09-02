@@ -234,9 +234,15 @@ export default function AanmeldingKaart({
   */
   if (selecteerbaar) {
     return (
+      /*
+        De rand blijft doen wat hij altijd doet: oranje als deze aanmelding over
+        de norm is. Aangevinkt zijn wordt met de achtergrond aangegeven, niet met
+        de rand. Anders verliest juist de kaart die je aanvinkt het signaal
+        waarom je hem aanvinkt.
+      */
       <label
-        className={`flex cursor-pointer items-start gap-3 rounded-2xl border bg-white p-4 shadow-sm ${
-          gekozen ? 'border-navy ring-1 ring-navy' : rand
+        className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 shadow-sm ${rand} ${
+          gekozen ? 'bg-cream' : 'bg-white'
         }`}
       >
         <input
