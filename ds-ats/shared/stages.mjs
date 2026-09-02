@@ -67,6 +67,21 @@ export const AFVAL_REDENEN = {
   ],
 }
 
+/**
+ * De drie die de lijst in de praktijk domineren. Ze staan als apart blok
+ * bovenaan het redenscherm, en blijven daarnaast gewoon in hun eigen groep
+ * hieronder staan: dubbel in de lijst is goedkoper dan veertien opties
+ * doorzoeken op een telefoon.
+ *
+ * Exact dezelfde tekst als hierboven, want deze waarde gaat naar Airtable.
+ * Een test in scripts/test/stages.test.mjs bewaakt dat.
+ */
+export const MEEST_GEBRUIKTE_REDENEN = [
+  'Geen reactie',
+  'Geen interesse',
+  'Afgewezen door ons (profielcheck)',
+]
+
 export const ALLE_AFVAL_REDENEN = Object.values(AFVAL_REDENEN).flat()
 
 export function stageIndex(stage) {

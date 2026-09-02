@@ -34,6 +34,7 @@ export declare const FUNNEL_STAGES: StageId[]
 export declare const EIND_STAGES: StageId[]
 export declare const EERSTE_KLANT_ZICHTBARE_STAGE: StageId
 export declare const AFVAL_REDENEN: Record<string, string[]>
+export declare const MEEST_GEBRUIKTE_REDENEN: string[]
 export declare const ALLE_AFVAL_REDENEN: string[]
 export declare function stageIndex(stage: string | null | undefined): number
 export declare function stageConfig(stage: string | null | undefined): StageConfig | undefined

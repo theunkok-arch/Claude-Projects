@@ -8,6 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   ALLE_AFVAL_REDENEN,
+  MEEST_GEBRUIKTE_REDENEN,
   STAGES,
   STAGE_IDS,
   dagenTussen,
@@ -87,4 +88,23 @@ test('stages zonder norm slaan nooit alarm', () => {
     if (stage.norm !== 0) continue
     assert.equal(normOverschreden(stage.id, '2020-01-01', '2026-08-28'), false, stage.id)
   }
+})
+
+// ── De snelkoppeling naar de meestgebruikte afvalredenen ────────────────────
+
+test('elke meestgebruikte reden bestaat ook echt', () => {
+  // De waarde gaat rechtstreeks naar het singleSelect "Reden afvallen" in
+  // Airtable. Een reden die hier anders is gespeld dan in AFVAL_REDENEN levert
+  // geen foutmelding op maar een tweede optie in de base, en daarmee tellingen
+  // die niet meer optellen.
+  for (const reden of MEEST_GEBRUIKTE_REDENEN) {
+    assert.ok(ALLE_AFVAL_REDENEN.includes(reden), `onbekende reden ${reden}`)
+  }
+})
+
+test('de snelkoppeling is korter dan de volledige lijst', () => {
+  // Zou hij even lang worden, dan is het geen snelkoppeling meer maar een
+  // tweede kopie van dezelfde lijst.
+  assert.ok(MEEST_GEBRUIKTE_REDENEN.length < ALLE_AFVAL_REDENEN.length)
+  assert.equal(new Set(MEEST_GEBRUIKTE_REDENEN).size, MEEST_GEBRUIKTE_REDENEN.length)
 })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AFVAL_REDENEN, STAGES } from '../../shared/stages.mjs'
+import { AFVAL_REDENEN, MEEST_GEBRUIKTE_REDENEN, STAGES } from '../../shared/stages.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import StageBadge from './StageBadge'
 
@@ -81,13 +81,22 @@ export default function StageSheet({ huidigeStage, naam, open, onSluit, onKies, 
 
         {redenVoor ? (
           <div className="px-5 py-3">
-            {Object.entries(AFVAL_REDENEN).map(([kop, redenen]) => (
+            {/*
+              Drie redenen doen het meeste werk. Ze staan hier bovenaan als
+              eigen blok en verderop nog een keer in hun eigen groep: die
+              herhaling kost een regel, terwijl scrollen door veertien opties
+              op een telefoon elke afwijzing een tik duurder maakt.
+            */}
+            {[
+              ['Meest gebruikt', MEEST_GEBRUIKTE_REDENEN] as [string, string[]],
+              ...Object.entries(AFVAL_REDENEN),
+            ].map(([kop, redenen]) => (
               <div key={kop} className="mb-4">
                 <p className="mb-2 text-xs font-semibold tracking-wide text-navy-400 uppercase">{kop}</p>
                 <div className="flex flex-col gap-1">
                   {redenen.map((reden) => (
                     <button
-                      key={reden}
+                      key={`${kop}-${reden}`}
                       type="button"
                       disabled={bezig}
                       onClick={() => kies('Afgevallen', reden)}
