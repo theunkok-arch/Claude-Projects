@@ -7,9 +7,6 @@ import { dagen, scoringKern } from '../lib/format'
 import { useHerkomst } from '../lib/herkomst'
 import StageBadge from './StageBadge'
 
-/** Boven de tien dagen krijgt de kaart een oranje rand. Dat is het signaal. */
-const RANDGRENS_DAGEN = 10
-
 interface Props {
   regel: Regel
   /**
@@ -57,7 +54,16 @@ export default function AanmeldingKaart({
   const [fout, setFout] = useState<string | null>(null)
   const { aanmelding, kandidaat, vacature, opdrachtgever, dagenInStage, overschreden } = regel
   const herkomst = useHerkomst()
-  const opvallend = (dagenInStage ?? 0) > RANDGRENS_DAGEN
+  /*
+    Rand en tekst hangen aan dezelfde waarde als de lijst "Over de norm": de
+    servicenorm van déze stage, in werkdagen. Het was een vaste tien
+    kalenderdagen, en dat gaf twee kanten op een verkeerd signaal. Opgevolgd
+    heeft twaalf werkdagen de tijd, dus stond een kaart daar na elf dagen alarm
+    te slaan terwijl hij ruim binnen de norm zat. Gereageerd heeft er drie, dus
+    stond een kaart die de norm al overschreed rustig grijs in de lijst waar
+    hij juist voor stond.
+  */
+  const opvallend = overschreden
   const score = aanmelding['Score totaal']
   const kern = toonVacature ? null : scoringKern(aanmelding['Score-onderbouwing'])
 
@@ -155,7 +161,7 @@ export default function AanmeldingKaart({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-        <span className={overschreden ? 'font-semibold text-oranje' : 'text-navy-400'}>
+        <span className={opvallend ? 'font-semibold text-oranje' : 'text-navy-400'}>
           {dagen(dagenInStage)} in stage
         </span>
         {aanmelding.Concurrent && (
