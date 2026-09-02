@@ -3,7 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAts } from '../store/AtsProvider'
 import { AuthFout } from '../lib/api'
 import { actieveRegels, bronVan, opUrgentie } from '../lib/metrics'
-import { FUNNEL_STAGES, dagenTussen } from '../../shared/stages.mjs'
+import { datumKort } from '../lib/format'
+import { FUNNEL_STAGES } from '../../shared/stages.mjs'
+import { MAX_PARTIJEN, nieuwstePartij, partijen } from '../../shared/partijen.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import StageBadge from '../components/StageBadge'
@@ -15,20 +17,8 @@ import type { Regel } from '../lib/types'
 /** Pseudo-stage in de URL: alles wat de servicenorm overschrijdt, ongeacht stage. */
 const NORM = 'norm'
 
-/**
- * Sinds wanneer een aanmelding meetelt, in dagen terug vanaf vandaag.
- * `null` is alles.
- *
- * Dit filtert op `Datum aangemaakt` van de aanmelding, niet van de kandidaat:
- * iemand die al een jaar in de base staat maar vandaag pas aan deze vacature is
- * gekoppeld, is voor deze opdracht wel degelijk nieuw.
- */
-const PERIODES = [
-  { dagen: null, label: 'Alles' },
-  { dagen: 0, label: 'Vandaag' },
-  { dagen: 7, label: '7 dagen' },
-  { dagen: 30, label: '30 dagen' },
-] as const
+/** De stage waarop de agents alles afleveren, en dus wat nog beoordeeld moet worden. */
+const TE_BEOORDELEN = 'Gescoord'
 
 /**
  * Scherm 1, template 2 uit het playbook. Het beginscherm toont de tellingen per
@@ -39,9 +29,6 @@ const PERIODES = [
  */
 export default function Maandag() {
   const { regels, data, wijzigStage } = useAts()
-  // De datum van de server, niet van de telefoon. Een toestel met een verkeerd
-  // ingestelde klok zou anders een andere selectie "nieuw" noemen dan de base.
-  const vandaag = data?.vandaag ?? ''
   const [zoek, setZoek] = useSearchParams()
   const [sheetVoor, setSheetVoor] = useState<Regel | null>(null)
   /*
@@ -60,11 +47,11 @@ export default function Maandag() {
   // Het werkt als klant en vacature — een filter op de scope, in de URL, dus
   // deelbaar en met een werkende terugknop.
   const bronFilter = zoek.get('bron')
-  // `?sinds=7` — alleen wat in de laatste zeven dagen is toegevoegd. Na elke
-  // nieuwe importronde is dit hoe je ziet wat erbij is gekomen zonder de hele
-  // lijst opnieuw door te lopen.
-  const sindsRuw = zoek.get('sinds')
-  const sindsFilter = sindsRuw === null ? null : Number(sindsRuw)
+  // `?partij=2026-09-02` — precies de kandidaten die op die dag zijn
+  // toegevoegd. De agents leveren in partijen aan, dus dat is de eenheid
+  // waarin je ze wilt beoordelen; een venster als "7 dagen" valt daar de
+  // ochtend na een run juist naast.
+  const partijFilter = zoek.get('partij')
   const stage = zoek.get('stage')
 
   const zetZoek = (sleutel: string, waarde: string | null) => {
@@ -74,8 +61,13 @@ export default function Maandag() {
     setZoek(volgende)
   }
 
-  /** Alles wat op dit scherm hoort: actief, binnen de gekozen klant en vacature. */
-  const inScope = useMemo(() => {
+  /**
+   * Alles wat op dit scherm hoort: actief, binnen de gekozen klant en vacature.
+   * De partij zit hier bewust nog niet in. De chips worden hieruit opgebouwd,
+   * en zouden ze uit de gefilterde lijst komen, dan bleef er na één tik nog
+   * maar één chip over en kon je niet meer terug naar een andere dag.
+   */
+  const inScopeBreed = useMemo(() => {
     let actief = actieveRegels(regels)
     if (klantFilter !== 'alle') {
       actief = actief.filter((r) => r.vacature?.Opdrachtgever?.[0] === klantFilter)
@@ -86,19 +78,58 @@ export default function Maandag() {
     if (bronFilter) {
       actief = actief.filter((r) => bronVan(r) === bronFilter)
     }
-    if (sindsFilter !== null && Number.isFinite(sindsFilter)) {
-      actief = actief.filter((r) => {
-        const oud = dagenTussen(r.aanmelding['Datum aangemaakt'], vandaag)
-        // Zonder datum weet je niet of het nieuw is. Die aanmeldingen vallen
-        // buiten het filter in plaats van erin: een lijst "nieuw sinds vandaag"
-        // die stiekem ook datumloze regels toont, is geen antwoord op de vraag.
-        return oud !== null && oud <= sindsFilter
-      })
-    }
     return actief
-  }, [regels, klantFilter, vacatureFilter, bronFilter, sindsFilter, vandaag])
+  }, [regels, klantFilter, vacatureFilter, bronFilter])
+
+  /** De dagen waarop er is aangeleverd, nieuwste eerst, met hun aantallen. */
+  const partijLijst = useMemo(
+    () => partijen(inScopeBreed.map((r) => r.aanmelding)).slice(0, MAX_PARTIJEN),
+    [inScopeBreed],
+  )
+
+  const inScope = useMemo(
+    // Zonder datum weet je niet uit welke partij een aanmelding komt. Die
+    // vallen buiten het filter in plaats van erin: een lijst "toegevoegd op 2
+    // september" die stiekem ook datumloze regels toont, is geen antwoord op
+    // de vraag.
+    () =>
+      partijFilter
+        ? inScopeBreed.filter((r) => r.aanmelding['Datum aangemaakt'] === partijFilter)
+        : inScopeBreed,
+    [inScopeBreed, partijFilter],
+  )
 
   const teLang = useMemo(() => inScope.filter((r) => r.overschreden), [inScope])
+
+  /**
+   * De laatste aanlevering van de agents, en wat daarvan nog op Gescoord staat.
+   *
+   * Bewust de nieuwste partij en niet alles wat ooit op Gescoord bleef liggen:
+   * de vraag is "wat heeft mijn agent net gebracht". Restanten van een oudere
+   * dag raak je niet kwijt, die staan onder hun eigen chip hierboven.
+   */
+  const nieuwsteDag = useMemo(
+    () => nieuwstePartij(inScopeBreed.map((r) => r.aanmelding)),
+    [inScopeBreed],
+  )
+  /*
+    Zonder chip gaat het over de laatste aanlevering. Staat er wél een chip aan,
+    dan volgt deze ingang die: de chip bepaalt het hele scherm, en een teller
+    die ondertussen naar een andere dag wijst dan de lijst eronder is geen
+    ingang maar een valstrik.
+  */
+  const beoordeelDag = partijFilter ?? nieuwsteDag
+  const nieuwTeBeoordelen = useMemo(
+    () =>
+      beoordeelDag === null
+        ? []
+        : inScopeBreed.filter(
+            (r) =>
+              r.aanmelding.Stage === TE_BEOORDELEN &&
+              r.aanmelding['Datum aangemaakt'] === beoordeelDag,
+          ),
+    [inScopeBreed, beoordeelDag],
+  )
 
   /*
     Een andere stage of een ander filter betekent andere kaarten. Een selectie
@@ -108,7 +139,7 @@ export default function Maandag() {
   useEffect(() => {
     setSelectieAan(false)
     setGekozen(new Set())
-  }, [stage, klantFilter, vacatureFilter, bronFilter, sindsFilter])
+  }, [stage, klantFilter, vacatureFilter, bronFilter, partijFilter])
 
   const tellingen: StageTelling[] = useMemo(
     () =>
@@ -158,16 +189,19 @@ export default function Maandag() {
   const vacatureNaam = vacatureFilter === 'alle' ? null : (gekozenVacature?.Titel ?? null)
   // In de doorgeklikte lijst staan de keuzelijsten niet meer op het scherm.
   // Zonder deze regel zie je een korter lijstje en weet je niet waarom.
-  const periodeNaam =
-    sindsFilter === null
-      ? null
-      : sindsFilter === 0
-        ? 'vandaag toegevoegd'
-        : `toegevoegd in ${sindsFilter} dagen`
+  const partijNaam = partijFilter ? `toegevoegd op ${datumKort(partijFilter)}` : null
 
   const linkNaarStage = (s: string) => {
     const volgende = new URLSearchParams(zoek)
     volgende.set('stage', s)
+    return `/?${volgende.toString()}`
+  }
+
+  /** Stage en partij in één keer, voor de ingang "Nieuw te beoordelen". */
+  const linkNaarPartij = (s: string, datum: string) => {
+    const volgende = new URLSearchParams(zoek)
+    volgende.set('stage', s)
+    volgende.set('partij', datum)
     return `/?${volgende.toString()}`
   }
 
@@ -265,9 +299,9 @@ export default function Maandag() {
             </button>
           )}
         </div>
-        {(klantNaam || vacatureNaam || bronFilter || periodeNaam) && (
+        {(klantNaam || vacatureNaam || bronFilter || partijNaam) && (
           <p className="text-sm text-navy-400">
-            {[klantNaam, vacatureNaam, bronFilter && `via ${bronFilter}`, periodeNaam]
+            {[klantNaam, vacatureNaam, bronFilter && `via ${bronFilter}`, partijNaam]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -431,28 +465,49 @@ export default function Maandag() {
         op een rij zijn bovendien in één tik te wisselen, en je ziet zonder open
         te klappen welke aan staat.
       */}
-      <div
-        role="group"
-        aria-label="Filter op wanneer de aanmelding is toegevoegd"
-        className="mt-2 flex gap-2 overflow-x-auto"
-      >
-        {PERIODES.map((periode) => {
-          const aan = sindsFilter === periode.dagen || (periode.dagen === null && sindsRuw === null)
-          return (
-            <button
-              key={periode.label}
-              type="button"
-              aria-pressed={aan}
-              onClick={() => zetZoek('sinds', periode.dagen === null ? null : String(periode.dagen))}
-              className={`tik shrink-0 rounded-full border px-3 text-sm ${
-                aan ? 'border-oranje bg-oranje/10 font-medium text-oranje' : 'border-lijn bg-white'
-              }`}
-            >
-              {periode.label}
-            </button>
-          )
-        })}
-      </div>
+      {/*
+        Een chip per aanleverdag in plaats van vaste vensters. De agents leveren
+        in partijen aan, dus "2 sep · 49" is de eenheid waarin je ze beoordeelt;
+        "7 dagen" was de ochtend na een run juist de hele base en "vandaag" nul.
+        Het aantal staat op de chip, zodat je voor het tikken al ziet wat je
+        krijgt.
+      */}
+      {partijLijst.length > 1 && (
+        <div
+          role="group"
+          aria-label="Filter op de dag waarop de kandidaten zijn toegevoegd"
+          className="mt-2 flex gap-2 overflow-x-auto"
+        >
+          <button
+            type="button"
+            aria-pressed={!partijFilter}
+            onClick={() => zetZoek('partij', null)}
+            className={`tik shrink-0 rounded-full border px-3 text-sm ${
+              !partijFilter ? 'border-oranje bg-oranje/10 font-medium text-oranje' : 'border-lijn bg-white'
+            }`}
+          >
+            Alles
+          </button>
+          {partijLijst.map((partij) => {
+            const aan = partijFilter === partij.datum
+            return (
+              <button
+                key={partij.datum}
+                type="button"
+                aria-pressed={aan}
+                // Nog een keer op dezelfde chip zet hem uit. Anders is "terug
+                // naar alles" een tik naar de andere kant van de rij.
+                onClick={() => zetZoek('partij', aan ? null : partij.datum)}
+                className={`tik shrink-0 rounded-full border px-3 text-sm whitespace-nowrap ${
+                  aan ? 'border-oranje bg-oranje/10 font-medium text-oranje' : 'border-lijn bg-white'
+                }`}
+              >
+                {datumKort(partij.datum)} · <span className="tabular-nums">{partij.aantal}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/*
         De telling van wat te lang stilstaat, met de link naar ?stage=norm waar
@@ -468,6 +523,39 @@ export default function Maandag() {
           <span className="flex-1 font-semibold text-oranje">Over de norm</span>
           <span className="text-2xl font-semibold tabular-nums text-oranje">{teLang.length}</span>
           <span aria-hidden className="text-oranje">
+            ›
+          </span>
+        </Link>
+      )}
+
+      {/*
+        De oogst van de laatste agent-run die nog beoordeeld moet worden. Niet
+        oranje: dit is werk van vandaag, geen achterstand, en twee alarmkleuren
+        onder elkaar maken allebei minder dringend. De link zet stage én partij,
+        zodat het scherm erachter precies deze lijst is en niet alles wat ooit
+        op Gescoord bleef staan.
+      */}
+      {nieuwTeBeoordelen.length > 0 && beoordeelDag && (
+        <Link
+          to={linkNaarPartij(TE_BEOORDELEN, beoordeelDag)}
+          className="tik mt-3 flex items-center gap-3 rounded-2xl border border-navy/30 bg-white px-4 py-3"
+        >
+          <span className="min-w-0 flex-1">
+            {/*
+              "Nieuw" alleen als het ook echt de laatste aanlevering is. Kiest
+              ze de chip van vijf dagen terug, dan staat er "Te beoordelen":
+              dezelfde ingang, maar zonder een partij van vorige week nieuw te
+              noemen.
+            */}
+            <span className="block font-semibold">
+              {beoordeelDag === nieuwsteDag ? 'Nieuw te beoordelen' : 'Te beoordelen'}
+            </span>
+            <span className="block text-sm text-navy-400">
+              toegevoegd op {datumKort(beoordeelDag)}
+            </span>
+          </span>
+          <span className="text-2xl font-semibold tabular-nums">{nieuwTeBeoordelen.length}</span>
+          <span aria-hidden className="text-navy-400">
             ›
           </span>
         </Link>
