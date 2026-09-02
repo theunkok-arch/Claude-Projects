@@ -122,6 +122,9 @@ export default function Maandag() {
     [inScope],
   )
 
+  /** Wat er op het beginscherm onder de tellingen staat, in dezelfde volgorde. */
+  const werklijst = useMemo(() => [...teLang].sort(opUrgentie), [teLang])
+
   const lijst = useMemo(() => {
     if (!stage) return []
     const selectie = stage === NORM ? teLang : inScope.filter((r) => r.aanmelding.Stage === stage)
@@ -219,6 +222,23 @@ export default function Maandag() {
     setGekozen(new Set())
   }
 
+  /*
+    Dezelfde bottom sheet op allebei de schermen: het beginscherm toont nu ook
+    kaarten, en die moeten net zo goed te verplaatsen zijn als in de
+    doorgeklikte lijst.
+  */
+  const kandidaatSheet = (
+    <StageSheet
+      open={sheetVoor !== null}
+      huidigeStage={sheetVoor?.aanmelding.Stage}
+      naam={sheetVoor?.kandidaat?.Naam ?? ''}
+      onSluit={() => setSheetVoor(null)}
+      onKies={async (naar, reden) => {
+        if (sheetVoor) await wijzigStage(sheetVoor.aanmelding.id, naar, { redenAfvallen: reden })
+      }}
+    />
+  )
+
   // ── Doorgeklikt: de kandidaten van één stage ────────────────────────────────
   if (stage) {
     return (
@@ -311,15 +331,7 @@ export default function Maandag() {
           </div>
         )}
 
-        <StageSheet
-          open={sheetVoor !== null}
-          huidigeStage={sheetVoor?.aanmelding.Stage}
-          naam={sheetVoor?.kandidaat?.Naam ?? ''}
-          onSluit={() => setSheetVoor(null)}
-          onKies={async (naar, reden) => {
-            if (sheetVoor) await wijzigStage(sheetVoor.aanmelding.id, naar, { redenAfvallen: reden })
-          }}
-        />
+        {kandidaatSheet}
 
         {/*
           Hetzelfde paneel, dezelfde stagelijst, dezelfde redenlijst. Geen
@@ -436,25 +448,66 @@ export default function Maandag() {
         })}
       </div>
 
-      {teLang.length > 0 && (
-        <Link
-          to={linkNaarStage(NORM)}
-          className="tik mt-4 flex items-center gap-3 rounded-2xl border border-oranje bg-oranje/10 px-4 py-3"
-        >
-          <span className="flex-1 font-semibold text-oranje">Over de norm</span>
-          <span className="text-2xl font-semibold tabular-nums text-oranje">{teLang.length}</span>
-          <span aria-hidden className="text-oranje">
-            ›
-          </span>
-        </Link>
-      )}
-
       <h2 className="mt-6 mb-2 font-semibold">Per stage</h2>
       {tellingen.length === 0 ? (
         <p className="mt-8 text-center text-navy-400">Nog geen actieve aanmeldingen.</p>
       ) : (
         <StageTegels tellingen={tellingen} hrefVoor={linkNaarStage} />
       )}
+
+      {/*
+        De werklijst zelf, direct onder de tellingen. Je landde hier op cijfers
+        en moest altijd eerst een stage of "Over de norm" aantikken voordat er
+        iemand in beeld kwam die je kon bijwerken. Nu staat de eerste kandidaat
+        er al, met de knop van de standaardactie eronder.
+
+        Dezelfde volgorde als de doorgeklikte lijst, want het is dezelfde
+        selectie door dezelfde sortering: het langst over de norm bovenaan.
+      */}
+      {tellingen.length > 0 && (
+        <section className="mt-6">
+          {teLang.length === 0 ? (
+            <>
+              <h2 className="mb-2 font-semibold">Over de norm</h2>
+              <p className="text-navy-400">Niemand over de norm.</p>
+            </>
+          ) : (
+            <>
+              {/*
+                De oranje balk stond hierboven als losse doorverwijzing en zou
+                naast een kop "Over de norm" twee keer hetzelfde zeggen. Hij is
+                nu de kop van zijn eigen lijst: hetzelfde getal, dezelfde link
+                naar ?stage=norm (waar selecteren zit), maar direct boven de
+                kaarten waar hij over gaat.
+              */}
+              <Link
+                to={linkNaarStage(NORM)}
+                className="tik flex items-center gap-3 rounded-2xl border border-oranje bg-oranje/10 px-4 py-3"
+              >
+                <span className="flex-1 font-semibold text-oranje">Over de norm</span>
+                <span className="text-2xl font-semibold tabular-nums text-oranje">{teLang.length}</span>
+                <span aria-hidden className="text-oranje">
+                  ›
+                </span>
+              </Link>
+              <div className="mt-2 flex flex-col gap-2">
+                {werklijst.map((regel) => (
+                  <AanmeldingKaart
+                    key={regel.aanmelding.id}
+                    regel={regel}
+                    onStage={() => setSheetVoor(regel)}
+                    onVolgende={(naar, redenAfvallen) =>
+                      wijzigStage(regel.aanmelding.id, naar, { redenAfvallen })
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {kandidaatSheet}
     </div>
   )
 }
