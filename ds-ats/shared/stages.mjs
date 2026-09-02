@@ -15,6 +15,16 @@
  *
  * Stages zonder `volgendeStage` hebben geen standaardstap: Ingewerkt en
  * Afgevallen zijn eindstations.
+ *
+ * Twee keuzes hierin zijn voorgelegd en op 02-09-2026 door Dominique
+ * bevestigd, zodat ze niet als aanname worden gelezen:
+ *
+ * - Gescoord kent twee uitkomsten ("Benaderen of afvoeren"). De knop doet
+ *   alleen benaderen; afvoeren blijft via de stage-chip, want dat is de
+ *   uitzondering en die hoort niet even makkelijk te zijn als de regel.
+ * - Gereageerd staat op "Gesprek inplannen", maar inplannen is een agenda-
+ *   actie en verandert de stage niet. De knop is daarom "Gesproken", te
+ *   gebruiken ná het gesprek.
  */
 export const STAGES = [
   { id: 'Gescoord',        norm: 5,  actie: 'Benaderen of afvoeren',                          toon: 'grijs',       volgendeStage: 'Benaderd',        volgendeLabel: 'Benaderen'              },
