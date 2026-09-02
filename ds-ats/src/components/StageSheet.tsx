@@ -9,13 +9,20 @@ interface Props {
   open: boolean
   onSluit: () => void
   onKies: (stage: StageId, redenAfvallen?: string) => Promise<void>
+  /**
+   * "3 van 14" tijdens een groepsverplaatsing. De aanroeper telt, want die
+   * doet de aanmeldingen één voor één. Bij één kandidaat blijft dit leeg: daar
+   * is de knop die op "Bezig…" springt genoeg, en zou een teller "1 van 1"
+   * alleen ruis zijn.
+   */
+  voortgang?: string | null
 }
 
 /**
  * Twee taps: stage kiezen en klaar. Kiest de gebruiker Afgevallen, dan komt de
  * redenlijst er direct achteraan en is die verplicht — geen afvaller zonder reden.
  */
-export default function StageSheet({ huidigeStage, naam, open, onSluit, onKies }: Props) {
+export default function StageSheet({ huidigeStage, naam, open, onSluit, onKies, voortgang }: Props) {
   const [redenVoor, setRedenVoor] = useState<StageId | null>(null)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState<string | null>(null)
@@ -60,6 +67,15 @@ export default function StageSheet({ huidigeStage, naam, open, onSluit, onKies }
           <p className="text-sm text-navy-400">{redenVoor ? 'Reden van afvallen' : 'Verplaats naar'}</p>
           <p className="truncate font-semibold">{naam}</p>
         </div>
+
+        {/*
+          Tijdens het wegschrijven blijft het paneel staan met de teller erin.
+          Sluiten en later melden hoe het afliep zou betekenen dat je terugkijkt
+          naar een lijst die halverwege is bijgewerkt zonder te weten hoe ver.
+        */}
+        {voortgang && (
+          <p className="mx-5 mt-3 rounded-lg bg-cream px-3 py-2 text-sm tabular-nums">{voortgang}</p>
+        )}
 
         {fout && <p className="mx-5 mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{fout}</p>}
 

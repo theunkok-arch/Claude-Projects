@@ -24,6 +24,16 @@ interface Props {
    */
   toonVacature?: boolean
   onStage?: () => void
+  /**
+   * Selectiemodus. De kaart is dan geen doorgang meer naar de kandidaat maar
+   * een vinkje: de hele kaart is het raakvlak, de naam linkt niet en de
+   * stage-chip doet niets. Dat laatste is geen detail. Wie een rij aantikt om
+   * hem aan te vinken en per ongeluk de chip raakt, zou anders midden in een
+   * selectie een losse kandidaat verplaatsen.
+   */
+  selecteerbaar?: boolean
+  gekozen?: boolean
+  onKiesSelectie?: () => void
 }
 
 export default function AanmeldingKaart({
@@ -31,6 +41,9 @@ export default function AanmeldingKaart({
   toonStage = true,
   toonVacature = true,
   onStage,
+  selecteerbaar = false,
+  gekozen = false,
+  onKiesSelectie,
 }: Props) {
   const { aanmelding, kandidaat, vacature, opdrachtgever, dagenInStage, overschreden, standaardActie } =
     regel
@@ -45,7 +58,7 @@ export default function AanmeldingKaart({
     link: dezelfde kaart, maar hij belooft niets meer.
   */
   const kop = (inhoud: ReactNode) =>
-    kandidaat ? (
+    kandidaat && !selecteerbaar ? (
       <Link
         to={`/kandidaat/${kandidaat.id}`}
         state={herkomst}
@@ -58,12 +71,8 @@ export default function AanmeldingKaart({
       <div className="min-w-0 flex-1">{inhoud}</div>
     )
 
-  return (
-    <article
-      className={`rounded-2xl border bg-white p-4 shadow-sm ${
-        opvallend ? 'border-oranje' : 'border-lijn'
-      }`}
-    >
+  const binnenkant = (
+    <>
       <div className="flex items-start justify-between gap-3">
         {kop(
           <>
@@ -89,9 +98,10 @@ export default function AanmeldingKaart({
           </>,
         )}
         {toonStage ? (
-          <StageBadge stage={aanmelding.Stage} klein onClick={onStage} />
+          <StageBadge stage={aanmelding.Stage} klein onClick={selecteerbaar ? undefined : onStage} />
         ) : (
-          onStage && (
+          onStage &&
+          !selecteerbaar && (
             /*
               De badge is tegelijk de knop naar de bottom sheet. Staat hij uit, dan
               blijft die functie hier als grijze tekstknop staan: hetzelfde raakvlak
@@ -145,6 +155,35 @@ export default function AanmeldingKaart({
       {aanmelding.Stage === 'Afgevallen' && !aanmelding['Reden afvallen'] && (
         <p className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-sm text-red-700">Reden ontbreekt</p>
       )}
-    </article>
+    </>
   )
+
+  const rand = opvallend ? 'border-oranje' : 'border-lijn'
+
+  /*
+    In selectiemodus is de kaart één groot label om een echt selectievakje heen.
+    Dat is met opzet geen div met een klikafhandelaar: een label geeft de hele
+    kaart als raakvlak, het toetsenbord en de schermlezer krijgen een vinkje dat
+    ze kennen, en de aan/uit-stand hoeft nergens te worden nagebouwd.
+  */
+  if (selecteerbaar) {
+    return (
+      <label
+        className={`flex cursor-pointer items-start gap-3 rounded-2xl border bg-white p-4 shadow-sm ${
+          gekozen ? 'border-navy ring-1 ring-navy' : rand
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={gekozen}
+          onChange={() => onKiesSelectie?.()}
+          className="mt-0.5 h-6 w-6 shrink-0 accent-navy"
+          aria-label={`Selecteer ${kandidaat?.Naam ?? 'kandidaat'}`}
+        />
+        <div className="min-w-0 flex-1">{binnenkant}</div>
+      </label>
+    )
+  }
+
+  return <article className={`rounded-2xl border bg-white p-4 shadow-sm ${rand}`}>{binnenkant}</article>
 }
