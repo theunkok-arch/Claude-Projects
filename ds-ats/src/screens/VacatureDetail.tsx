@@ -131,6 +131,9 @@ export default function VacatureDetail() {
               toonStage={gemengd}
               toonVacature={false}
               onStage={() => setSheetVoor(regel)}
+              onVolgende={(naar, redenAfvallen) =>
+                wijzigStage(regel.aanmelding.id, naar, { redenAfvallen })
+              }
             />
           ))}
           {lijst.length === 0 && <p className="mt-4 text-navy-400">Niemand in deze weergave.</p>}

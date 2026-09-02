@@ -2,20 +2,33 @@
 // de Netlify Functions (netlify/) en het importscript (scripts/).
 // Plain JS met een .d.ts ernaast, zodat alle drie hem kunnen importeren.
 
-/** De elf stages plus de eindstatus, in volgorde. Uit paragraaf 3.1 en 3.3. */
+/**
+ * De elf stages plus de eindstatus, in volgorde. Uit paragraaf 3.1 en 3.3.
+ *
+ * `volgendeStage` en `volgendeReden` zijn de standaardstap vooruit: waar de
+ * meeste kandidaten vanaf hier heen gaan. De kaart maakt daar één knop van, en
+ * `volgendeLabel` is wat erop staat. Dat derde veld is nodig omdat het label
+ * niet uit de doelstage valt af te leiden: Shortlist wordt "Op shortlist",
+ * Voorgesteld wordt "Voordragen" en Afgevallen wordt "Afvallen: geen reactie".
+ * Een aparte lijst met labels zou hetzelfde zijn als een veld, maar dan op een
+ * tweede plek, en dat is precies wat dit bestand moet voorkomen.
+ *
+ * Stages zonder `volgendeStage` hebben geen standaardstap: Ingewerkt en
+ * Afgevallen zijn eindstations.
+ */
 export const STAGES = [
-  { id: 'Gescoord',        norm: 5,  actie: 'Benaderen of afvoeren',                          toon: 'grijs'      },
-  { id: 'Benaderd',        norm: 5,  actie: 'Opvolgen',                                       toon: 'blauw'      },
-  { id: 'Opgevolgd',       norm: 12, actie: 'Afvallen met reden Geen reactie',                toon: 'blauw'      },
-  { id: 'Gereageerd',      norm: 3,  actie: 'Gesprek inplannen',                              toon: 'oranje'     },
-  { id: 'Gesproken',       norm: 5,  actie: 'Op shortlist zetten of afwijzen, met bericht',   toon: 'oranje'     },
-  { id: 'Shortlist',       norm: 5,  actie: 'Voordragen, of terug naar de klant',             toon: 'oranje-op'  },
-  { id: 'Voorgesteld',     norm: 5,  actie: 'Opdrachtgever nabellen',                         toon: 'donkerblauw'},
-  { id: 'Interview klant', norm: 10, actie: 'Terugkoppeling opeisen',                         toon: 'donkerblauw'},
-  { id: 'Aanbod',          norm: 0,  actie: '',                                               toon: 'donkerblauw'},
-  { id: 'Geplaatst',       norm: 0,  actie: '',                                               toon: 'groen'      },
-  { id: 'Ingewerkt',       norm: 0,  actie: '',                                               toon: 'groen'      },
-  { id: 'Afgevallen',      norm: 0,  actie: '',                                               toon: 'grijs'      },
+  { id: 'Gescoord',        norm: 5,  actie: 'Benaderen of afvoeren',                          toon: 'grijs',       volgendeStage: 'Benaderd',        volgendeLabel: 'Benaderen'              },
+  { id: 'Benaderd',        norm: 5,  actie: 'Opvolgen',                                       toon: 'blauw',       volgendeStage: 'Opgevolgd',       volgendeLabel: 'Opvolgen'               },
+  { id: 'Opgevolgd',       norm: 12, actie: 'Afvallen met reden Geen reactie',                toon: 'blauw',       volgendeStage: 'Afgevallen',      volgendeLabel: 'Afvallen: geen reactie', volgendeReden: 'Geen reactie' },
+  { id: 'Gereageerd',      norm: 3,  actie: 'Gesprek inplannen',                              toon: 'oranje',      volgendeStage: 'Gesproken',       volgendeLabel: 'Gesproken'              },
+  { id: 'Gesproken',       norm: 5,  actie: 'Op shortlist zetten of afwijzen, met bericht',   toon: 'oranje',      volgendeStage: 'Shortlist',       volgendeLabel: 'Op shortlist'           },
+  { id: 'Shortlist',       norm: 5,  actie: 'Voordragen, of terug naar de klant',             toon: 'oranje-op',   volgendeStage: 'Voorgesteld',     volgendeLabel: 'Voordragen'             },
+  { id: 'Voorgesteld',     norm: 5,  actie: 'Opdrachtgever nabellen',                         toon: 'donkerblauw', volgendeStage: 'Interview klant', volgendeLabel: 'Interview gepland'      },
+  { id: 'Interview klant', norm: 10, actie: 'Terugkoppeling opeisen',                         toon: 'donkerblauw', volgendeStage: 'Aanbod',          volgendeLabel: 'Aanbod uit'             },
+  { id: 'Aanbod',          norm: 0,  actie: '',                                               toon: 'donkerblauw', volgendeStage: 'Geplaatst',       volgendeLabel: 'Geplaatst'              },
+  { id: 'Geplaatst',       norm: 0,  actie: '',                                               toon: 'groen',       volgendeStage: 'Ingewerkt',       volgendeLabel: 'Ingewerkt'              },
+  { id: 'Ingewerkt',       norm: 0,  actie: '',                                               toon: 'groen'       },
+  { id: 'Afgevallen',      norm: 0,  actie: '',                                               toon: 'grijs'       },
 ]
 
 export const STAGE_IDS = STAGES.map((s) => s.id)

@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { stageConfig } from '../../shared/stages.mjs'
+import type { StageId } from '../../shared/stages.mjs'
 import type { Regel } from '../lib/types'
 import { dagen, scoringKern } from '../lib/format'
 import { useHerkomst } from '../lib/herkomst'
@@ -34,6 +36,11 @@ interface Props {
   selecteerbaar?: boolean
   gekozen?: boolean
   onKiesSelectie?: () => void
+  /**
+   * De standaardstap vooruit, in één tik. Ontbreekt hij, dan blijft de kaart
+   * zoals hij was en loopt elke wijziging via de stage-chip.
+   */
+  onVolgende?: (naar: StageId, reden?: string) => Promise<void>
 }
 
 export default function AanmeldingKaart({
@@ -44,13 +51,37 @@ export default function AanmeldingKaart({
   selecteerbaar = false,
   gekozen = false,
   onKiesSelectie,
+  onVolgende,
 }: Props) {
-  const { aanmelding, kandidaat, vacature, opdrachtgever, dagenInStage, overschreden, standaardActie } =
-    regel
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
+  const { aanmelding, kandidaat, vacature, opdrachtgever, dagenInStage, overschreden } = regel
   const herkomst = useHerkomst()
   const opvallend = (dagenInStage ?? 0) > RANDGRENS_DAGEN
   const score = aanmelding['Score totaal']
   const kern = toonVacature ? null : scoringKern(aanmelding['Score-onderbouwing'])
+
+  /*
+    De standaardstap uit shared/stages.mjs. In selectiemodus niet: daar is de
+    hele kaart één vinkje, en een knop erin zou dat vinkje omzeilen.
+  */
+  const config = stageConfig(aanmelding.Stage)
+  const volgende = !selecteerbaar && onVolgende && config?.volgendeStage ? config : null
+
+  async function zetVolgende() {
+    if (!volgende?.volgendeStage || !onVolgende) return
+    setBezig(true)
+    setFout(null)
+    try {
+      await onVolgende(volgende.volgendeStage, volgende.volgendeReden)
+    } catch (error) {
+      // De kaart blijft staan met de melding eronder. Een mislukking die alleen
+      // in een banner verschijnt raak je op een lijst van zestig kaarten kwijt,
+      // en dan denk je dat de stap gelukt is.
+      setFout(error instanceof Error ? error.message : 'Verplaatsen mislukt.')
+      setBezig(false)
+    }
+  }
 
   /*
     Een kaart zonder kandidaat linkte naar `/kandidaat/` en dus naar "Pagina
@@ -145,12 +176,41 @@ export default function AanmeldingKaart({
         )}
       </div>
 
-      {(aanmelding['Volgende actie'] || (overschreden && standaardActie)) && (
+      {/*
+        Wat de recruiter er zelf bij heeft getypt. Dat is een notitie ("bellen na
+        drie uur"), geen stap in de pijplijn, dus die blijft tekst. De
+        standaardactie eronder was wél altijd dezelfde stap, en is daarom een
+        knop geworden.
+      */}
+      {aanmelding['Volgende actie'] && (
         <p className="mt-2 border-t border-lijn pt-2 text-sm">
           <span className="text-navy-400">Volgende actie: </span>
-          {aanmelding['Volgende actie'] || standaardActie}
+          {aanmelding['Volgende actie']}
         </p>
       )}
+
+      {volgende && (
+        <button
+          type="button"
+          disabled={bezig}
+          onClick={() => void zetVolgende()}
+          /*
+            Afvallen krijgt een eigen kleur. De andere knoppen zetten iemand een
+            trede verder en zijn met de chip terug te draaien; deze zet iemand
+            uit de running, en er is bewust geen ongedaan maken. Dan hoort hij
+            er niet uit te zien als de rest.
+          */
+          className={`tik mt-3 w-full rounded-xl border px-3 text-sm font-medium disabled:opacity-50 ${
+            volgende.volgendeStage === 'Afgevallen'
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-navy/15 bg-cream'
+          }`}
+        >
+          {bezig ? 'Bezig…' : volgende.volgendeLabel}
+        </button>
+      )}
+
+      {fout && <p className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-sm text-red-700">{fout}</p>}
 
       {aanmelding.Stage === 'Afgevallen' && !aanmelding['Reden afvallen'] && (
         <p className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-sm text-red-700">Reden ontbreekt</p>

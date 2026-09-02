@@ -262,6 +262,9 @@ export default function Maandag() {
               // al boven het scherm en zou elke kaart dezelfde badge dragen.
               toonStage={stage === NORM}
               onStage={() => setSheetVoor(regel)}
+              onVolgende={(naar, reden) =>
+                wijzigStage(regel.aanmelding.id, naar, { redenAfvallen: reden })
+              }
               selecteerbaar={selectieAan}
               gekozen={gekozen.has(regel.aanmelding.id)}
               onKiesSelectie={() => zetSelectie(regel.aanmelding.id)}

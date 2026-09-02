@@ -20,6 +20,12 @@ export interface StageConfig {
   norm: number
   actie: string
   toon: StageToon
+  /** De standaardstap vooruit. Ontbreekt op de eindstations. */
+  volgendeStage?: StageId
+  /** Wat er op de knop staat. Staat er een volgendeStage, dan staat dit er ook. */
+  volgendeLabel?: string
+  /** Alleen bij een stap naar Afgevallen: de reden die dan wordt meegeschreven. */
+  volgendeReden?: string
 }
 
 export declare const STAGES: StageConfig[]
