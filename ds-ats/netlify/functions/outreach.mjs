@@ -36,11 +36,12 @@ import {
 } from '../lib/airtable.mjs'
 import { wijzigStage } from './ats.mjs'
 import { ALLE_AFVAL_REDENEN, STAGE_IDS, isKlantZichtbaar } from '../../shared/stages.mjs'
+import { GEBEURTENISSEN } from '../../shared/mapping.mjs'
 
 export const config = { path: '/api/outreach' }
 
 /**
- * De vertaaltabel tussen het framework en de ATS, op één plek.
+ * De vertaaltabel tussen het framework en de ATS, uit config/ats-mapping.json.
  *
  * Deze twee spreken niet dezelfde taal. Het framework kent `Reactie` en
  * `Gesprek` waar de ATS `Gereageerd` en `Gesproken` zegt, en `Shortlist`
@@ -49,25 +50,11 @@ export const config = { path: '/api/outreach' }
  * Die verwarring heeft eerder 25 kandidaten in de verkeerde fase gezet.
  *
  * Daarom accepteert dit eindpunt geen ATS-fasenamen maar gebeurtenissen: wat
- * er is gebeurd, niet waar iemand daarna hoort te staan. De vertaling gebeurt
- * hier, één keer, in code die je kunt lezen.
+ * er is gebeurd, niet waar iemand daarna hoort te staan. De vertaling stond
+ * hier in code en staat nu in het bestand dat het importscript ook leest, want
+ * twee kopieën van dezelfde tabel is hoe ze uit elkaar lopen.
  */
-const GEBEURTENISSEN = {
-  'eerste bericht': 'Benaderd',
-  'follow-up': 'Opgevolgd',
-  reactie: 'Gereageerd',
-  gesproken: 'Gesproken',
-  // De zes stappen na het gesprek. Ze hadden geen pad en werden met de hand in
-  // Airtable gezet; de skills kandidaat-profiel, klant-preread en de
-  // afsluitstap van ds-pipeline melden ze nu via dit eindpunt.
-  shortlist: 'Shortlist',
-  voorgesteld: 'Voorgesteld',
-  'interview klant': 'Interview klant',
-  aanbod: 'Aanbod',
-  geplaatst: 'Geplaatst',
-  ingewerkt: 'Ingewerkt',
-  afgevallen: 'Afgevallen',
-}
+
 
 /**
  * De natuurlijke volgorde van de pijplijn. Afgevallen staat er bewust buiten:

@@ -1,0 +1,135 @@
+{
+  "versie": "1.0",
+  "toelichting": "Vertaling tussen kandidaten.xlsx (schema 1.1) en de Airtable-ATS. Dit bestand is de enige plek waar die vertaling staat. Skills praten nooit rechtstreeks met Airtable; alles loopt via het importscript (nieuwe kandidaten) en het Netlify-eindpunt (gebeurtenissen).",
+
+  "ats": {
+    "base": "Do Solutions ATS",
+    "eindpunt": "https://dosolats.netlify.app/api/outreach",
+    "sleutel_omgevingsvariabele": "OUTREACH_KEY",
+    "tabellen": {
+      "Kandidaten": "een persoon bestaat precies een keer; dedupe op LinkedIn-URL, anders naam plus woonplaats",
+      "Aanmeldingen": "kandidaat x vacature; hier leven Stage, Score totaal, Score-onderbouwing, Concurrent, Zichtbaar voor klant",
+      "Activiteiten": "contactmomenten en statuswijzigingen",
+      "Stagelog": "automatisch bij elke stagewijziging"
+    }
+  },
+
+  "master_regel": {
+    "voor_import": "kandidaten.xlsx is master. De ATS kent de kandidaat nog niet.",
+    "na_import": "De ATS is master voor Stage, Datum in huidige stage, Reden afvallen en de servicenormklok. kandidaten.xlsx blijft de werkkopie van de search (scores, onderbouwing, outreach-concepten, checkpoints) en wordt via log_outreach.py in de pas gehouden.",
+    "conflict": "Wijkt de xlsx-Status af van de ATS-Stage, dan wint de ATS. Corrigeer de xlsx, nooit andersom."
+  },
+
+  "stage_mapping": {
+    "toelichting": "Links de Status uit kandidaten.xlsx, rechts de Stage waarin de aanmelding bij IMPORT terechtkomt. Let op: Shortlist betekent in de xlsx 'nog te benaderen, hoog gescoord' en in de ATS 'al gesproken en geschikt'. Daarom landt xlsx-Shortlist op ATS-Gescoord.",
+    "xlsx_naar_ats_bij_import": {
+      "Nieuw": "Gescoord",
+      "Gescoord": "Gescoord",
+      "Shortlist": "Gescoord",
+      "Twijfel": "Gescoord",
+      "Wacht op akkoord": "Gescoord",
+      "Benaderd": "Benaderd",
+      "Reactie": "Gereageerd",
+      "Gesprek": "Gesproken",
+      "Voorgesteld": "Voorgesteld",
+      "Afgewezen": "Afgevallen"
+    },
+    "ats_naar_xlsx": {
+      "Gescoord": "Gescoord",
+      "Benaderd": "Benaderd",
+      "Opgevolgd": "Benaderd",
+      "Gereageerd": "Reactie",
+      "Gesproken": "Gesprek",
+      "Shortlist": "Gesprek",
+      "Voorgesteld": "Voorgesteld",
+      "Interview klant": "Voorgesteld",
+      "Aanbod": "Voorgesteld",
+      "Geplaatst": "Voorgesteld",
+      "Ingewerkt": "Voorgesteld",
+      "Afgevallen": "Afgewezen"
+    },
+    "niet_importeren": {
+      "toelichting": "Rijen met deze xlsx-Status gaan niet mee in de import tenzij Dominique dat expliciet wil.",
+      "statussen": ["Twijfel"],
+      "concurrent_gevuld": "Rijen met Concurrent = direct/adjacent/niche gaan wel mee (Concurrent-vinkje aan), maar de outreach-gate blijft bij Dominique."
+    }
+  },
+
+  "gebeurtenissen": {
+    "toelichting": "Wat een skill aan het eindpunt meldt. Nooit een fasenaam; het eindpunt vertaalt zelf. Rechts de Stage die het eindpunt zet.",
+    "eerste bericht": "Benaderd",
+    "follow-up": "Opgevolgd",
+    "reactie": "Gereageerd",
+    "gesproken": "Gesproken",
+    "shortlist": "Shortlist",
+    "voorgesteld": "Voorgesteld",
+    "interview klant": "Interview klant",
+    "aanbod": "Aanbod",
+    "geplaatst": "Geplaatst",
+    "ingewerkt": "Ingewerkt",
+    "afgevallen": "Afgevallen"
+  },
+
+  "gebeurtenis_per_stap": {
+    "9_outreach": ["eerste bericht", "follow-up", "reactie", "gesproken", "afgevallen"],
+    "10_kandidaat_profiel": ["voorgesteld"],
+    "11_klant_preread": ["interview klant"],
+    "12_plaatsing": ["aanbod", "geplaatst", "ingewerkt", "afgevallen"]
+  },
+
+  "bron_mapping": {
+    "toelichting": "Kolom Bron in kandidaten.xlsx is vrije tekst (bijv. 'linkedin-salesnav-direct' of 'Sales Navigator peer-companies scan'). De patronen hieronder worden in volgorde als substring (hoofdletterongevoelig) op die tekst gelegd; de eerste treffer bepaalt de keuze in het ATS-veld Bron. Geen treffer wordt Overig en wordt gemeld in de importcheck.",
+    "patronen": [
+      { "bevat": "salesnav", "ats": "LinkedIn Sales Navigator" },
+      { "bevat": "sales navigator", "ats": "LinkedIn Sales Navigator" },
+      { "bevat": "alumni", "ats": "Alumni-netwerk" },
+      { "bevat": "indeed", "ats": "Indeed CV-database" },
+      { "bevat": "instagram", "ats": "Instagram" },
+      { "bevat": "branche", "ats": "Brancheorganisatie" },
+      { "bevat": "vereniging", "ats": "Brancheorganisatie" },
+      { "bevat": "referral", "ats": "Referral" },
+      { "bevat": "eigen netwerk", "ats": "Eigen netwerk" },
+      { "bevat": "eigen-netwerk", "ats": "Eigen netwerk" },
+      { "bevat": "website", "ats": "Website inbound" },
+      { "bevat": "linkedin", "ats": "LinkedIn regulier" }
+    ],
+    "_default": "Overig"
+  },
+
+  "veld_mapping": {
+    "toelichting": "xlsx-kolom naar ATS-veld. Alleen bij import; daarna schrijft alleen het eindpunt.",
+    "Kandidaten": {
+      "Naam": "Naam",
+      "Bron-URL": "LinkedIn-URL (alleen als het een linkedin.com-URL is; anders leeg en dedupe op naam plus woonplaats)",
+      "E-mail": "E-mail",
+      "Telefoon": "Telefoon",
+      "Woonplaats": "Woonplaats",
+      "Huidige rol": "Huidige rol",
+      "Werkgever": "Huidige werkgever",
+      "Bron": "Bron (via bron_mapping)",
+      "Datum status": "Laatste contact (alleen als Status Benaderd of verder)"
+    },
+    "Aanmeldingen": {
+      "Status": "Stage (via stage_mapping)",
+      "Datum status": "Datum in huidige stage",
+      "Reistijd minuten": "Reistijd minuten",
+      "Totaal (100)": "Score totaal",
+      "Onderbouwing": "Score-onderbouwing (voorafgegaan door 'Core x/60, custom y/40')",
+      "Concurrent": "Concurrent (vinkje aan als gevuld; de waarde direct/adjacent/niche gaat naar Opmerkingen)",
+      "Outreach-concept": "Outreach-concept",
+      "Reden afvallen": "Reden afvallen",
+      "Opmerkingen": "Opmerkingen",
+      "Signaal/observatie": "Opmerkingen (toegevoegd als regel 'Signaal: ...')"
+    },
+    "niet_in_ats": [
+      "Score core (60)",
+      "Score custom (40)",
+      "Tenure",
+      "Bron-URL van niet-LinkedIn bronnen (blijft alleen in xlsx en Opmerkingen)"
+    ]
+  },
+
+  "zichtbaar_voor_klant": {
+    "toelichting": "Het vinkje Zichtbaar voor klant bepaalt wat de opdrachtgever in het klantportaal ziet. Gaat aan bij de gebeurtenis voorgesteld, nooit eerder. Een kandidaat verschijnt dus pas bij de klant als er een profiel ligt."
+  }
+}
