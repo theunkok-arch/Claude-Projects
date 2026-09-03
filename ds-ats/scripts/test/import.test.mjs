@@ -17,6 +17,7 @@ import {
   vertaalStatus,
 } from '../import/status-map.mjs'
 import { ALLE_AFVAL_REDENEN } from '../../shared/stages.mjs'
+import { GEBEURTENISSEN } from '../../shared/mapping.mjs'
 
 const INDEED_ZOEK =
   'https://resumes.indeed.com/search?q=sales+support+OR+%22project+coordinator%22&l=Vlijmen'
@@ -132,9 +133,25 @@ test('de statussen uit deze lijst vertalen naar de ATS-trechter', () => {
     ['Afgewezen', 'Afgevallen'],
     ['Benaderd', 'Benaderd'],
     ['Gesproken', 'Gesproken'],
-    ['Shortlist', 'Shortlist'],
     ['Interview klant', 'Interview klant'],
   ]) {
     assert.equal(vertaalStatus(ruw).stage, stage, ruw)
   }
+})
+
+test('xlsx-Status Shortlist landt op Gescoord en niet op Shortlist', () => {
+  /*
+    Het woord betekent aan de twee kanten iets anders. In kandidaten.xlsx is
+    Shortlist "hoog gescoord, nog te benaderen"; in de ATS is het "gesproken en
+    geschikt", vier treden verderop. Deze code zette hem tot 03-09-2026 op
+    Shortlist, en dat is precies de verwisseling die eerder 25 kandidaten in de
+    verkeerde fase zette. config/ats-mapping.json noemt dit zijn belangrijkste
+    regel; deze toets houdt hem vast.
+  */
+  assert.equal(vertaalStatus('Shortlist').stage, 'Gescoord')
+  assert.equal(vertaalStatus('shortlist').stage, 'Gescoord')
+
+  // De gebeurtenis shortlist is iets anders en blijft wel op Shortlist zetten:
+  // die komt van een skill die iemand al gesproken heeft.
+  assert.equal(GEBEURTENISSEN.shortlist, 'Shortlist')
 })

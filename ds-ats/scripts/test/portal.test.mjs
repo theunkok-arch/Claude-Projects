@@ -379,18 +379,15 @@ test('LinkedIn-URLs die dezelfde persoon aanwijzen worden gelijk gemaakt', async
 
 test('elke gebeurtenis vertaalt naar een bestaande ATS-fase', async () => {
   const { STAGE_IDS } = await import('../../shared/stages.mjs')
-  const bron = await import('node:fs').then((fs) =>
-    fs.readFileSync(new URL('../../netlify/functions/outreach.mjs', import.meta.url), 'utf8'),
-  )
+  const { GEBEURTENISSEN } = await import('../../shared/mapping.mjs')
 
-  // De tabel staat niet in een export omdat hij nergens anders nodig is; deze
-  // toets leest hem uit de bron. Het punt is dat er nooit een fase in staat
-  // die shared/stages.mjs niet kent — dan zou Airtable met typecast stilzwijgen
-  // iets anders maken van de waarde.
-  const blok = bron.slice(bron.indexOf('const GEBEURTENISSEN'), bron.indexOf('export default'))
-  const fasen = [...blok.matchAll(/:\s*'([^']+)'/g)].map((m) => m[1])
-
-  assert.ok(fasen.length >= 5, `te weinig gebeurtenissen gevonden: ${fasen.length}`)
+  // Deze toets las de tabel vroeger uit de brontekst van outreach.mjs, omdat
+  // hij nergens werd geëxporteerd. Nu komt hij uit config/ats-mapping.json en
+  // is hij gewoon te importeren. Het punt is ongewijzigd: er mag nooit een
+  // fase in staan die shared/stages.mjs niet kent, want Airtable maakt daar
+  // met typecast stilzwijgend een nieuwe keuze-optie van.
+  const fasen = Object.values(GEBEURTENISSEN)
+  assert.ok(fasen.length >= 11, `te weinig gebeurtenissen gevonden: ${fasen.length}`)
   for (const fase of fasen) {
     assert.ok(STAGE_IDS.includes(fase), `"${fase}" is geen bestaande ATS-fase`)
   }
@@ -400,6 +397,11 @@ test('elke gebeurtenis vertaalt naar een bestaande ATS-fase', async () => {
   for (const val of ['Reactie', 'Gesprek', 'Nieuw', 'Twijfel', 'Wacht op akkoord']) {
     assert.equal(fasen.includes(val), false, `frameworknaam "${val}" lekt de ATS in`)
   }
+
+  // De gebeurtenis heet wel shortlist, en zet in de ATS ook Shortlist. Dat is
+  // iets anders dan de xlsx-Status Shortlist, die bij import op Gescoord
+  // landt; zie de toets in import.test.mjs.
+  assert.equal(GEBEURTENISSEN.shortlist, 'Shortlist')
 })
 
 test('elke ingang heeft zijn eigen sleutel en header', async () => {

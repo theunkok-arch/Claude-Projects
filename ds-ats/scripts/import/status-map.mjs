@@ -1,55 +1,48 @@
 // Vertaaltabellen voor de import. Sleutels zijn genormaliseerd: lowercase,
 // zonder accenten, zonder dubbele spaties.
 //
-// De kolomnamen en waarden hieronder zijn afgeleid van de twee master-sheets
+// De vertaling zelf komt uit config/ats-mapping.json, hetzelfde bestand dat
+// /api/outreach leest. Wat hier in code staat zijn alleen de schrijfwijzen uit
+// de echte sheets die dat bestand niet kent, plus de kolomsynoniemen: die
+// gaan over rommelige koppen in een xlsx en staan niet in de mapping.
+//
+// De kolomnamen hieronder zijn afgeleid van de twee master-sheets
 // (090826_kandidaten_shortlist_compleet en
 // Royal_Sanders_RA_Officer_kandidatenlijst_samengevoegd), niet verzonnen.
 
+import {
+  BRON_DEFAULT,
+  BRON_PATRONEN,
+  IMPORT_STAGES,
+  NIET_IMPORTEREN,
+} from '../../shared/mapping.mjs'
+
 /**
- * Oude status → nieuwe stage. Beide sheets gebruiken grotendeels de nieuwe
- * woordenschat al; de oude termen uit paragraaf 10 staan er voor de lijsten
- * die nog niet zijn bijgewerkt.
+ * Oude status → nieuwe stage.
+ *
+ * De basis komt uit config/ats-mapping.json (`stage_mapping`), want dat is de
+ * enige plek waar die vertaling hoort te staan en het eindpunt leest hem ook.
+ * Wat hieronder in AANVULLENDE_ALIASSEN staat, kent dat bestand niet: dat zijn
+ * schrijfwijzen die in de echte sheets voorkomen ("inmail 2", "gesprek/wachten",
+ * "reminder sturen") en die het framework nooit zelf produceert. Ze vullen aan,
+ * ze overschrijven nooit: bij een botsing wint het bestand.
+ *
+ * De belangrijkste regel die daarmee verandert: xlsx-Status "Shortlist" landt
+ * op Gescoord en niet op Shortlist. In de xlsx betekent Shortlist "hoog
+ * gescoord, nog te benaderen", in de ATS "gesproken en geschikt" — vier treden
+ * verderop. Deze code zette hem tot nu toe op Shortlist.
+ *
  * @type {Record<string, { stage: string, reden?: string }>}
  */
-export const STATUS_MAP = {
-  // Nieuwe woordenschat — mapt op zichzelf. Zonder deze regels zou een sheet
-  // die al is bijgewerkt terugvallen op Gescoord.
-  gescoord: { stage: 'Gescoord' },
-  benaderd: { stage: 'Benaderd' },
-  opgevolgd: { stage: 'Opgevolgd' },
-  gereageerd: { stage: 'Gereageerd' },
-  gesproken: { stage: 'Gesproken' },
-  shortlist: { stage: 'Shortlist' },
-  voorgesteld: { stage: 'Voorgesteld' },
-  'interview klant': { stage: 'Interview klant' },
-  aanbod: { stage: 'Aanbod' },
-  geplaatst: { stage: 'Geplaatst' },
-  ingewerkt: { stage: 'Ingewerkt' },
-  afgevallen: { stage: 'Afgevallen' },
-
+const AANVULLENDE_ALIASSEN = {
   // Oude woordenschat, paragraaf 10.
   lead: { stage: 'Gescoord' },
   longlist: { stage: 'Gescoord' },
   'te verifieren': { stage: 'Gescoord' },
-  nieuw: { stage: 'Gescoord' },
-
   'te benaderen': { stage: 'Gescoord' },
   'nog niet benaderd': { stage: 'Gescoord' },
-
-  // Vier statussen die alle vier vóór de outreach zitten. Ze stonden op
-  // Shortlist, en dat is de trede waarop je iemand aan de klant voordraagt —
-  // vier trappen verderop. De Normec-lijst had er vier op Twijfel staan, de
-  // vier laagste scores van de lijst; die kwamen naast de 80-scoorders in de
-  // kolom "voordragen" terecht. Gescoord is de juiste plek: de servicenorm
-  // vraagt daar binnen vijf dagen "benaderen of afvoeren", en dat is precies
-  // de beslissing die nog openstaat.
   'te contacten': { stage: 'Gescoord' },
   warm: { stage: 'Gescoord' },
-  twijfel: { stage: 'Gescoord' },
-  // Wacht op akkoord hoort bij een concurrent-kandidaat: gescoord, nog niet
-  // benaderd, wachtend op Dominique's go. Het vinkje Concurrent draagt de
-  // reden, de stage draagt de stand van zaken.
-  'wacht op akkoord': { stage: 'Gescoord' },
 
   inmail: { stage: 'Benaderd' },
   'bericht gestuurd': { stage: 'Benaderd' },
@@ -57,25 +50,46 @@ export const STATUS_MAP = {
   linkedin: { stage: 'Benaderd' },
   connectie: { stage: 'Benaderd' },
 
+  opgevolgd: { stage: 'Opgevolgd' },
   'reminder sturen': { stage: 'Opgevolgd' },
   reminder: { stage: 'Opgevolgd' },
 
+  gereageerd: { stage: 'Gereageerd' },
   reageert: { stage: 'Gereageerd' },
-  // ds-framework schrijft "Reactie"; zonder deze regel viel die terug op
-  // Gescoord en zette hij de kandidaat een halve trechter terug.
-  reactie: { stage: 'Gereageerd' },
 
-  gesprek: { stage: 'Gesproken' },
+  gesproken: { stage: 'Gesproken' },
   'gesprek/wachten': { stage: 'Gesproken' },
   'gesprek wachten': { stage: 'Gesproken' },
   teamsgesprek: { stage: 'Gesproken' },
   belafspraak: { stage: 'Gesproken' },
 
   voorstellen: { stage: 'Voorgesteld' },
+  'interview klant': { stage: 'Interview klant' },
+  aanbod: { stage: 'Aanbod' },
+  geplaatst: { stage: 'Geplaatst' },
+  ingewerkt: { stage: 'Ingewerkt' },
 
+  afgevallen: { stage: 'Afgevallen' },
   afgewezen: { stage: 'Afgevallen', reden: 'Afgewezen door ons (profielcheck)' },
   'te vroeg': { stage: 'Afgevallen', reden: 'Timing' },
 }
+
+export const STATUS_MAP = {
+  ...AANVULLENDE_ALIASSEN,
+  // Het bestand als laatste, zodat het wint waar het iets zegt.
+  ...Object.fromEntries(
+    Object.entries(IMPORT_STAGES).map(([status, stage]) => [
+      normaliseer(status),
+      stage === 'Afgevallen'
+        ? { stage, reden: 'Afgewezen door ons (profielcheck)' }
+        : { stage },
+    ]),
+  ),
+}
+
+/** xlsx-statussen die het bestand niet vanzelf mee wil nemen in een import. */
+export const NIET_VANZELF_IMPORTEREN = new Set(NIET_IMPORTEREN.map(normaliseer))
+
 
 /**
  * "In gesprek" is de enige status die niet automatisch te vertalen is: hij
@@ -127,29 +141,23 @@ export function vertaalReden(ruw, geldigeRedenen) {
 }
 
 /**
- * De bronkolom is vrije tekst — 44 varianten in de RA-lijst alleen al. Deze
- * regels vouwen dat terug op de keuzelijst in Airtable. Volgorde telt:
- * salesnav vóór linkedin, brancheorganisatie vóór linkedin.
+ * De bronkolom is vrije tekst — 44 varianten in de RA-lijst alleen al. De
+ * patronen komen uit config/ats-mapping.json en worden op volgorde als
+ * substring gelegd; de eerste treffer wint. Volgorde telt: salesnav vóór
+ * linkedin, branche vóór linkedin.
+ *
+ * Substrings en geen reguliere expressies, want dit bestand wordt ook door
+ * Python gelezen en een regex die daar net anders werkt is precies het
+ * verschil dat één gedeeld bestand moet uitsluiten.
  */
-const BRON_REGELS = [
-  [/salesnav|sales navigator|sales nav/, 'LinkedIn Sales Navigator'],
-  [/alumni/, 'Alumni-netwerk'],
-  [/\bncv\b|branchevereniging|brancheorganisatie/, 'Brancheorganisatie'],
-  [/\bindeed\b/, 'Indeed CV-database'],
-  [/instagram/, 'Instagram'],
-  [/referral|doorverwijz|aanbevol/, 'Referral'],
-  [/eigen search|eigen netwerk|dominique/, 'Eigen netwerk'],
-  [/website|inbound|contactformulier/, 'Website inbound'],
-  [/linkedin/, 'LinkedIn regulier'],
-]
 
 export function vertaalBron(ruw) {
   const tekst = normaliseer(ruw)
   if (!tekst) return null
-  for (const [patroon, bron] of BRON_REGELS) {
-    if (patroon.test(tekst)) return bron
+  for (const { bevat, ats } of BRON_PATRONEN) {
+    if (tekst.includes(normaliseer(bevat))) return ats
   }
-  return 'Overig'
+  return BRON_DEFAULT
 }
 
 /**

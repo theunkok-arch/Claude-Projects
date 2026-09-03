@@ -28,18 +28,20 @@ import {
   TABLES,
   HttpError,
   listAll,
+  updateRecord,
   json,
   fail,
   requireKey,
   today,
 } from '../lib/airtable.mjs'
 import { wijzigStage } from './ats.mjs'
-import { ALLE_AFVAL_REDENEN } from '../../shared/stages.mjs'
+import { ALLE_AFVAL_REDENEN, STAGE_IDS, isKlantZichtbaar } from '../../shared/stages.mjs'
+import { GEBEURTENISSEN } from '../../shared/mapping.mjs'
 
 export const config = { path: '/api/outreach' }
 
 /**
- * De vertaaltabel tussen het framework en de ATS, op één plek.
+ * De vertaaltabel tussen het framework en de ATS, uit config/ats-mapping.json.
  *
  * Deze twee spreken niet dezelfde taal. Het framework kent `Reactie` en
  * `Gesprek` waar de ATS `Gereageerd` en `Gesproken` zegt, en `Shortlist`
@@ -48,15 +50,96 @@ export const config = { path: '/api/outreach' }
  * Die verwarring heeft eerder 25 kandidaten in de verkeerde fase gezet.
  *
  * Daarom accepteert dit eindpunt geen ATS-fasenamen maar gebeurtenissen: wat
- * er is gebeurd, niet waar iemand daarna hoort te staan. De vertaling gebeurt
- * hier, één keer, in code die je kunt lezen.
+ * er is gebeurd, niet waar iemand daarna hoort te staan. De vertaling stond
+ * hier in code en staat nu in het bestand dat het importscript ook leest, want
+ * twee kopieën van dezelfde tabel is hoe ze uit elkaar lopen.
  */
-const GEBEURTENISSEN = {
-  'eerste bericht': 'Benaderd',
-  'follow-up': 'Opgevolgd',
-  reactie: 'Gereageerd',
-  gesproken: 'Gesproken',
-  afgevallen: 'Afgevallen',
+
+
+/**
+ * De natuurlijke volgorde van de pijplijn. Afgevallen staat er bewust buiten:
+ * daar kun je vanuit elke stage heen, en er is geen weg terug via dit
+ * eindpunt.
+ */
+export const VOLGORDE = STAGE_IDS.filter((stage) => stage !== 'Afgevallen')
+
+/** Een datum zonder tijd, zoals Airtable hem in een datumveld wil. */
+const ISO_DAG = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Mag deze stap? Vooruit wel, ook meerdere treden tegelijk: een kandidaat die
+ * rechtstreeks van Gesproken naar Voorgesteld gaat heeft de shortlist gewoon
+ * overgeslagen, en dat is een echte gang van zaken en geen fout.
+ *
+ * Terug niet. Een agent die een oude melding opnieuw verstuurt zou anders een
+ * kandidaat die al bij de klant op gesprek is geweest terugzetten naar
+ * Gesproken, en de servicenormklok opnieuw laten lopen. Terugzetten is een
+ * beslissing van een mens, in de ATS zelf.
+ */
+export function controleerVolgorde(vanStage, naarStage) {
+  if (vanStage === naarStage) return 'ongewijzigd'
+  if (naarStage === 'Afgevallen') return 'vooruit'
+  if (vanStage === 'Afgevallen') {
+    throw new HttpError(409, 'Kandidaat is afgevallen; heropenen doe je in de ATS zelf.')
+  }
+
+  const van = VOLGORDE.indexOf(vanStage)
+  const naar = VOLGORDE.indexOf(naarStage)
+  // Een aanmelding zonder stage, of met een stage die de app niet kent, is
+  // geen stap terug. Die laten we vooruit gaan in plaats van hem te blokkeren
+  // op een vergelijking met -1.
+  if (van === -1) return 'vooruit'
+  if (naar < van) {
+    throw new HttpError(409, `Aanmelding staat al op ${vanStage}; terugzetten doe je in de ATS zelf.`)
+  }
+  return 'vooruit'
+}
+
+/**
+ * De twee nieuwe velden horen bij bepaalde gebeurtenissen en niet bij andere.
+ *
+ * Ze gaan verschillend om met een misplaatste waarde, en dat is met opzet.
+ * `interviewdatum` bij `aanbod` is een vergissing met gevolgen: de datum zou
+ * nergens landen en de agent denkt dat hij hem heeft doorgegeven. Dat wordt
+ * een 400. `zichtbaarVoorKlant` bij een vroege gebeurtenis is niet gevaarlijk
+ * maar wel zinloos, want het vinkje gaat pas aan bij Voorgesteld; dat wordt
+ * genegeerd, en het antwoord zegt dat erbij zodat het niet stil gebeurt.
+ */
+export function controleerVelden(gebeurtenis, naarStage, body) {
+  const genegeerd = []
+
+  const interviewdatum = String(body?.interviewdatum ?? '').trim()
+  if (interviewdatum) {
+    if (gebeurtenis !== 'interview klant') {
+      throw new HttpError(
+        400,
+        'interviewdatum hoort alleen bij de gebeurtenis "interview klant".',
+      )
+    }
+    if (!ISO_DAG.test(interviewdatum)) {
+      throw new HttpError(400, 'interviewdatum moet een datum zijn in de vorm JJJJ-MM-DD.')
+    }
+  }
+
+  if (body?.zichtbaarVoorKlant !== undefined && !isKlantZichtbaar(naarStage)) {
+    genegeerd.push('zichtbaarVoorKlant')
+  }
+
+  return { genegeerd, interviewdatum: interviewdatum || null }
+}
+
+/**
+ * Het kanaal bepaalt het soort activiteit. Alleen deze drie: de rest van de
+ * keuzelijst (Reminder, Teams, Notitie) hoort bij handmatig loggen in de app,
+ * en een onbekend kanaal wordt gewoon een statuswijziging in plaats van een
+ * nieuwe optie in Airtable.
+ */
+export function activiteitTypeVoor(kanaal) {
+  const tekst = String(kanaal ?? '').trim().toLowerCase()
+  if (tekst === 'inmail') return 'InMail'
+  if (tekst === 'e-mail' || tekst === 'email' || tekst === 'mail') return 'E-mail'
+  if (tekst === 'telefoon' || tekst === 'bellen' || tekst === 'phone') return 'Telefoon'
+  return 'Statuswijziging'
 }
 
 export default async (req) => {
@@ -107,32 +190,78 @@ async function verwerk(body) {
     )
   }
 
-  const aanmelding = await zoekAanmelding(url, body?.opdrachtgever, body?.vacature)
+  const { genegeerd, interviewdatum } = controleerVelden(gebeurtenis, naarStage, body)
+
+  const { aanmelding, kandidaat } = await zoekAanmelding(url, body?.opdrachtgever, body?.vacature)
+  const vanStage = aanmelding.fields.Stage ?? null
 
   // Al in de juiste fase is geen fout maar een herhaling. Een cron die
   // opnieuw draait, of een follow-up die twee keer wordt gelogd, hoort geen
   // rood scherm op te leveren — dan gaat iemand het script "repareren".
-  if (aanmelding.fields.Stage === naarStage) {
-    return { ongewijzigd: true, aanmelding: aanmelding.id, fase: naarStage }
+  if (controleerVolgorde(vanStage, naarStage) === 'ongewijzigd') {
+    return antwoord({ ongewijzigd: true, aanmelding: aanmelding.id, fase: naarStage, genegeerd })
   }
+
+  const datum = ISO_DAG.test(String(body?.datum ?? '').trim()) ? String(body.datum).trim() : today()
 
   const resultaat = await wijzigStage({
     aanmeldingId: aanmelding.id,
     naarStage,
     redenAfvallen: body?.redenAfvallen,
-    notitie: notitie(body, gebeurtenis),
+    notitie: notitie(body, gebeurtenis, interviewdatum, datum),
+    // De afspraak met de klant komt in Volgende actie te staan, zodat hij op
+    // de kaart en in het maandagoverzicht zichtbaar is en niet alleen in de
+    // historie.
+    ...(interviewdatum ? { volgendeActie: `Interview klant op ${interviewdatum}` } : {}),
+    doorWie: 'Cowork-agent',
+    activiteitType: activiteitTypeVoor(body?.kanaal),
+    activiteitDatum: datum,
   })
 
-  return { ongewijzigd: false, aanmelding: aanmelding.id, van: aanmelding.fields.Stage ?? null, naar: naarStage, ...resultaat }
+  // Geplaatst is het laatste echte contactmoment van de search. Zonder deze
+  // regel blijft de AVG-bewaartermijn hangen op de dag van de laatste InMail.
+  if (naarStage === 'Geplaatst' && kandidaat) {
+    await updateRecord(TABLES.kandidaten, kandidaat.id, { 'Laatste contact': datum })
+  }
+
+  return antwoord({
+    ongewijzigd: false,
+    aanmelding: aanmelding.id,
+    fase: naarStage,
+    van: vanStage,
+    naar: naarStage,
+    genegeerd,
+    zichtbaarVoorKlant: resultaat.aanmelding?.fields?.['Zichtbaar voor klant'] === true,
+    ...resultaat,
+  })
 }
 
-function notitie(body, gebeurtenis) {
+/**
+ * Eén vorm voor elk antwoord.
+ *
+ * `ok` en `fase` zijn wat de skills lezen; `ongewijzigd`, `van` en `naar`
+ * stonden er al en blijven staan, zodat wie het eindpunt vandaag aanroept er
+ * geen last van heeft. `zichtbaarVoorKlant` staat er altijd in, ook als het
+ * veld niet is meegestuurd: de skill wil kunnen bevestigen dat het portaal de
+ * kandidaat nu toont, en "niet in het antwoord" is daar geen antwoord op.
+ */
+export function antwoord({ genegeerd, zichtbaarVoorKlant, fase, ...rest }) {
+  return {
+    ok: true,
+    fase,
+    ...rest,
+    zichtbaarVoorKlant: zichtbaarVoorKlant ?? isKlantZichtbaar(fase),
+    ...(genegeerd?.length ? { genegeerd } : {}),
+  }
+}
+
+export function notitie(body, gebeurtenis, interviewdatum, datum) {
   const delen = [
     `Outreach: ${gebeurtenis}`,
     body?.kanaal ? `via ${body.kanaal}` : null,
-    body?.datum ? `op ${body.datum}` : `op ${today()}`,
+    `op ${datum ?? body?.datum ?? today()}`,
   ].filter(Boolean)
-  const kop = delen.join(' ')
+  const kop = interviewdatum ? `${delen.join(' ')}. Interview op ${interviewdatum}` : delen.join(' ')
   return body?.notitie ? `${kop}\n\n${body.notitie}` : kop
 }
 
@@ -184,5 +313,5 @@ async function zoekAanmelding(url, opdrachtgeverNaam, vacatureTitel) {
       `${kandidaat.fields.Naam ?? url} loopt bij meerdere vacatures (${namen}). Geef opdrachtgever en vacature mee.`,
     )
   }
-  return eigen[0]
+  return { aanmelding: eigen[0], kandidaat }
 }
