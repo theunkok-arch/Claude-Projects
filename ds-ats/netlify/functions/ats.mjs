@@ -274,7 +274,18 @@ const plat = (record) => ({ id: record.id, ...record.fields })
  * tweede versie daarvan zou binnen een maand uit de pas lopen.
  */
 export async function wijzigStage(body) {
-  const { aanmeldingId, naarStage, redenAfvallen, volgendeActie, notitie } = body ?? {}
+  const {
+    aanmeldingId,
+    naarStage,
+    redenAfvallen,
+    volgendeActie,
+    notitie,
+    // De drie hieronder zijn er voor /api/outreach. Ze hebben allemaal de
+    // oude waarde als standaard, zodat het interne scherm ongewijzigd blijft.
+    doorWie = 'Dominique',
+    activiteitType = 'Statuswijziging',
+    activiteitDatum,
+  } = body ?? {}
 
   if (!aanmeldingId) throw new HttpError(400, 'Aanmelding-id ontbreekt.')
   if (!STAGE_IDS.includes(naarStage)) throw new HttpError(400, `Onbekende stage ${naarStage}.`)
@@ -332,9 +343,16 @@ export async function wijzigStage(body) {
       {
         Samenvatting: `${vanStage ?? 'nieuw'} → ${naarStage}${redenAfvallen ? ` (${redenAfvallen})` : ''}`,
         Aanmelding: [aanmeldingId],
-        Datum: vandaag,
-        Type: 'Statuswijziging',
-        'Door wie': 'Dominique',
+        /*
+          Alleen de datum van de activiteit mag van de aanroeper komen. "Datum
+          in huidige stage" en de Stagelog-regel hierboven houden `vandaag`:
+          die twee voeden de servicenormklok, en een melding die een week later
+          binnenkomt met de datum van toen zou die klok terugzetten en de
+          aanmelding uit "Over de norm" laten verdwijnen.
+        */
+        Datum: activiteitDatum ?? vandaag,
+        Type: activiteitType,
+        'Door wie': doorWie,
         Toelichting: notitie ?? '',
       },
     ]),
