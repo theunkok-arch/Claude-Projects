@@ -61,6 +61,28 @@ test('het bestand wint van de aliassen in code', () => {
   assert.equal(vertaalStatus('gesprek/wachten').stage, 'Gesproken')
 })
 
+test('de zeven schrijfwijzen uit de sheets vertalen weer', () => {
+  /*
+    Toen de patronen van code naar config verhuisden, was de lijst in het
+    bestand korter dan de reguliere expressies die hier stonden, en vielen deze
+    zeven terug op Overig. Ze staan sinds ats-mapping 1.1 weer in het canonieke
+    bestand. Deze toets merkt het als ze er bij een volgende versie weer uit
+    vallen, want een bron die stilzwijgend Overig wordt maakt het bronscherm
+    onbruikbaar zonder dat iemand het ziet.
+  */
+  for (const [ruw, verwacht] of [
+    ['NCV ledenlijst', 'Brancheorganisatie'],
+    ['sales nav export', 'LinkedIn Sales Navigator'],
+    ['doorverwijzing via Jan', 'Referral'],
+    ['aanbevolen door collega', 'Referral'],
+    ['eigen search', 'Eigen netwerk'],
+    ['via Dominique', 'Eigen netwerk'],
+    ['inbound lead', 'Website inbound'],
+  ]) {
+    assert.equal(vertaalBron(ruw), verwacht, ruw)
+  }
+})
+
 test('de bronpatronen worden op volgorde gelegd', () => {
   // Volgorde telt: "linkedin-salesnav-direct" bevat allebei, en moet op
   // Sales Navigator uitkomen en niet op LinkedIn regulier.
