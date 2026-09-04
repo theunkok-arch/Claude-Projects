@@ -1,5 +1,5 @@
 {
-  "versie": "1.0",
+  "versie": "1.1",
   "toelichting": "Vertaling tussen kandidaten.xlsx (schema 1.1) en de Airtable-ATS. Dit bestand is de enige plek waar die vertaling staat. Skills praten nooit rechtstreeks met Airtable; alles loopt via het importscript (nieuwe kandidaten) en het Netlify-eindpunt (gebeurtenissen).",
 
   "ats": {
@@ -82,15 +82,22 @@
     "patronen": [
       { "bevat": "salesnav", "ats": "LinkedIn Sales Navigator" },
       { "bevat": "sales navigator", "ats": "LinkedIn Sales Navigator" },
+      { "bevat": "sales nav", "ats": "LinkedIn Sales Navigator" },
       { "bevat": "alumni", "ats": "Alumni-netwerk" },
       { "bevat": "indeed", "ats": "Indeed CV-database" },
       { "bevat": "instagram", "ats": "Instagram" },
       { "bevat": "branche", "ats": "Brancheorganisatie" },
       { "bevat": "vereniging", "ats": "Brancheorganisatie" },
+      { "bevat": "ncv", "ats": "Brancheorganisatie" },
       { "bevat": "referral", "ats": "Referral" },
+      { "bevat": "doorverwijz", "ats": "Referral" },
+      { "bevat": "aanbevol", "ats": "Referral" },
       { "bevat": "eigen netwerk", "ats": "Eigen netwerk" },
       { "bevat": "eigen-netwerk", "ats": "Eigen netwerk" },
+      { "bevat": "eigen search", "ats": "Eigen netwerk" },
+      { "bevat": "dominique", "ats": "Eigen netwerk" },
       { "bevat": "website", "ats": "Website inbound" },
+      { "bevat": "inbound", "ats": "Website inbound" },
       { "bevat": "linkedin", "ats": "LinkedIn regulier" }
     ],
     "_default": "Overig"
