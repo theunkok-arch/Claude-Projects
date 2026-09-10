@@ -40,6 +40,7 @@ export const AANMELDING_VELDEN = {
   Opmerkingen: 'fld4aQRWCz67bD5M1',
   'Outreach-concept': 'fldtyiPCfsdITrwHT',
   Concurrent: 'fldBrXKLqvGelxUDl',
+  Zoekronde: 'fldozRkWUsqeZiDPQ',
 }
 
 export const STAGELOG_VELDEN = {

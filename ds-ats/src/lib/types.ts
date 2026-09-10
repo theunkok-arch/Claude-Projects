@@ -75,6 +75,8 @@ export interface Aanmelding extends AirtableRecord {
   'Zichtbaar voor klant'?: boolean
   'Volgende actie'?: string
   Opmerkingen?: string
+  /** In welke zoekronde van deze vacature de kandidaat binnenkwam. */
+  Zoekronde?: string
 }
 
 /**
