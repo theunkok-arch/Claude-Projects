@@ -36,6 +36,10 @@ const AANMELDING_VELDEN = new Set([
   'Concurrent',
   'Zichtbaar voor klant',
   'Eigenaar',
+  // Corrigeerbaar vanuit de app: het importscript zet de ronde, maar een rij
+  // die in de verkeerde ronde is beland moet je kunnen rechtzetten zonder in
+  // Airtable te duiken.
+  'Zoekronde',
 ])
 
 const KANDIDAAT_VELDEN = new Set([

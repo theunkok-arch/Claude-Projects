@@ -6,6 +6,7 @@ import { actieveRegels, bronVan, opUrgentie } from '../lib/metrics'
 import { datumKort } from '../lib/format'
 import { FUNNEL_STAGES } from '../../shared/stages.mjs'
 import { MAX_PARTIJEN, nieuwstePartij, partijen } from '../../shared/partijen.mjs'
+import { MAX_RONDES, rondes } from '../../shared/rondes.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import StageBadge from '../components/StageBadge'
@@ -52,6 +53,10 @@ export default function Maandag() {
   // waarin je ze wilt beoordelen; een venster als "7 dagen" valt daar de
   // ochtend na een run juist naast.
   const partijFilter = zoek.get('partij')
+  // `?ronde=Ronde 3` — uit welke search de kandidaat komt. Naast de partij en
+  // niet in plaats daarvan: op 10-09 kwamen ronde 1 en ronde 3 op dezelfde dag
+  // binnen, dus één partijchip dekte twee totaal verschillende lijsten.
+  const rondeFilter = zoek.get('ronde')
   const stage = zoek.get('stage')
 
   const zetZoek = (sleutel: string, waarde: string | null) => {
@@ -81,22 +86,47 @@ export default function Maandag() {
     return actief
   }, [regels, klantFilter, vacatureFilter, bronFilter])
 
-  /** De dagen waarop er is aangeleverd, nieuwste eerst, met hun aantallen. */
-  const partijLijst = useMemo(
-    () => partijen(inScopeBreed.map((r) => r.aanmelding)).slice(0, MAX_PARTIJEN),
-    [inScopeBreed],
+  /*
+    De twee chiprijen filteren elkaar kruislings, maar niet zichzelf. Een rij
+    die zijn eigen filter meerekent houdt na één tik nog één chip over, en dan
+    kun je niet meer wisselen zonder eerst terug naar "Alles". Elke rij ziet
+    dus wél het andere filter, zodat het aantal op de chip klopt met wat je
+    krijgt als je hem aantikt.
+
+    Aanmeldingen zonder datum of zonder ronde vallen buiten het bijbehorende
+    filter in plaats van erin: een lijst "toegevoegd op 2 september" die
+    stiekem ook datumloze regels toont, is geen antwoord op de vraag.
+  */
+  const naRonde = useMemo(
+    () =>
+      rondeFilter ? inScopeBreed.filter((r) => r.aanmelding.Zoekronde === rondeFilter) : inScopeBreed,
+    [inScopeBreed, rondeFilter],
   )
 
-  const inScope = useMemo(
-    // Zonder datum weet je niet uit welke partij een aanmelding komt. Die
-    // vallen buiten het filter in plaats van erin: een lijst "toegevoegd op 2
-    // september" die stiekem ook datumloze regels toont, is geen antwoord op
-    // de vraag.
+  const naPartij = useMemo(
     () =>
       partijFilter
         ? inScopeBreed.filter((r) => r.aanmelding['Datum aangemaakt'] === partijFilter)
         : inScopeBreed,
     [inScopeBreed, partijFilter],
+  )
+
+  /** De dagen waarop er is aangeleverd, nieuwste eerst, met hun aantallen. */
+  const partijLijst = useMemo(
+    () => partijen(naRonde.map((r) => r.aanmelding)).slice(0, MAX_PARTIJEN),
+    [naRonde],
+  )
+
+  /** De zoekrondes binnen deze scope, hoogste ronde eerst. */
+  const rondeLijst = useMemo(
+    () => rondes(naPartij.map((r) => r.aanmelding)).slice(0, MAX_RONDES),
+    [naPartij],
+  )
+
+  const inScope = useMemo(
+    () =>
+      rondeFilter ? naPartij.filter((r) => r.aanmelding.Zoekronde === rondeFilter) : naPartij,
+    [naPartij, rondeFilter],
   )
 
   const teLang = useMemo(() => inScope.filter((r) => r.overschreden), [inScope])
@@ -109,8 +139,8 @@ export default function Maandag() {
    * dag raak je niet kwijt, die staan onder hun eigen chip hierboven.
    */
   const nieuwsteDag = useMemo(
-    () => nieuwstePartij(inScopeBreed.map((r) => r.aanmelding)),
-    [inScopeBreed],
+    () => nieuwstePartij(naRonde.map((r) => r.aanmelding)),
+    [naRonde],
   )
   /*
     Zonder chip gaat het over de laatste aanlevering. Staat er wél een chip aan,
@@ -123,12 +153,12 @@ export default function Maandag() {
     () =>
       beoordeelDag === null
         ? []
-        : inScopeBreed.filter(
+        : naRonde.filter(
             (r) =>
               r.aanmelding.Stage === TE_BEOORDELEN &&
               r.aanmelding['Datum aangemaakt'] === beoordeelDag,
           ),
-    [inScopeBreed, beoordeelDag],
+    [naRonde, beoordeelDag],
   )
 
   /*
@@ -139,7 +169,7 @@ export default function Maandag() {
   useEffect(() => {
     setSelectieAan(false)
     setGekozen(new Set())
-  }, [stage, klantFilter, vacatureFilter, bronFilter, partijFilter])
+  }, [stage, klantFilter, vacatureFilter, bronFilter, partijFilter, rondeFilter])
 
   const tellingen: StageTelling[] = useMemo(
     () =>
@@ -299,9 +329,9 @@ export default function Maandag() {
             </button>
           )}
         </div>
-        {(klantNaam || vacatureNaam || bronFilter || partijNaam) && (
+        {(klantNaam || vacatureNaam || bronFilter || partijNaam || rondeFilter) && (
           <p className="text-sm text-navy-400">
-            {[klantNaam, vacatureNaam, bronFilter && `via ${bronFilter}`, partijNaam]
+            {[klantNaam, vacatureNaam, bronFilter && `via ${bronFilter}`, rondeFilter, partijNaam]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -503,6 +533,55 @@ export default function Maandag() {
                 }`}
               >
                 {datumKort(partij.datum)} · <span className="tabular-nums">{partij.aantal}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/*
+        De zoekronde, als tweede rij onder de partijen. Ze staan naast elkaar
+        omdat ze verschillende vragen beantwoorden: de partij is wanneer een
+        agent aanleverde, de ronde is uit welke search iemand komt. Op 10-09
+        vielen 37 kandidaten uit ronde 1 en 46 uit ronde 3 op dezelfde dag,
+        dus met alleen de partijchip stond er één knop voor twee lijsten.
+
+        Alleen zichtbaar bij meer dan één ronde: bij een vacature die pas één
+        search achter de rug heeft valt er niets te kiezen, en dan is de rij
+        een regel die het eerste scherm kost zonder iets toe te voegen.
+      */}
+      {rondeLijst.length > 1 && (
+        <div
+          role="group"
+          aria-label="Filter op de zoekronde waaruit de kandidaten komen"
+          className="mt-2 flex gap-2 overflow-x-auto"
+        >
+          <button
+            type="button"
+            aria-pressed={!rondeFilter}
+            onClick={() => zetZoek('ronde', null)}
+            className={`tik shrink-0 rounded-full border px-3 text-sm ${
+              !rondeFilter ? 'border-oranje bg-oranje/10 font-medium text-oranje' : 'border-lijn bg-white'
+            }`}
+          >
+            Alle rondes
+          </button>
+          {rondeLijst.map((r) => {
+            const aan = rondeFilter === r.ronde
+            return (
+              <button
+                key={r.ronde}
+                type="button"
+                aria-pressed={aan}
+                // Nog een keer op dezelfde chip zet hem uit, net als bij de
+                // partijen: terug naar alles is dan dezelfde tik en niet een
+                // reis naar de andere kant van de rij.
+                onClick={() => zetZoek('ronde', aan ? null : r.ronde)}
+                className={`tik shrink-0 rounded-full border px-3 text-sm whitespace-nowrap ${
+                  aan ? 'border-oranje bg-oranje/10 font-medium text-oranje' : 'border-lijn bg-white'
+                }`}
+              >
+                {r.ronde} · <span className="tabular-nums">{r.aantal}</span>
               </button>
             )
           })}

@@ -6,6 +6,7 @@
 // Heb je een token? Gebruik dan import.mjs — die is sneller en compleet.
 //
 //   node scripts/import/mcp-batches.mjs plan --bestand <csv> --vacature "<titel>"
+//       [--ronde "Ronde 3"]
 //   node scripts/import/mcp-batches.mjs status
 //   node scripts/import/mcp-batches.mjs kandidaten <batchnummer> [batchgrootte]
 //   node scripts/import/mcp-batches.mjs aanmeldingen <batchnummer> [batchgrootte]
@@ -14,6 +15,11 @@
 // Airtable neemt maximaal 50 records per verzoek. Aanmeldingen dragen de hele
 // score-onderbouwing en het outreach-concept, dus daar is een kleinere batch
 // soms praktischer: `aanmeldingen 0 20`.
+//
+// --ronde zet de zoekronde op elke aanmelding uit dit plan. Zonder de vlag
+// blijft het veld leeg, en dat betekent "niet vastgelegd", niet ronde 1. Draai
+// je twee rondes van dezelfde vacature achter elkaar in, doe dat dan in twee
+// aparte plannen: de vlag geldt voor het hele plan.
 //
 // --bestand en --vacature mogen allebei meerdere keren, op volgorde gepaard:
 //   plan --bestand a.csv --vacature "Brand Manager" --bestand b.csv --vacature "RA Officer"
@@ -58,6 +64,7 @@ if (commando === 'plan') {
       bron: { type: 'string' },
       'in-gesprek': { type: 'string' },
       vandaag: { type: 'string' },
+      ronde: { type: 'string' },
     },
   })
   const paden = values.bestand ?? []
@@ -78,6 +85,7 @@ if (commando === 'plan') {
       bron: values.bron,
       vandaag,
       inGesprek: values['in-gesprek'],
+      ronde: values.ronde,
     })
     for (const [sleutel, velden] of plan.kandidaten) kandidaten.push({ sleutel, velden })
     for (const a of plan.aanmeldingen) {

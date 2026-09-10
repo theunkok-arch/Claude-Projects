@@ -25,6 +25,7 @@ const { values: opties } = parseArgs({
     tab: { type: 'string' },
     bron: { type: 'string' },
     'in-gesprek': { type: 'string' },
+    ronde: { type: 'string' },
     echt: { type: 'boolean', default: false },
   },
 })
@@ -128,6 +129,7 @@ async function main() {
     bron: opties.bron,
     vandaag,
     inGesprek: IN_GESPREK,
+    ronde: opties.ronde,
   })
   const bekend = new Map(
     bestaandeKandidaten.map((k) => [(k.fields['Dedupe-sleutel'] ?? '').trim().toLowerCase(), k.id]),

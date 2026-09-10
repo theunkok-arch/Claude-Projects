@@ -285,7 +285,7 @@ function concurrentUitTekst(tekst) {
  * Zet de ruwe rijen om in kandidaten en aanmeldingen. Schrijft niets; geeft
  * terug wat er zou gebeuren, inclusief wat het niet kon plaatsen.
  */
-export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
+export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek, ronde }) {
   const { index, genegeerd } = bouwKolomIndex(rijen)
   const kandidaten = new Map()
   const aanmeldingen = []
@@ -387,6 +387,11 @@ export function bouwPlan(rijen, { vacatureTitel, bron, vandaag, inGesprek }) {
       velden: schoon({
         Aanmelding: `${naam} — ${vacatureTitel}`,
         Stage: stage,
+        // De ronde komt van de aanroeper en niet uit de sheet: het bestand
+        // weet niet de hoeveelste search het is, en een kolom die per ronde
+        // handmatig moet worden bijgewerkt staat de ene keer goed en de
+        // andere keer niet.
+        Zoekronde: ronde,
         'Reden afvallen': reden,
         Eigenaar: 'Dominique',
         // De sheets kennen geen stagedatum; de import is het startpunt van de klok.
