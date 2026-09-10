@@ -192,13 +192,29 @@ export default function Maandag() {
     return [...selectie].sort(opUrgentie)
   }, [stage, inScope, teLang])
 
-  const alleActieveVacatures = (data?.vacatures ?? []).filter(
-    (v) => v.Status === 'Actief' || v.Status === 'Intake',
+  /*
+    Wat je kunt kiezen moet dekken wat je telt.
+
+    De tellingen op dit scherm kijken niet naar de vacaturestatus: elke actieve
+    aanmelding telt mee, ook een uit een vervulde vacature. De keuzelijsten
+    deden dat wél, en dus verdween opdrachtgever Verhaeg terwijl 22 van zijn
+    kandidaten sinds 28 augustus over de norm stonden. Ze zaten in het
+    normcijfer maar waren met geen enkel filter te bereiken.
+
+    Een vacature hoort daarom in de lijst als hij loopt óf als er nog werk in
+    zit. Dat laatste is precies de verzameling waar de cijfers uit komen.
+  */
+  const vacaturesMetLopendWerk = useMemo(
+    () => new Set(actieveRegels(regels).map((r) => r.vacature?.id).filter(Boolean)),
+    [regels],
+  )
+  const kiesbareVacatures = (data?.vacatures ?? []).filter(
+    (v) => v.Status === 'Actief' || v.Status === 'Intake' || vacaturesMetLopendWerk.has(v.id),
   )
   const actieveVacatures =
     klantFilter === 'alle'
-      ? alleActieveVacatures
-      : alleActieveVacatures.filter((v) => v.Opdrachtgever?.[0] === klantFilter)
+      ? kiesbareVacatures
+      : kiesbareVacatures.filter((v) => v.Opdrachtgever?.[0] === klantFilter)
 
   // Wie via het bronscherm binnenkomt neemt de vacaturekeuze van dáár mee, en
   // die lijst kent ook gesloten vacatures. Staat die keuze niet in de lijst,
@@ -212,7 +228,7 @@ export default function Maandag() {
   // Alleen klanten met werk in de trechter; een lege naam in een keuzelijst
   // kost een tik en levert een leeg scherm op.
   const klanten = (data?.opdrachtgevers ?? []).filter((o) =>
-    alleActieveVacatures.some((v) => v.Opdrachtgever?.[0] === o.id),
+    kiesbareVacatures.some((v) => v.Opdrachtgever?.[0] === o.id),
   )
   const klantNaam =
     klantFilter === 'alle' ? null : (klanten.find((o) => o.id === klantFilter)?.Naam ?? null)
@@ -483,7 +499,11 @@ export default function Maandag() {
           <option value="alle">Alle vacatures</option>
           {vacatureOpties.map((vacature) => (
             <option key={vacature.id} value={vacature.id}>
+              {/* De status erbij als de vacature niet loopt: anders sta je je
+                  af te vragen waarom een vervulde vacature in de lijst staat. */}
               {vacature.Titel}
+              {vacature.Status !== 'Actief' && vacature.Status !== 'Intake' &&
+                ` (${vacature.Status})`}
             </option>
           ))}
         </select>
@@ -546,11 +566,17 @@ export default function Maandag() {
         vielen 37 kandidaten uit ronde 1 en 46 uit ronde 3 op dezelfde dag,
         dus met alleen de partijchip stond er één knop voor twee lijsten.
 
-        Alleen zichtbaar bij meer dan één ronde: bij een vacature die pas één
-        search achter de rug heeft valt er niets te kiezen, en dan is de rij
-        een regel die het eerste scherm kost zonder iets toe te voegen.
+        Alleen zichtbaar met één vacature gekozen. Een ronde is genummerd
+        binnen een vacature, dus "Ronde 1" van SNA en "Ronde 1" van Brand
+        Manager zijn verschillende searches met hetzelfde etiket; over alle
+        vacatures heen zou de chip die bij elkaar optellen. Een gekozen
+        opdrachtgever is niet genoeg, want die kan vijf vacatures hebben.
+
+        En pas vanaf twee rondes: bij een vacature die één search achter de rug
+        heeft valt er niets te kiezen, en dan is de rij een regel die het
+        eerste scherm kost zonder iets toe te voegen.
       */}
-      {rondeLijst.length > 1 && (
+      {vacatureFilter !== 'alle' && rondeLijst.length > 1 && (
         <div
           role="group"
           aria-label="Filter op de zoekronde waaruit de kandidaten komen"

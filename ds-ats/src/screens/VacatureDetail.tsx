@@ -5,6 +5,7 @@ import { REDEN_ONTBREEKT, afvalRedenen, funnel, opUrgentie } from '../lib/metric
 import { band, datum } from '../lib/format'
 import { useHerkomst } from '../lib/herkomst'
 import { FUNNEL_STAGES } from '../../shared/stages.mjs'
+import { rondes } from '../../shared/rondes.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import Funnel from '../components/Funnel'
@@ -37,15 +38,34 @@ export default function VacatureDetail() {
   // opleveren. Vandaar dat kiezen altijd Afgevallen meezet, en dat de lijst
   // hieronder er ook op controleert.
   const reden = stage === 'Afgevallen' ? zoek.get('reden') : null
+  // De zoekronde. Anders dan de afvalreden blijft die wél staan als je een
+  // andere trede kiest: een ronde betekent in elke stage hetzelfde, dus
+  // "Benaderd binnen ronde 3" is een zinnige vraag. Alleen het wissen van de
+  // stage wist hem mee, want dan ben je terug op het overzicht.
+  const rondeFilter = zoek.get('ronde')
   const kiesStage = (keuze: string | null) => {
     const volgende = new URLSearchParams(zoek)
-    if (keuze === null) volgende.delete('stage')
-    else volgende.set('stage', keuze)
+    if (keuze === null) {
+      volgende.delete('stage')
+      volgende.delete('ronde')
+    } else volgende.set('stage', keuze)
     // Een andere trede kiezen laat het sub-filter niet staan: anders krijg je
     // een lijst met een reden in de kop die op niets meer slaat.
     volgende.delete('reden')
     // De herkomst blijft meelopen: het filter wisselen is geen nieuw scherm, en
     // zonder dit zou de terugknop na één filterwissel weer gaan gokken.
+    setZoek(volgende, { state })
+  }
+  /*
+    Een ronde loopt over alle stages heen, dus hij opent de volledige lijst en
+    niet één trede. Hetzelfde patroon als de afvalredenen: een getal waar je
+    niet doorheen kunt is een dood eind.
+  */
+  const kiesRonde = (keuze: string) => {
+    const volgende = new URLSearchParams(zoek)
+    volgende.set('stage', 'alles')
+    volgende.set('ronde', keuze)
+    volgende.delete('reden')
     setZoek(volgende, { state })
   }
   const kiesReden = (keuze: string) => {
@@ -63,9 +83,12 @@ export default function VacatureDetail() {
     if (!stage) return []
     const opStage =
       stage === 'lopend' ? lopend : stage === 'alles' ? eigen : eigen.filter((r) => r.aanmelding.Stage === stage)
-    const selectie = reden
+    const opReden = reden
       ? opStage.filter((r) => (r.aanmelding['Reden afvallen'] ?? REDEN_ONTBREEKT) === reden)
       : opStage
+    const selectie = rondeFilter
+      ? opReden.filter((r) => r.aanmelding.Zoekronde === rondeFilter)
+      : opReden
 
     return [...selectie].sort((a, b) => {
       const verschil =
@@ -73,13 +96,14 @@ export default function VacatureDetail() {
         FUNNEL_STAGES.indexOf(a.aanmelding.Stage as never)
       return verschil !== 0 ? verschil : opUrgentie(a, b)
     })
-  }, [eigen, lopend, stage, reden])
+  }, [eigen, lopend, stage, reden, rondeFilter])
 
   if (!data) return null
   if (!vacature) return <p className="text-navy-400">Deze vacature bestaat niet (meer).</p>
 
   const opdrachtgever = data.opdrachtgevers.find((o) => o.id === vacature.Opdrachtgever?.[0])
   const redenen = afvalRedenen(eigen)
+  const rondeLijst = rondes(eigen.map((r) => r.aanmelding))
   const afgevallen = eigen.length - lopend.length
 
   // ── Doorgeklikt: de kandidaten van één stage ────────────────────────────────
@@ -105,6 +129,11 @@ export default function VacatureDetail() {
             hier de kop van de lijst, niet de context erbij. Op 390px valt hij
             desnoods op een eigen regel, vandaar flex-wrap.
           */}
+          {rondeFilter && (
+            <span className="rounded-full border border-lijn bg-white px-2 py-0.5 text-sm text-navy-400">
+              {rondeFilter}
+            </span>
+          )}
           {reden && (
             <span
               className={`rounded-full border px-2 py-0.5 text-sm ${
@@ -229,6 +258,36 @@ export default function VacatureDetail() {
           Alles ({eigen.length})
         </button>
       </div>
+
+      {/*
+        Waar deze pipeline vandaan komt. Staat vóór "Waarom ze afvielen", want
+        eerst waar ze binnenkwamen en dan waarom ze vertrokken.
+
+        Al vanaf één ronde zichtbaar, anders dan de chiprij op het
+        maandagoverzicht. Daar is het een filter en valt er bij één ronde niets
+        te kiezen; hier is het ook informatie: je ziet in één oogopslag dat 46
+        van de 109 uit de laatste search komen. De hele regel is het raakvlak,
+        niet alleen het getal.
+      */}
+      {rondeLijst.length > 0 && (
+        <section className="mt-5 rounded-2xl border border-lijn bg-white p-4">
+          <h2 className="mb-2 font-semibold">Per zoekronde</h2>
+          <ul className="divide-y divide-lijn">
+            {rondeLijst.map((r) => (
+              <li key={r.ronde}>
+                <button
+                  type="button"
+                  onClick={() => kiesRonde(r.ronde)}
+                  className="tik flex w-full items-center justify-between gap-3 text-left"
+                >
+                  <span>{r.ronde}</span>
+                  <span className="tabular-nums font-semibold">{r.aantal}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {redenen.length > 0 && (
         <section className="mt-5 rounded-2xl border border-lijn bg-white p-4">
