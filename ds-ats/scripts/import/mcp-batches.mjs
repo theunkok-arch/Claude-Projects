@@ -31,10 +31,11 @@
 // dedupet, dus daar hoort dit ook op te matchen.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { bouwPlan, leesRijen } from './lees.mjs'
+import { alsMarkdown, controleer, poortOordeel, vingerafdruk } from './rapport.mjs'
 import { normaliseer } from './status-map.mjs'
 import {
   AANMELDING_VELDEN,
@@ -49,11 +50,25 @@ const HIER = dirname(fileURLToPath(import.meta.url))
 const WERKMAP = join(HIER, '.batches')
 const PLAN = join(WERKMAP, 'plan.json')
 const BESTAAND = join(WERKMAP, 'bestaand.txt')
+/*
+  Het oordeel van de laatste importcheck. Staat naast plan.json en niet in
+  het geheugen, omdat plan en schrijven aparte aanroepen zijn: zonder dit
+  bestand kun je het rapport overslaan door meteen `aanmeldingen 0` te
+  draaien, en dan is de controle een formaliteit.
+*/
+const OORDEEL = join(WERKMAP, 'oordeel.json')
 const PER_BATCH = 50
 
 // Veld-id's: zie velden.mjs. Bewust niet hier herhaald.
 
 const [commando, ...rest] = process.argv.slice(2)
+/*
+  Vlaggen en posities uit elkaar. `aanmeldingen --akkoord 0 20` moet hetzelfde
+  doen als `aanmeldingen 0 20 --akkoord`; anders wordt de vlag stilletjes het
+  batchnummer en schrijf je de verkeerde twintig weg.
+*/
+const AKKOORD = rest.includes('--akkoord')
+const posities = rest.filter((arg) => arg !== '--akkoord')
 
 if (commando === 'plan') {
   const { values } = parseArgs({
@@ -65,6 +80,7 @@ if (commando === 'plan') {
       'in-gesprek': { type: 'string' },
       vandaag: { type: 'string' },
       ronde: { type: 'string' },
+      rapport: { type: 'string' },
     },
   })
   const paden = values.bestand ?? []
@@ -79,6 +95,7 @@ if (commando === 'plan') {
 
   const kandidaten = []
   const aanmeldingen = []
+  const plannen = []
   for (const lijst of lijsten) {
     const plan = bouwPlan(await leesRijen(lijst.pad), {
       vacatureTitel: lijst.titel,
@@ -87,6 +104,7 @@ if (commando === 'plan') {
       inGesprek: values['in-gesprek'],
       ronde: values.ronde,
     })
+    plannen.push({ plan, titel: lijst.titel, pad: lijst.pad })
     for (const [sleutel, velden] of plan.kandidaten) kandidaten.push({ sleutel, velden })
     for (const a of plan.aanmeldingen) {
       aanmeldingen.push({ sleutel: a.sleutel, vacature: lijst.titel, velden: a.velden })
@@ -108,8 +126,59 @@ if (commando === 'plan') {
   }
 
   mkdirSync(WERKMAP, { recursive: true })
-  writeFileSync(PLAN, JSON.stringify({ kandidaten, aanmeldingen }))
+  const planTekst = JSON.stringify({ kandidaten, aanmeldingen })
+  writeFileSync(PLAN, planTekst)
   console.error(`\nplan.json geschreven: ${kandidaten.length} kandidaten, ${aanmeldingen.length} aanmeldingen`)
+
+  /*
+    De importcheck. Draait altijd, ook zonder --rapport: het oordeel bepaalt of
+    de schrijfcommando's straks door mogen, en dat mag niet afhangen van of
+    iemand eraan dacht een vlag mee te geven.
+  */
+  const fouten = []
+  const waarschuwingen = []
+  const stukken = []
+  for (const { plan, titel, pad } of plannen) {
+    const uitkomst = controleer(plan, { vandaag })
+    fouten.push(...uitkomst.fouten)
+    waarschuwingen.push(...uitkomst.waarschuwingen)
+    stukken.push(
+      alsMarkdown(uitkomst, {
+        bestand: basename(pad),
+        vacature: titel,
+        vandaag,
+        overgeslagen: plan.overgeslagen.length,
+      }),
+    )
+  }
+
+  if (values.rapport) {
+    writeFileSync(values.rapport, stukken.join('\n\n---\n\n'))
+    console.error(`rapport geschreven: ${values.rapport}`)
+  }
+
+  writeFileSync(
+    OORDEEL,
+    JSON.stringify({
+      blokkerend: fouten,
+      waarschuwingen: waarschuwingen.length,
+      gedraaid: vandaag,
+      vingerafdruk: vingerafdruk(planTekst),
+    }),
+  )
+
+  console.error(`\nImportcheck: ${fouten.length} blokkerend, ${waarschuwingen.length} waarschuwingen`)
+  for (const fout of fouten.slice(0, 10)) console.error(`  ! ${fout}`)
+  if (fouten.length > 10) console.error(`  ... en nog ${fouten.length - 10}`)
+
+  if (fouten.length > 0) {
+    console.error(
+      '\nDe schrijfcommando\'s weigeren zolang dit blokkerend is.\n' +
+        'Fix het in de bron en draai plan opnieuw, of ga bewust door met --akkoord.',
+    )
+    process.exit(1)
+  }
+  console.error('\nKlaar voor import.')
 } else if (commando === 'status') {
   const { kandidaten, aanmeldingen } = laadPlan()
   const nieuw = nogTeDoen(kandidaten)
@@ -119,14 +188,16 @@ if (commando === 'plan') {
   console.log(`aanmeldingen in plan : ${aanmeldingen.length}  -> ${batches(aanmeldingen.length)} batches`)
   console.log(`stagelog-regels      : ${aanmeldingen.length}  -> ${batches(aanmeldingen.length)} batches`)
 } else if (commando === 'kandidaten') {
+  poort()
   const nieuw = nogTeDoen(laadPlan().kandidaten)
-  console.log(JSON.stringify(schijf(nieuw, rest[0], rest[1]).map(({ velden }) => ({ fields: velden2fields(velden, KANDIDAAT_VELDEN) }))))
+  console.log(JSON.stringify(schijf(nieuw, posities[0], posities[1]).map(({ velden }) => ({ fields: velden2fields(velden, KANDIDAAT_VELDEN) }))))
 } else if (commando === 'aanmeldingen') {
+  poort()
   const { kandidaten, aanmeldingen } = laadPlan()
   const naamVanSleutel = new Map(kandidaten.map((k) => [k.sleutel, k.velden.Naam]))
   console.log(
     JSON.stringify(
-      schijf(aanmeldingen, rest[0], rest[1]).map((a) => ({
+      schijf(aanmeldingen, posities[0], posities[1]).map((a) => ({
         fields: {
           // Koppelen op naam: met typecast zoekt Airtable het bestaande record erbij.
           [LINK_KANDIDAAT]: [naamVanSleutel.get(a.sleutel)],
@@ -137,12 +208,13 @@ if (commando === 'plan') {
     ),
   )
 } else if (commando === 'stagelog') {
+  poort()
   // Startregel per aanmelding. Zonder deze regels blijven doorlooptijd en
   // conversie leeg tot iemand met de hand een stage verzet.
   const { aanmeldingen } = laadPlan()
   console.log(
     JSON.stringify(
-      schijf(aanmeldingen, rest[0], rest[1]).map((a) => ({
+      schijf(aanmeldingen, posities[0], posities[1]).map((a) => ({
         fields: {
           [STAGELOG_VELDEN.Omschrijving]: `${a.velden.Aanmelding}: import → ${a.velden.Stage}`,
           [STAGELOG_VELDEN['Naar stage']]: a.velden.Stage,
@@ -159,6 +231,51 @@ if (commando === 'plan') {
 
 function batches(aantal) {
   return Math.ceil(aantal / PER_BATCH)
+}
+
+/**
+ * De poort voor de batchcommando's: geen groene importcheck, geen records.
+ *
+ * Dit was tot nu toe een afspraak in de documentatie en niet in het gereedschap,
+ * en dat verschil is een keer duur geworden: de route via dit script had
+ * helemaal geen check, terwijl de documentatie er twee voorschreef. Een afspraak
+ * die alleen in een tekst staat, sla je op een drukke dag over.
+ *
+ * --akkoord is de uitweg, en bewust een vlag die je moet typen: dan staat in je
+ * shell-geschiedenis dat iemand het besluit heeft genomen.
+ */
+function poort() {
+  const oordeel = existsSync(OORDEEL) ? JSON.parse(readFileSync(OORDEEL, 'utf8')) : null
+  const afdruk = existsSync(PLAN) ? vingerafdruk(readFileSync(PLAN, 'utf8')) : undefined
+  const uitspraak = poortOordeel(oordeel, { akkoord: AKKOORD, afdruk })
+  if (uitspraak.door) {
+    if (uitspraak.reden === 'akkoord') {
+      console.error('Poort open met --akkoord: de blokkerende punten zijn bewust geaccepteerd.\n')
+    }
+    return
+  }
+
+  if (uitspraak.reden === 'geen-check') {
+    console.error(
+      'Geen importcheck gevonden. Draai eerst:\n' +
+        '  mcp-batches.mjs plan --bestand <csv> --vacature "<titel>"\n' +
+        'Een plan van voor deze versie telt niet: dat is nooit gecontroleerd.',
+    )
+    process.exit(1)
+  }
+  if (uitspraak.reden === 'ander-plan') {
+    console.error(
+      'De importcheck hoort bij een ander plan dan het plan dat nu klaarstaat.\n' +
+        'Draai plan opnieuw, dan controleert hij wat je daadwerkelijk gaat wegschrijven.',
+    )
+    process.exit(1)
+  }
+
+  console.error(`Importcheck blokkeert: ${uitspraak.blokkerend.length} punt(en).\n`)
+  for (const fout of uitspraak.blokkerend.slice(0, 10)) console.error(`  ! ${fout}`)
+  if (uitspraak.blokkerend.length > 10) console.error(`  ... en nog ${uitspraak.blokkerend.length - 10}`)
+  console.error('\nFix het in de bron en draai plan opnieuw, of ga bewust door met --akkoord.')
+  process.exit(1)
 }
 
 function laadPlan() {
