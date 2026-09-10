@@ -185,7 +185,13 @@ export const KOLOM_SYNONIEMEN = {
   __reistijd: ['reistijd', 'reisafstand', 'reistijd minuten'],
   __concurrent: ['concurrent', 'concurrentie'],
   __outreach: ['outreach-concept', 'outreach', 'inmail concept', 'bericht'],
-  __datum: ['datum', 'laatste contact', 'laatst benaderd', 'datum benaderd', 'contactdatum'],
+  // 'datum status' is de kolomnaam uit schema 1.1 en ontbrak hier. Gevolg: de
+  // datum werd nooit gelezen, elke aanmelding kreeg de importdatum als
+  // "Datum in huidige stage" en de servicenormklok begon opnieuw. Bij de
+  // SNA-imports van 10-09 viel dat niet op omdat die rijen de datum leeg
+  // hadden of toevallig op de importdatum stonden; in de sheet stonden 14
+  // rijen op 26-08 die er wel door geraakt zouden zijn.
+  __datum: ['datum status', 'datum', 'laatste contact', 'laatst benaderd', 'datum benaderd', 'contactdatum'],
 }
 
 /**
