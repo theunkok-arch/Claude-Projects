@@ -546,11 +546,17 @@ export default function Maandag() {
         vielen 37 kandidaten uit ronde 1 en 46 uit ronde 3 op dezelfde dag,
         dus met alleen de partijchip stond er één knop voor twee lijsten.
 
-        Alleen zichtbaar bij meer dan één ronde: bij een vacature die pas één
-        search achter de rug heeft valt er niets te kiezen, en dan is de rij
-        een regel die het eerste scherm kost zonder iets toe te voegen.
+        Alleen zichtbaar met één vacature gekozen. Een ronde is genummerd
+        binnen een vacature, dus "Ronde 1" van SNA en "Ronde 1" van Brand
+        Manager zijn verschillende searches met hetzelfde etiket; over alle
+        vacatures heen zou de chip die bij elkaar optellen. Een gekozen
+        opdrachtgever is niet genoeg, want die kan vijf vacatures hebben.
+
+        En pas vanaf twee rondes: bij een vacature die één search achter de rug
+        heeft valt er niets te kiezen, en dan is de rij een regel die het
+        eerste scherm kost zonder iets toe te voegen.
       */}
-      {rondeLijst.length > 1 && (
+      {vacatureFilter !== 'alle' && rondeLijst.length > 1 && (
         <div
           role="group"
           aria-label="Filter op de zoekronde waaruit de kandidaten komen"
