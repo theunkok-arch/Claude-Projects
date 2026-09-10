@@ -1,5 +1,5 @@
 {
-  "versie": "1.1",
+  "versie": "1.2",
   "toelichting": "Vertaling tussen kandidaten.xlsx (schema 1.1) en de Airtable-ATS. Dit bestand is de enige plek waar die vertaling staat. Skills praten nooit rechtstreeks met Airtable; alles loopt via het importscript (nieuwe kandidaten) en het Netlify-eindpunt (gebeurtenissen).",
 
   "ats": {
@@ -83,6 +83,8 @@
       { "bevat": "salesnav", "ats": "LinkedIn Sales Navigator" },
       { "bevat": "sales navigator", "ats": "LinkedIn Sales Navigator" },
       { "bevat": "sales nav", "ats": "LinkedIn Sales Navigator" },
+      { "bevat": "loonsoftware", "ats": "LinkedIn Sales Navigator" },
+      { "bevat": "seu-pdl", "ats": "LinkedIn Sales Navigator" },
       { "bevat": "alumni", "ats": "Alumni-netwerk" },
       { "bevat": "indeed", "ats": "Indeed CV-database" },
       { "bevat": "instagram", "ats": "Instagram" },
