@@ -75,6 +75,17 @@ export const AFVAL_REDENEN = {
     'Elders geaccepteerd',
     'Teruggetrokken tijdens proces',
   ],
+  /*
+    Een derde groep, want de twee hierboven passen niet. Wie hierin valt is
+    niet afgewezen en is niet zelf weggelopen: de search stopte om ons.
+
+    Toegevoegd 10-09-2026. Bij Verhaeg stonden 22 mensen die voor de
+    Tandartsassistent waren benaderd of gescoord sinds 28 augustus stil, terwijl
+    de vacature op 2 september al vervuld was. Zonder deze reden zouden ze
+    terugvallen op "Afgewezen door ons (profielcheck)", en dat is niet waar en
+    zou het afvalrapport voor die klant vervuilen.
+  */
+  'Zoekopdracht gestopt': ['Vacature vervuld', 'Opdracht ingetrokken'],
 }
 
 /**
