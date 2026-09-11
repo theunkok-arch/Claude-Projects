@@ -445,7 +445,7 @@ async function logActiviteit(body) {
   return { activiteit: plat(record), kandidaat }
 }
 
-/** AVG-verwijdering: kandidaat en alles wat aan hem hangt, onherstelbaar. */
+/** Een nieuwe opdrachtgever, met een dubbelcheck op de naam. */
 async function maakOpdrachtgever(body) {
   const fields = pick(body, OPDRACHTGEVER_VELDEN)
   if (!fields.Naam) throw new HttpError(400, 'Naam is verplicht.')
@@ -456,7 +456,7 @@ async function maakOpdrachtgever(body) {
     throw new HttpError(409, `Opdrachtgever "${fields.Naam}" bestaat al.`)
   }
 
-  const [record] = await createRecords(TABLES.opdrachtgevers, [{ fields }])
+  const [record] = await createRecords(TABLES.opdrachtgevers, [fields])
   return { opdrachtgever: plat(record) }
 }
 
@@ -469,7 +469,7 @@ async function maakVacature(body) {
   bewaakSalarisband(fields)
 
   const [record] = await createRecords(TABLES.vacatures, [
-    { fields: { ...fields, Opdrachtgever: [opdrachtgeverId] } },
+    { ...fields, Opdrachtgever: [opdrachtgeverId] },
   ])
   return { vacature: plat(record) }
 }
@@ -481,11 +481,12 @@ async function maakContactpersoon(body) {
   if (!fields.Naam) throw new HttpError(400, 'Naam is verplicht.')
 
   const [record] = await createRecords(TABLES.contactpersonen, [
-    { fields: { ...fields, Opdrachtgever: [opdrachtgeverId] } },
+    { ...fields, Opdrachtgever: [opdrachtgeverId] },
   ])
   return { contactpersoon: plat(record) }
 }
 
+/** AVG-verwijdering: kandidaat en alles wat aan hem hangt, onherstelbaar. */
 async function verwijderKandidaat(kandidaatId) {
   const kandidaat = await getRecord(TABLES.kandidaten, kandidaatId)
   const aanmeldingIds = kandidaat.fields.Aanmeldingen ?? []

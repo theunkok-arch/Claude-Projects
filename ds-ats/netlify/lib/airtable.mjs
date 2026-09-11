@@ -81,7 +81,31 @@ export async function getRecord(table, id) {
   return request('GET', `${encodeURIComponent(table)}/${id}`)
 }
 
+const isObject = (waarde) =>
+  typeof waarde === 'object' && waarde !== null && !Array.isArray(waarde)
+
+/**
+ * Maakt records aan. Geef **losse veldobjecten** mee, geen `{ fields }`: het
+ * verpakken gebeurt hier.
+ *
+ * De grendel hieronder staat er omdat het andersom een keer fout is gegaan en
+ * niemand het zag. Wie hier `[{ fields: {...} }]` binnenbrengt, stuurt Airtable
+ * een record met een veld dat "fields" heet. Airtable kent dat veld niet en
+ * antwoordt met 422, wat verderop een 502 wordt en in het scherm landt als
+ * "Er ging iets mis aan de serverkant." Niets in die keten noemt de echte
+ * oorzaak. Nu faalt het meteen, met de reden erbij.
+ */
 export async function createRecords(table, records) {
+  for (const record of records) {
+    const sleutels = Object.keys(record ?? {})
+    if (sleutels.length === 1 && sleutels[0] === 'fields' && isObject(record.fields)) {
+      throw new HttpError(
+        500,
+        `createRecords(${table}) kreeg een al verpakt record. Geef de velden los mee: createRecords(tabel, [velden]).`,
+      )
+    }
+  }
+
   const created = []
   for (let i = 0; i < records.length; i += 10) {
     const batch = records.slice(i, i + 10).map((fields) => ({ fields }))
