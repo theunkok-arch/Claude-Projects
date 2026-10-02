@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Benjamin deze week</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <header class="top">
+      <h1 id="title">Benjamin deze week</h1>
+      <p id="range" class="range"></p>
+      <nav id="weeks" class="weeks" aria-label="Kies een week"></nav>
+    </header>
+
+    <main>
+      <section class="stage" id="stage">
+        <canvas id="scene"></canvas>
+        <div id="hotspots" class="hotspots"></div>
+        <div id="loading" class="loading" hidden>Laden…</div>
+        <div class="hint" id="hint">Sleep om te draaien, knijp om te zoomen</div>
+        <div id="debug" class="debug" hidden></div>
+        <div id="popup" class="popup" hidden>
+          <button class="close" id="popup-close" aria-label="Sluiten">×</button>
+          <h3 id="popup-title"></h3>
+          <p id="popup-text"></p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="stats">
+          <div><span class="big" id="len"></span><span class="lbl" id="len-lbl">lengte</span></div>
+          <div><span class="big" id="wt"></span><span class="lbl">gewicht</span></div>
+          <div><span class="big" id="today"></span><span class="lbl" id="today-lbl">vandaag</span></div>
+        </div>
+        <p class="fruit" id="fruit"></p>
+
+        <h2>Wat er deze week gebeurt</h2>
+        <ul id="baby" class="list"></ul>
+
+        <h2>Tik op een plekje</h2>
+        <div id="chips" class="chips"></div>
+
+        <h2>Bij mama</h2>
+        <ul id="mama" class="list"></ul>
+
+        <p class="note">Gemiddelden ter inspiratie, geen medisch advies. Elk kind groeit in zijn eigen tempo.</p>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
