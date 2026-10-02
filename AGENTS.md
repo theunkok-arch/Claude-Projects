@@ -12,6 +12,7 @@
 |---|---|---|
 | **`eigen-poc/`** | EIGEN — AI real-estate PoC (React 19 + Vite 8 + Tailwind v4, SPA) | **Netlify** → https://eigenpoc.netlify.app, branch `main`, config in root `netlify.toml` (`base = "eigen-poc"`) |
 | **`ds-ats/`** | Do Solutions ATS — recruitment-pipeline op Airtable (React 19 + Vite 8 + Tailwind v4 + TS, Netlify Functions) | **Netlify** → https://dosolats.netlify.app, eigen site met base directory `ds-ats`, config in `ds-ats/netlify.toml`, branch `main` |
+| **`zwangerschap/`** | "Benjamin deze week": privé 3D-zwangerschapsvolger (Vite + Three.js, geen backend) | **Netlify**, derde site met base directory `zwangerschap`, config in `zwangerschap/netlify.toml`, branch `main` |
 | **Root `index.html` / `app.js` / ...** | Losse "BTC EMA26 Alerts" PWA | **GitHub Pages** via `.github/workflows/deploy.yml`, branch `claude/bitcoin-ema-alerts-b9BPw` |
 
 **De root `netlify.toml` bouwt alleen `eigen-poc/`.** De ATS is een *tweede*
