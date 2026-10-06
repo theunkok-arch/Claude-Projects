@@ -27,10 +27,17 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      # Publiceer alleen de app, niet de hele repo: de losse documenten in
+      # de root horen niet op een website te staan.
+      - name: Collect site files
+        run: |
+          mkdir -p _site
+          cp index.html manifest.json sw.js icon-180.png icon-512.png _site/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment

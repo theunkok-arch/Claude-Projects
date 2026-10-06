@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -8,18 +8,178 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>BTC EMA26 Alerts</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #d29922;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+#app { max-width: 480px; margin: 0 auto; padding: 16px 16px 96px; }
+
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0;
+}
+header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+.accent { color: var(--accent); }
+
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+.status-dot.connected { background: var(--green); box-shadow: 0 0 8px rgba(63,185,80,.5); }
+.status-dot.trying { background: var(--orange); }
+
+/* Source row */
+#source-row {
+  font-size: .7rem; color: var(--text-dim);
+  padding: 2px 0 10px; display: flex; align-items: center; gap: 6px;
+}
+#source-row .ok { color: var(--green); font-weight: 600; }
+
+/* Diagnostics panel */
+#diag {
+  display: none;
+  background: var(--surface); border: 1px solid var(--red);
+  border-radius: 12px; padding: 14px; margin: 4px 0 12px;
+}
+#diag h2 {
+  font-size: .8rem; color: var(--red); text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: 8px;
+}
+#diag p { font-size: .8rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 10px; }
+#diag ul { list-style: none; font-size: .75rem; }
+#diag li {
+  display: flex; gap: 8px; padding: 5px 0;
+  border-top: 1px solid var(--border); font-variant-numeric: tabular-nums;
+}
+#diag li:first-child { border-top: none; }
+#diag .src { font-weight: 600; min-width: 74px; }
+#diag .why { color: var(--text-dim); }
+
+#price-banner {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px; text-align: center; margin: 4px 0 12px;
+}
+.current-price .label {
+  display: block; font-size: .75rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px;
+}
+.current-price .price {
+  font-size: 2rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+
+.timeframe-cards { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden; transition: border-color .3s;
+}
+.card.bullish { border-color: var(--green); }
+.card.bearish { border-color: var(--red); }
+
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.tf-badge {
+  background: var(--accent); color: #000; font-size: .7rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 4px; letter-spacing: .05em;
+}
+.signal { font-size: .85rem; font-weight: 600; padding: 3px 10px; border-radius: 4px; }
+.signal.above { color: var(--green); background: rgba(63,185,80,.12); }
+.signal.below { color: var(--red); background: rgba(248,81,73,.12); }
+
+.card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px; }
+.metric .label {
+  display: block; font-size: .65rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px;
+}
+.metric .value { font-size: .95rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.metric .value.positive { color: var(--green); }
+.metric .value.negative { color: var(--red); }
+
+canvas { width: 100%; display: block; padding: 8px 12px 12px; }
+
+#alert-log { margin: 16px 0; }
+#alert-log h2 {
+  font-size: .85rem; color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: 8px;
+}
+.empty-state { color: var(--text-dim); font-size: .85rem; text-align: center; padding: 16px; }
+
+.alert-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 6px; font-size: .85rem;
+  animation: slideIn .3s ease;
+}
+@keyframes slideIn { from { opacity:0; transform: translateY(-8px); } to { opacity:1; transform:none; } }
+.alert-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.alert-item .dot.green { background: var(--green); }
+.alert-item .dot.red { background: var(--red); }
+.alert-item .time { color: var(--text-dim); font-size: .75rem; margin-left: auto; white-space: nowrap; }
+
+footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--bg); border-top: 1px solid var(--border);
+  padding: 12px 16px; display: flex; align-items: center; gap: 8px; z-index: 10;
+}
+.btn {
+  background: var(--accent); color: #000; border: none; padding: 8px 14px;
+  border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.btn:active { opacity: .8; }
+.btn.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn.enabled { background: var(--green); }
+.meta { font-size: .7rem; color: var(--text-dim); margin-left: auto; text-align: right; }
+
+@keyframes flashGreen { 0% { color: var(--green); } 100% { color: var(--text); } }
+@keyframes flashRed   { 0% { color: var(--red);   } 100% { color: var(--text); } }
+.flash-up { animation: flashGreen 1s ease; }
+.flash-down { animation: flashRed 1s ease; }
+
+@media (max-width: 380px) {
+  .current-price .price { font-size: 1.6rem; }
+  .card-body { gap: 4px; padding: 10px 12px; }
+}
+  </style>
 </head>
 <body>
   <div id="app">
     <header>
       <h1>BTC Futures <span class="accent">EMA26</span></h1>
-      <div id="connection-status" class="status-dot connected" title="Connected"></div>
+      <div id="connection-status" class="status-dot trying" title="Verbinden..."></div>
     </header>
+
+    <div id="source-row">Bron: <span id="source-name">zoeken…</span></div>
+
+    <section id="diag">
+      <h2>Geen marktdata</h2>
+      <p id="diag-intro"></p>
+      <ul id="diag-list"></ul>
+    </section>
 
     <section id="price-banner">
       <div class="current-price">
-        <span class="label">BTCUSDT Perp</span>
+        <span class="label">BTC/USDT Perp</span>
         <span id="live-price" class="price">--</span>
       </div>
     </section>
@@ -31,22 +191,10 @@
           <span id="signal-4h" class="signal">--</span>
         </div>
         <div class="card-body">
-          <div class="metric">
-            <span class="label">Close</span>
-            <span id="close-4h" class="value">--</span>
-          </div>
-          <div class="metric">
-            <span class="label">EMA26</span>
-            <span id="ema-4h" class="value">--</span>
-          </div>
-          <div class="metric">
-            <span class="label">Diff</span>
-            <span id="diff-4h" class="value">--</span>
-          </div>
-          <div class="metric">
-            <span class="label">Last Cross</span>
-            <span id="cross-4h" class="value">--</span>
-          </div>
+          <div class="metric"><span class="label">Close</span><span id="close-4h" class="value">--</span></div>
+          <div class="metric"><span class="label">EMA26</span><span id="ema-4h" class="value">--</span></div>
+          <div class="metric"><span class="label">Verschil</span><span id="diff-4h" class="value">--</span></div>
+          <div class="metric"><span class="label">Laatste cross</span><span id="cross-4h" class="value">--</span></div>
         </div>
         <canvas id="chart-4h" height="120"></canvas>
       </div>
@@ -57,45 +205,426 @@
           <span id="signal-1d" class="signal">--</span>
         </div>
         <div class="card-body">
-          <div class="metric">
-            <span class="label">Close</span>
-            <span id="close-1d" class="value">--</span>
-          </div>
-          <div class="metric">
-            <span class="label">EMA26</span>
-            <span id="ema-1d" class="value">--</span>
-          </div>
-          <div class="metric">
-            <span class="label">Diff</span>
-            <span id="diff-1d" class="value">--</span>
-          </div>
-          <div class="metric">
-            <span class="label">Last Cross</span>
-            <span id="cross-1d" class="value">--</span>
-          </div>
+          <div class="metric"><span class="label">Close</span><span id="close-1d" class="value">--</span></div>
+          <div class="metric"><span class="label">EMA26</span><span id="ema-1d" class="value">--</span></div>
+          <div class="metric"><span class="label">Verschil</span><span id="diff-1d" class="value">--</span></div>
+          <div class="metric"><span class="label">Laatste cross</span><span id="cross-1d" class="value">--</span></div>
         </div>
         <canvas id="chart-1d" height="120"></canvas>
       </div>
     </section>
 
     <section id="alert-log">
-      <h2>Alert History</h2>
-      <div id="alerts-list">
-        <p class="empty-state">No alerts yet. Monitoring...</p>
-      </div>
+      <h2>Meldingen</h2>
+      <div id="alerts-list"><p class="empty-state">Nog geen meldingen.</p></div>
     </section>
 
     <footer>
-      <button id="btn-notify" class="btn">Enable Notifications</button>
-      <button id="btn-sound" class="btn btn-secondary">Sound: ON</button>
+      <button id="btn-notify" class="btn">Meldingen aan</button>
+      <button id="btn-sound" class="btn btn-secondary">Geluid: AAN</button>
       <span id="last-update" class="meta">--</span>
     </footer>
   </div>
 
-  <audio id="alert-sound" preload="auto">
-    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2LkY2Ff3d3goqRjomDfXd5gYmOjYmEfnl5f4aMjYqGgHt5fIKIjIuIhH97eX2DiIyLiIR/e3l9g4iMi4iEf3t5fYOIi4uHg398en6EiYuKhoJ+enp/hYqLiYWBfXp7gIaKi4iFgX16e4GHiouIhIB8enuBh4qKiISAfHp8goiKioeDf3t6fIKIioqHg397enyDiIqKh4N/e3t8g4iKiYeDf3t7fIOIiomHg397e3yDiIqJh4N/e3t8g4iKiYeDf3t7fYSJiomGgn57e32EiYqJhoJ+e3t9hImKiYaCfnt7fYSJiomGgn57e32EiYqJhoJ+e3t9hImJiYaCfnt8fYSJiYmFgX57fH2FiYmJhYF+e3x+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWJiYiFgX58fH6FiYmIhYF+fHx+hYmJiIWBfnx8foWIiYiFgX58fH6FiImIhYF+fHx+hYiJiIWBfnx8foWIiYiFgX5+fH6FiImIhYF+fHx+hYiJiIWBfn58foWIiYiFgX5+fH6FiImIhYF+fnx+hYiJiIWBfn58foWIiYiFgX5+fH6FiImIhYF+fn5+hYiJiIWBfn5+foWIiYiFgX5+fn6FiIiIhYF+fn5+hYiIiIWBfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+fn+FiIiIhYJ+fn5+f4WIiIiFgn5+fn5/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIiFgn5+foB/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIiFgn5+foB/hYiIiIWCfn5+gH+FiIiIhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WIiIeFgn5+foB/hYiIh4WCfn5+gH+FiIiHhYJ+fn6Af4WHiIeFgn5+foB/hYeIh4WCfn5+gH+Fh4iHhYJ+fn6Af4WHiIeFgn5+foCAhYeIh4WCfn5+gICFh4iHhYJ+fn6AgIWHiIeFgn5+foCAhYeHh4WCfn5+gICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn5+gICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn6AgICFh4eHhYJ+fn6AgIWHh4eFgn5+gICAhYeHh4WCfn6AgICFh4eHhYJ+gICAf4WHh4eFgn5+gICAf4WHh4eFgn6AgIB/hYeHh4WCfn6AgIB/hYeHh4WCfoCAf3+Fh4eHhYJ+gICAf4WHh4eFgn6AgH9/hYeHh4WCfoCAf3+Fh4eHhYKAfoB/f4WHh4eHgoB+gH9/hYeHh4eCgH6Af3+Fh4eHh4KAfn9/f4WHh4eHgoB+f39/hYeHh4eCgH5/f3+Fh4eHh4KAfn9/f4WHh4eHgoB+f39/hYeHh4eCgH5/f3+Fh4eHh4KAfn9/f4WHh4eHgoB+f3+AhYeHh4eCgH5/f4CFh4eHh4KAfn9/gIWHh4eHgoB+f3+AhYeHh4eCgH5/f4CFh4eHh4KAfn9/gIWHh4eHgoB+f3+AhYeHh4eCgIB/f4CFh4eHh4KAgH9/gIWHh4eHgoCAgH9/hYeHh4eCgICAf3+Fh4eHh4KAgIB/f4WHh4eHgoCAgH9/hYeHh4eCgICAf3+Fh4eHh4KAgIB/gIWHh4eHgoCAgH+AhYeHh4eCgICAf4CFh4eHh4KAgIB/gIWHh4eHgoCAgH+AhYeHh4eCgICAf4CFh4eHh4KAgIB/gA==" type="audio/wav">
-  </audio>
+  <script>
+/* ────────────────────────────────────────────────────────────────────
+   Marktdata-bronnen, in volgorde van voorkeur.
 
-  <script src="app.js"></script>
+   BloFin staat eerst omdat daar ook gehandeld gaat worden: dan zie je
+   dezelfde prijzen en dezelfde EMA als de bot.
+
+   Binance staat expliciet laatst: die geeft HTTP 451 vanuit Nederland
+   sinds het vertrek uit de Nederlandse markt in 2023.
+
+   LET OP: geen van deze endpoints is vanuit de bouwomgeving te testen —
+   alle crypto-hosts zijn daar geblokkeerd. Welke bron werkt, bepaalt
+   deze pagina zelf; faalt alles, dan staat per bron de reden in beeld.
+   ──────────────────────────────────────────────────────────────────── */
+
+const EMA_PERIOD = 26;
+
+const SOURCES = [
+  {
+    name: 'BloFin',
+    bars: { '4h': '4H', '1d': '1D' },
+    url: (bar) => `https://openapi.blofin.com/api/v1/market/candles?instId=BTC-USDT&bar=${bar}&limit=100`,
+    parse: (j) => okxShape(j),
+  },
+  {
+    name: 'Bybit',
+    bars: { '4h': '240', '1d': 'D' },
+    url: (bar) => `https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=${bar}&limit=100`,
+    parse: (j) => {
+      const rows = j && j.result && j.result.list;
+      if (!Array.isArray(rows) || !rows.length) throw new Error('onverwachte vorm');
+      return rows.map(r => ({
+        time: +r[0], open: +r[1], high: +r[2], low: +r[3], close: +r[4], closed: null,
+      })).reverse();
+    },
+  },
+  {
+    name: 'OKX',
+    bars: { '4h': '4H', '1d': '1D' },
+    url: (bar) => `https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=${bar}&limit=100`,
+    parse: (j) => okxShape(j),
+  },
+  {
+    name: 'Binance',
+    bars: { '4h': '4h', '1d': '1d' },
+    url: (bar) => `https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${bar}&limit=100`,
+    parse: (j) => {
+      if (!Array.isArray(j) || !j.length) throw new Error('onverwachte vorm');
+      return j.map(c => ({
+        time: +c[0], open: +c[1], high: +c[2], low: +c[3], close: +c[4],
+        closed: +c[6] < Date.now(),
+      }));
+    },
+  },
+];
+
+/* OKX en BloFin delen hetzelfde antwoordformaat: nieuwste candle eerst,
+   en een laatste veld `confirm` dat "1" is als de candle afgesloten is. */
+function okxShape(j) {
+  const rows = j && j.data;
+  if (!Array.isArray(rows) || !rows.length) throw new Error('onverwachte vorm');
+  return rows.map(r => ({
+    time: +r[0], open: +r[1], high: +r[2], low: +r[3], close: +r[4],
+    closed: r.length > 8 ? r[8] === '1' : null,
+  })).reverse();
+}
+
+const TIMEFRAMES = ['4h', '1d'];
+const POLL_MS = 30000;
+
+const state = {
+  source: null,
+  notificationsEnabled: false,
+  soundEnabled: true,
+  lastSignal: { '4h': null, '1d': null },
+  alerts: readAlerts(),
+  previousPrice: null,
+};
+
+const $ = (s) => document.querySelector(s);
+
+/* ── EMA met SMA-seeding, zoals TradingView's ta.ema ─────────────── */
+function ema(values, period) {
+  if (values.length < period) throw new Error(`minstens ${period} candles nodig`);
+  const k = 2 / (period + 1);
+  const out = new Array(period - 1).fill(null);
+  let prev = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  out.push(prev);
+  for (let i = period; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    out.push(prev);
+  }
+  return out;
+}
+
+/* ── Ophalen met bron-fallback ───────────────────────────────────── */
+async function fetchFrom(source, tf) {
+  const res = await fetch(source.url(source.bars[tf]), { cache: 'no-store' });
+  if (!res.ok) {
+    const e = new Error(res.status === 451
+      ? 'HTTP 451 — geblokkeerd in deze regio'
+      : `HTTP ${res.status}`);
+    e.soft = true;
+    throw e;
+  }
+  return source.parse(await res.json());
+}
+
+/* Probeert elke bron tot er één werkt. Geeft {source, data} of gooit
+   een fout met per bron de reden erin. */
+async function fetchAny() {
+  const failures = [];
+  const ordered = state.source
+    ? [state.source, ...SOURCES.filter(s => s !== state.source)]
+    : SOURCES;
+
+  for (const source of ordered) {
+    try {
+      const data = {};
+      for (const tf of TIMEFRAMES) data[tf] = await fetchFrom(source, tf);
+      return { source, data };
+    } catch (err) {
+      failures.push({
+        name: source.name,
+        why: err.soft ? err.message
+          : (err instanceof TypeError
+            ? 'geblokkeerd door browser (CORS of netwerk)'
+            : err.message),
+      });
+    }
+  }
+  const e = new Error('alle bronnen faalden');
+  e.failures = failures;
+  throw e;
+}
+
+/* ── Formatteren ─────────────────────────────────────────────────── */
+const fmt = (n) => n.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDiff = (n) => (n >= 0 ? '+' : '') + fmt(n);
+const fmtPct = (n) => (n >= 0 ? '+' : '') + n.toFixed(2).replace('.', ',') + '%';
+const fmtTime = (ts) => new Date(ts).toLocaleString('nl-NL',
+  { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const nowStr = () => new Date().toLocaleTimeString('nl-NL',
+  { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+/* ── Chart ───────────────────────────────────────────────────────── */
+function drawChart(canvasId, candles, emaValues) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const n = Math.min(40, candles.length);
+  const c = candles.slice(-n);
+  const e = emaValues.slice(-n).filter(v => v !== null);
+
+  const vals = c.flatMap(x => [x.high, x.low]).concat(e);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max - min) || 1;
+  const yOf = (v) => H - ((v - min) / range) * (H - 8) - 4;
+  const gap = W / n;
+  const barW = Math.max(1, gap * 0.6);
+
+  c.forEach((candle, i) => {
+    const x = i * gap + gap / 2;
+    const up = candle.close >= candle.open;
+    ctx.strokeStyle = ctx.fillStyle = up ? '#3fb950' : '#f85149';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, yOf(candle.high));
+    ctx.lineTo(x, yOf(candle.low));
+    ctx.stroke();
+    const top = yOf(Math.max(candle.open, candle.close));
+    const bot = yOf(Math.min(candle.open, candle.close));
+    ctx.fillRect(x - barW / 2, top, barW, Math.max(1, bot - top));
+  });
+
+  const offset = n - e.length;
+  ctx.beginPath();
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 1.5;
+  e.forEach((v, i) => {
+    const x = (i + offset) * gap + gap / 2;
+    const y = yOf(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+/* ── Meldingen ───────────────────────────────────────────────────── */
+function readAlerts() {
+  try { return JSON.parse(localStorage.getItem('ema26_alerts') || '[]'); }
+  catch { return []; }
+}
+function saveAlerts() {
+  try { localStorage.setItem('ema26_alerts', JSON.stringify(state.alerts)); } catch {}
+}
+
+function notify(title, body) {
+  state.alerts.unshift({
+    text: body, time: Date.now(),
+    type: body.includes('BOVEN') ? 'green' : 'red',
+  });
+  state.alerts = state.alerts.slice(0, 50);
+  saveAlerts();
+  renderAlerts();
+
+  if (state.soundEnabled) beep();
+  if (state.notificationsEnabled && Notification.permission === 'granted') {
+    new Notification(title, { body, tag: title });
+  }
+}
+
+function beep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(); osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+function renderAlerts() {
+  const el = $('#alerts-list');
+  if (!state.alerts.length) {
+    el.innerHTML = '<p class="empty-state">Nog geen meldingen.</p>';
+    return;
+  }
+  el.textContent = '';
+  for (const a of state.alerts) {
+    const row = document.createElement('div');
+    row.className = 'alert-item';
+    const dot = document.createElement('span');
+    dot.className = 'dot ' + a.type;
+    const txt = document.createElement('span');
+    txt.textContent = a.text;
+    const t = document.createElement('span');
+    t.className = 'time';
+    t.textContent = fmtTime(a.time);
+    row.append(dot, txt, t);
+    el.append(row);
+  }
+}
+
+/* ── Eén timeframe bijwerken ─────────────────────────────────────── */
+function renderTimeframe(tf, candles) {
+  /* Het signaal komt van de laatste AFGESLOTEN candle, niet van de candle
+     die nu nog loopt. Anders verspringt het signaal gedurende de candle en
+     wijkt het af van wat de bot ziet. */
+  let closed = candles.filter(c => c.closed !== false);
+  if (closed.length === candles.length && candles.length > 1) closed = candles.slice(0, -1);
+  if (closed.length < EMA_PERIOD) return;
+
+  const emaValues = ema(closed.map(c => c.close), EMA_PERIOD);
+  const last = closed[closed.length - 1];
+  const emaNow = emaValues[emaValues.length - 1];
+  const diff = last.close - emaNow;
+  const isAbove = last.close > emaNow;
+
+  $(`#close-${tf}`).textContent = fmt(last.close);
+  $(`#ema-${tf}`).textContent = fmt(emaNow);
+
+  const diffEl = $(`#diff-${tf}`);
+  diffEl.textContent = `${fmtDiff(diff)} (${fmtPct(diff / emaNow * 100)})`;
+  diffEl.className = 'value ' + (diff >= 0 ? 'positive' : 'negative');
+
+  const sigEl = $(`#signal-${tf}`);
+  sigEl.textContent = isAbove ? 'BOVEN EMA26' : 'ONDER EMA26';
+  sigEl.className = 'signal ' + (isAbove ? 'above' : 'below');
+  $(`#card-${tf}`).className = 'card ' + (isAbove ? 'bullish' : 'bearish');
+
+  let crossIdx = -1;
+  for (let i = emaValues.length - 1; i >= 1; i--) {
+    if (emaValues[i] === null || emaValues[i - 1] === null) break;
+    const a = closed[i - 1].close > emaValues[i - 1];
+    const b = closed[i].close > emaValues[i];
+    if (a !== b) { crossIdx = i; break; }
+  }
+  $(`#cross-${tf}`).textContent = crossIdx >= 0 ? fmtTime(closed[crossIdx].time) : '--';
+
+  const side = isAbove ? 'above' : 'below';
+  const prev = state.lastSignal[tf];
+  if (prev !== null && prev !== side) {
+    notify(`BTC ${tf.toUpperCase()} EMA26`,
+      `[${tf.toUpperCase()}] BTC sloot ${isAbove ? 'BOVEN' : 'ONDER'} EMA26 op $${fmt(last.close)}`);
+  }
+  state.lastSignal[tf] = side;
+
+  drawChart(`chart-${tf}`, closed, emaValues);
+}
+
+/* ── Hoofdlus ────────────────────────────────────────────────────── */
+function showDiagnostics(failures) {
+  $('#diag').style.display = 'block';
+  $('#source-name').textContent = 'geen';
+  $('#connection-status').className = 'status-dot';
+
+  const binance = failures.find(f => f.name === 'Binance');
+  $('#diag-intro').textContent = binance && binance.why.includes('451')
+    ? 'Binance weigert verzoeken uit Nederland (HTTP 451) sinds het vertrek uit de Nederlandse markt in 2023. De andere bronnen reageerden ook niet — hieronder staat waarom per bron.'
+    : 'Geen van de bronnen gaf data terug. Per bron de reden:';
+
+  const list = $('#diag-list');
+  list.textContent = '';
+  for (const f of failures) {
+    const li = document.createElement('li');
+    const s = document.createElement('span');
+    s.className = 'src';
+    s.textContent = f.name;
+    const w = document.createElement('span');
+    w.className = 'why';
+    w.textContent = f.why;
+    li.append(s, w);
+    list.append(li);
+  }
+}
+
+async function tick() {
+  try {
+    const { source, data } = await fetchAny();
+    state.source = source;
+
+    $('#diag').style.display = 'none';
+    $('#source-name').innerHTML = `<span class="ok">${source.name}</span>`;
+    $('#connection-status').className = 'status-dot connected';
+
+    /* De nog lopende candle geeft de actuele prijs. */
+    const newest = data['4h'][data['4h'].length - 1];
+    const price = newest.close;
+    const el = $('#live-price');
+    el.textContent = '$' + fmt(price);
+    if (state.previousPrice !== null && price !== state.previousPrice) {
+      el.classList.remove('flash-up', 'flash-down');
+      void el.offsetWidth;
+      el.classList.add(price > state.previousPrice ? 'flash-up' : 'flash-down');
+    }
+    state.previousPrice = price;
+
+    for (const tf of TIMEFRAMES) renderTimeframe(tf, data[tf]);
+    $('#last-update').textContent = 'Bijgewerkt ' + nowStr();
+  } catch (err) {
+    if (err.failures) showDiagnostics(err.failures);
+    else console.error(err);
+  }
+}
+
+/* ── Start ───────────────────────────────────────────────────────── */
+function syncNotifyBtn() {
+  const on = 'Notification' in window && Notification.permission === 'granted';
+  state.notificationsEnabled = on;
+  $('#btn-notify').textContent = on ? 'Meldingen AAN' : 'Meldingen aan';
+  $('#btn-notify').classList.toggle('enabled', on);
+}
+
+renderAlerts();
+syncNotifyBtn();
+
+$('#btn-notify').addEventListener('click', async () => {
+  if (!('Notification' in window)) {
+    alert('Deze browser ondersteunt geen meldingen.');
+    return;
+  }
+  await Notification.requestPermission();
+  syncNotifyBtn();
+});
+
+$('#btn-sound').addEventListener('click', () => {
+  state.soundEnabled = !state.soundEnabled;
+  const b = $('#btn-sound');
+  b.textContent = 'Geluid: ' + (state.soundEnabled ? 'AAN' : 'UIT');
+  b.classList.toggle('enabled', state.soundEnabled);
+});
+
+window.addEventListener('resize', () => {
+  if (state.source) tick();
+});
+
+tick();
+setInterval(tick, POLL_MS);
+
+/* Service worker: maakt de app installeerbaar op je beginscherm.
+   Alleen de app-shell wordt gecached; marktdata gaat altijd live. */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+  </script>
 </body>
 </html>
