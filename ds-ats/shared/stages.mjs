@@ -123,6 +123,35 @@ export function isActief(stage) {
   return Boolean(stage) && stage !== 'Afgevallen' && stage !== 'Ingewerkt'
 }
 
+/**
+ * Stages die in de data staan maar hier niet, met hoeveel aanmeldingen erop.
+ *
+ * Dit bestand is de enige bron voor stages, maar de base kan er toch eentje bij
+ * krijgen: `typecast` maakt een ontbrekende keuzeoptie aan, en wie records
+ * rechtstreeks in Airtable zet komt niet langs de controle in ats.mjs. Beide
+ * schrijfroutes van de app weigeren een onbekende stage, dus zoiets komt altijd
+ * van buiten de app.
+ *
+ * Zonder deze functie verdwijnen die aanmeldingen stil: ze tellen als actief,
+ * maar ze krijgen geen tegel, staan in geen enkele stagegroep, halen de funnel
+ * niet en kennen geen servicenorm. Actief, onzichtbaar, en zonder klok. Op
+ * 12-10-2026 stonden er zo zeven op "Nieuw" bij Interne Accountmanager, ruim
+ * twee weken lang.
+ *
+ * Afgevallen hoort er niet bij: die staat wel in STAGE_IDS, alleen niet in de
+ * trechter.
+ */
+export function onbekendeStages(stages) {
+  const telling = new Map()
+  for (const stage of stages ?? []) {
+    if (!stage || STAGE_IDS.includes(stage)) continue
+    telling.set(stage, (telling.get(stage) ?? 0) + 1)
+  }
+  return [...telling]
+    .map(([stage, aantal]) => ({ stage, aantal }))
+    .sort((a, b) => b.aantal - a.aantal || a.stage.localeCompare(b.stage, 'nl'))
+}
+
 /** Werkdagen tussen twee ISO-datums, zaterdag en zondag niet meegeteld. */
 export function werkdagenTussen(vanISO, totISO) {
   if (!vanISO) return null

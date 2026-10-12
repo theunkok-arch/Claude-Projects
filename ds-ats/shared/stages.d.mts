@@ -40,6 +40,9 @@ export declare function stageIndex(stage: string | null | undefined): number
 export declare function stageConfig(stage: string | null | undefined): StageConfig | undefined
 export declare function isKlantZichtbaar(stage: string | null | undefined): boolean
 export declare function isActief(stage: string | null | undefined): boolean
+export declare function onbekendeStages(
+  stages: ReadonlyArray<string | null | undefined> | null | undefined,
+): Array<{ stage: string; aantal: number }>
 export declare function werkdagenTussen(vanISO: string | null | undefined, totISO: string): number | null
 export declare function dagenTussen(vanISO: string | null | undefined, totISO: string): number | null
 export declare function normOverschreden(
