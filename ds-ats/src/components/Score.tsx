@@ -1,16 +1,42 @@
 import { SCORE_BANDEN, scoreBand, scoreRegels } from '../../shared/score.mjs'
 
 /**
+ * Vertalingen van de bandnamen plus "nog niet gescoord".
+ *
+ * Standaard Nederlands, zoals in shared/score.mjs. Het klantportaal geeft hier
+ * het Engels mee; de banden zelf en hun grenzen blijven één bron.
+ */
+export interface ScoreTeksten {
+  legenda: string
+  nogNiet: string
+  banden: Record<string, string>
+}
+
+const NEDERLANDS: ScoreTeksten = {
+  legenda: 'Wat de score betekent',
+  nogNiet: 'Nog niet gescoord',
+  banden: Object.fromEntries(SCORE_BANDEN.map((b) => [b.id, b.label])),
+}
+
+/**
  * De totaalscore als cijfer plus de betekenis ervan.
  *
  * Het cijfer alleen zegt een opdrachtgever niets: is 67 goed? Daarom staat de
  * bandnaam er altijd naast, en nooit alleen de kleur. Wie kleuren niet
  * onderscheidt leest hetzelfde verhaal.
  */
-export function ScoreBadge({ score, groot = false }: { score?: number | null; groot?: boolean }) {
+export function ScoreBadge({
+  score,
+  groot = false,
+  teksten = NEDERLANDS,
+}: {
+  score?: number | null
+  groot?: boolean
+  teksten?: ScoreTeksten
+}) {
   const band = scoreBand(score ?? null)
   if (!band) {
-    return <span className="text-sm text-navy-400">Nog niet gescoord</span>
+    return <span className="text-sm text-navy-400">{teksten.nogNiet}</span>
   }
 
   return (
@@ -19,7 +45,9 @@ export function ScoreBadge({ score, groot = false }: { score?: number | null; gr
       style={{ backgroundColor: band.tint, color: band.kleur }}
     >
       <span className={`font-semibold tabular-nums ${groot ? 'text-2xl' : 'text-base'}`}>{score}</span>
-      <span className={groot ? 'text-sm font-medium' : 'text-xs font-medium'}>{band.label}</span>
+      <span className={groot ? 'text-sm font-medium' : 'text-xs font-medium'}>
+        {teksten.banden[band.id] ?? band.label}
+      </span>
     </span>
   )
 }
@@ -28,10 +56,10 @@ export function ScoreBadge({ score, groot = false }: { score?: number | null; gr
  * Wat de cijfers betekenen. Staat altijd op het scherm, ook als er maar een
  * kandidaat is: de opdrachtgever leest dit scherm zonder ons erbij.
  */
-export function ScoreLegenda() {
+export function ScoreLegenda({ teksten = NEDERLANDS }: { teksten?: ScoreTeksten }) {
   return (
     <div className="rounded-xl border border-lijn bg-white p-3">
-      <p className="mb-2 text-xs font-medium text-navy-400">Wat de score betekent</p>
+      <p className="mb-2 text-xs font-medium text-navy-400">{teksten.legenda}</p>
       <ul className="flex flex-wrap gap-x-3 gap-y-1.5">
         {SCORE_BANDEN.map((band, i) => {
           const boven = SCORE_BANDEN[i - 1]
@@ -49,7 +77,7 @@ export function ScoreLegenda() {
               />
               <span className="tabular-nums text-navy-400">{bereik}</span>
               <span style={{ color: band.kleur }} className="font-medium">
-                {band.label}
+                {teksten.banden[band.id] ?? band.label}
               </span>
             </li>
           )

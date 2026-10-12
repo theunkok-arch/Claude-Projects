@@ -54,8 +54,25 @@ export interface KlantOverzicht {
   vacatures: KlantVacature[]
 }
 
+/**
+ * Een fout van het portaal, met de code die de server meestuurde.
+ *
+ * De `message` blijft de Nederlandse zin van de server, als laatste terugval.
+ * Het portaal vertaalt op `code`, nooit op de zin: daar ging het eerder mis.
+ */
+export class PortaalFout extends Error {
+  code?: string
+  vars?: Record<string, unknown>
+
+  constructor(bericht: string, code?: string, vars?: Record<string, unknown>) {
+    super(bericht)
+    this.code = code
+    this.vars = vars
+  }
+}
+
 /** Een 401 of 403. De aanroeper valt hierop terug op het inlogscherm. */
-export class GeenToegang extends Error {}
+export class GeenToegang extends PortaalFout {}
 
 async function vraag<T>(pad: string, init: RequestInit = {}): Promise<T> {
   let res: Response
@@ -66,14 +83,19 @@ async function vraag<T>(pad: string, init: RequestInit = {}): Promise<T> {
     })
   } catch {
     // Zonder verbinding gooit fetch een Engelse TypeError ("Failed to fetch").
-    throw new Error('Geen verbinding. Controleer je internet en probeer het opnieuw.')
+    throw new PortaalFout(
+      'Geen verbinding. Controleer je internet en probeer het opnieuw.',
+      'geenVerbinding',
+    )
   }
 
   const tekst = await res.text()
   const data = tekst ? JSON.parse(tekst) : {}
 
-  if (res.status === 401 || res.status === 403) throw new GeenToegang(data.error ?? 'Geen toegang.')
-  if (!res.ok) throw new Error(data.error ?? 'Er ging iets mis.')
+  if (res.status === 401 || res.status === 403) {
+    throw new GeenToegang(data.error ?? 'Geen toegang.', data.code ?? 'geenToegang', data.vars)
+  }
+  if (!res.ok) throw new PortaalFout(data.error ?? 'Er ging iets mis.', data.code, data.vars)
   return data as T
 }
 
