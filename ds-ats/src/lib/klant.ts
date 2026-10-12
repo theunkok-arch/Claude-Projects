@@ -40,6 +40,8 @@ export interface KlantVacature {
   startdatum: string | null
   streefdatumShortlist: string | null
   totaal: number
+  /** Kandidaten die onder de scoredrempel bleven. Alleen als aantal, niet als regel. */
+  onderDrempel: number
   funnel: KlantFunnelTrede[]
   afgevallen: Array<{ reden: string; aantal: number }>
   kandidaten: KlantKandidaat[]

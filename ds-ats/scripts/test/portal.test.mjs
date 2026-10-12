@@ -56,6 +56,10 @@ const aanmeldingen = [
   { id: 'recA3', fields: { Vacature: ['recVacFT'], Kandidaat: ['recK3'], Stage: 'Afgevallen', 'Reden afvallen': 'Salariswens te hoog', 'Score totaal': 64 } },
   { id: 'recA4', fields: { Vacature: ['recVacFT'], Kandidaat: ['recK2'], Stage: 'Afgevallen', 'Reden afvallen': 'Salariswens te hoog' } },
   { id: 'recA5', fields: { Vacature: ['recVacSNA'], Kandidaat: ['recK3'], Stage: 'Voorgesteld', 'Zichtbaar voor klant': true } },
+  // Onder de drempel: mag alleen als aantal terugkomen, nooit als regel.
+  { id: 'recA6', fields: { Vacature: ['recVacFT'], Kandidaat: ['recK3'], Stage: 'Gescoord', 'Score totaal': 35, 'Datum in huidige stage': '2026-08-26' } },
+  // Onder de drempel maar bewust voorgedragen: die wint het van het cijfer.
+  { id: 'recA7', fields: { Vacature: ['recVacFT'], Kandidaat: ['recK1'], Stage: 'Interview klant', 'Score totaal': 42, 'Zichtbaar voor klant': true, 'Datum in huidige stage': '2026-08-27' } },
 ]
 
 const stagelog = [
@@ -108,7 +112,7 @@ test('salarisband, scoringsdrempel en validatie blijven binnen', () => {
     assert.equal(sleutel in vacature, false, `${sleutel} zit in het vacatureantwoord`)
   }
   assert.deepEqual(Object.keys(vacature).sort(), [
-    'afgevallen', 'funnel', 'id', 'kandidaten', 'standplaats',
+    'afgevallen', 'funnel', 'id', 'kandidaten', 'onderDrempel', 'standplaats',
     'startdatum', 'status', 'streefdatumShortlist', 'titel', 'totaal',
   ])
 })
@@ -156,7 +160,7 @@ test('afgevallen kandidaten verschijnen geteld, nooit als rij', () => {
     false,
     'een afgevallen kandidaat staat als rij in de lijst',
   )
-  assert.equal(vacature.totaal, 4, 'het totaal telt de afgevallen kandidaten wel mee')
+  assert.equal(vacature.totaal, 6, 'het totaal telt de afgevallen kandidaten wel mee')
 })
 
 // --- de dubbele grendel ----------------------------------------------------
@@ -187,8 +191,12 @@ test('alleen de toegewezen vacature komt door, niet alles van die klant', () => 
 test('de funnel telt cumulatief en gebruikt de stagelog voor afgevallen', () => {
   const funnel = bouw(VOLLE_TOEGANG).vacatures[0].funnel
   const bij = (fase) => funnel.find((f) => f.fase === fase)
-  assert.equal(bij('Gescoord').bereikt, 4, 'iedereen is minstens gescoord')
-  assert.equal(bij('Gesproken').bereikt, 2, 'de een staat op Aanbod, de ander kwam via de log tot Gesproken')
+  assert.equal(bij('Gescoord').bereikt, 6, 'iedereen is minstens gescoord')
+  assert.equal(
+    bij('Gesproken').bereikt,
+    3,
+    'een op Aanbod, een die via de log tot Gesproken kwam, en de voorgedragen kandidaat op Interview klant',
+  )
   assert.equal(bij('Aanbod').bereikt, 1)
   assert.equal(bij('Aanbod').nuHier, 1)
   assert.equal(
@@ -506,4 +514,47 @@ test('de portal en het ATS-scherm tonen dezelfde kop', async () => {
       `portal toont "${inPortal}" en het ATS-scherm "${opScherm.kop}" (vrijgegeven: ${vrijgegeven})`,
     )
   }
+})
+
+
+// --- de scoredrempel -------------------------------------------------------
+
+test('kandidaten onder de 50 komen alleen als aantal terug, niet als regel', () => {
+  const { vacatures } = bouw(VOLLE_TOEGANG)
+  const ft = vacatures.find((v) => v.titel === 'Formulation Technologist')
+
+  assert.equal(ft.onderDrempel, 1)
+  assert.equal(
+    ft.kandidaten.some((k) => k.score === 35),
+    false,
+    'de score van 35 staat nog in een kandidaatregel',
+  )
+  // Niet alleen de score: de hele regel hoort weg te zijn, dus ook de rest van
+  // wat erin zat. Zoeken op de waarde, niet op de veldnaam.
+  assert.equal(JSON.stringify(ft.kandidaten).includes('35'), false)
+})
+
+test('wie is vrijgegeven blijft staan, ook onder de drempel', () => {
+  // Anders ziet de klant een lege lijst naast een trechter die wel iemand op
+  // Interview klant telt.
+  const { vacatures } = bouw(VOLLE_TOEGANG)
+  const ft = vacatures.find((v) => v.titel === 'Formulation Technologist')
+  const voorgedragen = ft.kandidaten.find((k) => k.score === 42)
+
+  assert.ok(voorgedragen, 'de vrijgegeven kandidaat van 42 is weggefilterd')
+  assert.equal(voorgedragen.fase, 'Interview klant')
+})
+
+test('zonder score blijft iemand zichtbaar, want niet beoordeeld is niet afgekeurd', () => {
+  const { vacatures } = bouw({ Opdrachtgever: [NM], Vacatures: ['recVacSNA'] })
+  const sna = vacatures.find((v) => v.titel === 'SNA inspecteur')
+
+  assert.equal(sna.onderDrempel, 0)
+  assert.equal(sna.kandidaten.length, 1)
+  assert.equal(sna.kandidaten[0].score, null)
+})
+
+test('het aantal onder de drempel lekt verder niets', () => {
+  const payload = bouw(VOLLE_TOEGANG)
+  eisGeenVerbodenWaarden(payload, 'met de scoredrempel aan')
 })

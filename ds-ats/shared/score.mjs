@@ -31,6 +31,15 @@ export const SCORE_BANDEN = [
  * beoordeeld", de tweede "beoordeeld en niet passend". Die twee mogen er nooit
  * hetzelfde uitzien, dus geeft deze functie null en geen laagste band.
  */
+/**
+ * Onder deze score heet iemand "Niet passend".
+ *
+ * Dezelfde grens die de onderste band begint, en dezelfde grens die het
+ * klantportaal gebruikt om kandidaten te tellen in plaats van te tonen. Eén
+ * getal, zodat die twee nooit uit elkaar lopen.
+ */
+export const DREMPEL_PASSEND = 50
+
 export function scoreBand(score) {
   if (typeof score !== 'number' || Number.isNaN(score)) return null
   return SCORE_BANDEN.find((band) => score >= band.vanaf) ?? SCORE_BANDEN.at(-1)

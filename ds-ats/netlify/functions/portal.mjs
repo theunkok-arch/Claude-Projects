@@ -42,6 +42,7 @@ import {
   wisCookie,
 } from '../lib/portaal.mjs'
 import { FUNNEL_STAGES, STAGE_IDS, dagenTussen } from '../../shared/stages.mjs'
+import { DREMPEL_PASSEND } from '../../shared/score.mjs'
 import { initialen } from '../../shared/klantweergave.mjs'
 
 export const config = { path: '/api/portal/*' }
@@ -274,6 +275,7 @@ export function bouwOverzicht({
         (a.fields.Vacature ?? []).includes(vacature.id),
       )
       const lopend = eigenAanmeldingen.filter((a) => a.fields.Stage !== 'Afgevallen')
+      const toonbaar = lopend.filter(magInLijst)
 
       return {
         id: vacature.id,
@@ -285,7 +287,8 @@ export function bouwOverzicht({
         totaal: eigenAanmeldingen.length,
         funnel: funnel(eigenAanmeldingen, logPerAanmelding),
         afgevallen: afvalRedenen(eigenAanmeldingen),
-        kandidaten: lopend
+        onderDrempel: lopend.length - toonbaar.length,
+        kandidaten: toonbaar
           .map((a) => kandidaatregel(a, kandidaatById, vandaag))
           .sort(
             (a, b) =>
@@ -308,6 +311,34 @@ export function bouwOverzicht({
  * Contactgegevens komen er in geen van beide standen bij; die staan niet eens
  * in `kandidaatById`.
  */
+/**
+ * Mag deze aanmelding als losse regel in het portaal, of alleen als aantal?
+ *
+ * Kandidaten onder de drempel komen niet apart in de lijst: de opdrachtgever
+ * ziet er alleen het aantal van. Vastgesteld door Dominique op 12-10-2026, toen
+ * de scorebanden erbij kwamen en de klant kandidaten als "Niet passend" in zijn
+ * eigen portaal zag staan.
+ *
+ * Twee uitzonderingen, allebei met opzet:
+ *
+ * 1. **Geen score is geen lage score.** Nog niet beoordeeld mag er niet
+ *    uitzien als beoordeeld en afgekeurd, dus die blijft gewoon staan.
+ * 2. **Vrijgegeven wint altijd.** Zet Dominique `Zichtbaar voor klant` aan,
+ *    dan heeft ze die kandidaat bewust voorgedragen. Hem daarna op een cijfer
+ *    verbergen zou de klant een lege lijst geven naast een trechter die wel
+ *    iemand op Interview klant telt. Vandaag raakt dit niemand, het is een
+ *    grendel voor later.
+ *
+ * Dit filtert server-side. Wat de klant niet mag zien staat niet in het
+ * antwoord, en is dus ook niet uit de ontwikkelaarsconsole te vissen.
+ */
+function magInLijst(aanmelding) {
+  if (aanmelding.fields['Zichtbaar voor klant']) return true
+  const score = aanmelding.fields['Score totaal']
+  if (typeof score !== 'number') return true
+  return score >= DREMPEL_PASSEND
+}
+
 function kandidaatregel(aanmelding, kandidaatById, vandaag) {
   const kandidaat = kandidaatById.get((aanmelding.fields.Kandidaat ?? [])[0]) ?? {}
   const vrijgegeven = Boolean(aanmelding.fields['Zichtbaar voor klant'])
