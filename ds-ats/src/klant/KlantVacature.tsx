@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import StageBadge from '../components/StageBadge'
+import { ScoreBadge, ScoreLegenda } from '../components/Score'
 import { dagen, datum } from '../lib/format'
 import type { KlantKandidaat, KlantVacature as Vacature } from '../lib/klant'
 
@@ -63,6 +64,14 @@ export default function KlantVacature({ vacature }: { vacature: Vacature }) {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
+            {/*
+              De legenda hoort op dit scherm en niet in een toelichting ergens
+              anders: de opdrachtgever leest dit zonder ons erbij, en "Score 67"
+              zegt zonder uitleg niet of dat goed nieuws is.
+            */}
+            <li>
+              <ScoreLegenda />
+            </li>
             {vacature.kandidaten.map((kandidaat) => (
               <li key={kandidaat.id}>
                 <Kandidaatkaart kandidaat={kandidaat} />
@@ -98,14 +107,14 @@ function Kandidaatkaart({ kandidaat }: { kandidaat: KlantKandidaat }) {
         <StageBadge stage={kandidaat.fase ?? undefined} klein />
       </div>
 
-      <p className="mt-2 text-xs text-navy-400 tabular-nums">
-        {[
-          kandidaat.score !== null ? `Score ${kandidaat.score}` : null,
-          kandidaat.dagenInFase !== null ? `${dagen(kandidaat.dagenInFase)} in deze fase` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ') || ' '}
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <ScoreBadge score={kandidaat.score} />
+        {kandidaat.dagenInFase !== null && (
+          <span className="text-xs text-navy-400 tabular-nums">
+            {dagen(kandidaat.dagenInFase)} in deze fase
+          </span>
+        )}
+      </div>
     </article>
   )
 }
