@@ -67,7 +67,7 @@ export default async (req) => {
         return json(200, await overzicht(await huidigeGebruiker(req)))
 
       default:
-        throw new HttpError(404, 'Onbekend adres.')
+        throw new HttpError(404, 'Onbekend adres.', 'onbekendAdres')
     }
   } catch (error) {
     return fail(error)
@@ -110,12 +110,12 @@ async function login(req) {
   const email = String(body.email ?? '')
   const wachtwoord = String(body.wachtwoord ?? '')
 
-  if (!email || !wachtwoord) throw new HttpError(400, 'Vul je e-mailadres en wachtwoord in.')
+  if (!email || !wachtwoord) throw new HttpError(400, 'Vul je e-mailadres en wachtwoord in.', 'veldenLeeg')
 
   const gebruiker = await zoekGebruiker(email)
 
   if (gebruiker && opSlot(gebruiker)) {
-    throw new HttpError(429, `Te veel pogingen. Probeer het over ${BLOKKADE_MINUTEN} minuten opnieuw.`)
+    throw new HttpError(429, `Te veel pogingen. Probeer het over ${BLOKKADE_MINUTEN} minuten opnieuw.`, 'teVeelPogingen', { minuten: BLOKKADE_MINUTEN })
   }
 
   // Ook zonder gevonden gebruiker één keer scrypt draaien. Zonder dit is het
@@ -127,18 +127,18 @@ async function login(req) {
 
   if (!juist) {
     if (gebruiker) await telMisserOp(gebruiker)
-    throw new HttpError(401, AFGEWEZEN)
+    throw new HttpError(401, AFGEWEZEN, 'afgewezen')
   }
 
   // Pas ná een juist wachtwoord mag het antwoord specifiek worden. Wie het
   // wachtwoord kent, mag horen waarom hij er alsnog niet in komt — dat scheelt
   // een telefoontje, en het verraadt niets aan iemand die zit te raden.
   if (gebruiker.fields.Status === 'Geblokkeerd') {
-    throw new HttpError(403, 'Deze toegang is ingetrokken. Neem contact op met Do Solutions.')
+    throw new HttpError(403, 'Deze toegang is ingetrokken. Neem contact op met Do Solutions.', 'ingetrokkenContact')
   }
   const verloopt = gebruiker.fields['Verloopt op']
   if (verloopt && verloopt < today()) {
-    throw new HttpError(403, `Deze toegang is verlopen op ${verloopt}. Vraag Do Solutions om een nieuwe.`)
+    throw new HttpError(403, `Deze toegang is verlopen op ${verloopt}. Vraag Do Solutions om een nieuwe.`, 'verlopenOp', { datum: verloopt })
   }
 
   await updateRecord(TABLES.portaalgebruikers, gebruiker.id, {
@@ -179,14 +179,14 @@ async function telMisserOp(gebruiker) {
  */
 async function huidigeGebruiker(req) {
   const id = leesSessie(cookieUitHeader(req.headers.get('cookie'), COOKIE))
-  if (!id) throw new HttpError(401, 'Je bent niet ingelogd.')
+  if (!id) throw new HttpError(401, 'Je bent niet ingelogd.', 'nietIngelogd')
 
   const gebruiker = await getRecord(TABLES.portaalgebruikers, id).catch(() => null)
-  if (!gebruiker) throw new HttpError(401, 'Je bent niet ingelogd.')
-  if (gebruiker.fields.Status === 'Geblokkeerd') throw new HttpError(403, 'Deze toegang is ingetrokken.')
+  if (!gebruiker) throw new HttpError(401, 'Je bent niet ingelogd.', 'nietIngelogd')
+  if (gebruiker.fields.Status === 'Geblokkeerd') throw new HttpError(403, 'Deze toegang is ingetrokken.', 'ingetrokken')
 
   const verloopt = gebruiker.fields['Verloopt op']
-  if (verloopt && verloopt < today()) throw new HttpError(403, 'Deze toegang is verlopen.')
+  if (verloopt && verloopt < today()) throw new HttpError(403, 'Deze toegang is verlopen.', 'verlopen')
 
   return gebruiker
 }

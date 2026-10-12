@@ -23,10 +23,23 @@ function env(name) {
   return value
 }
 
+/**
+ * Een fout met een HTTP-status, en sinds het Engelstalige klantportaal ook met
+ * een `code`.
+ *
+ * De `message` blijft Nederlands en gaat naar de logs en naar de interne app.
+ * De `code` is wat het portaal vertaalt. Zonder die code moest de frontend op
+ * de zin zelf matchen (`message.startsWith('Je bent niet')`), en dan breekt een
+ * vertaling stilletjes de afhandeling.
+ *
+ * `vars` draagt de getallen of datums die in de vertaalde zin horen.
+ */
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code, vars) {
     super(message)
     this.status = status
+    this.code = code
+    this.vars = vars
   }
 }
 
@@ -143,7 +156,15 @@ export function fail(error) {
   const status = error instanceof HttpError ? error.status : 500
   // Airtable-details horen niet in een clientrespons; wel in de functielogs.
   if (status >= 500) console.error(error)
-  return json(status, { error: status >= 500 ? 'Er ging iets mis aan de serverkant.' : error.message })
+  if (status >= 500) return json(status, { error: 'Er ging iets mis aan de serverkant.' })
+
+  // De code gaat alleen mee onder de 500. Een serverfout krijgt nooit een
+  // code, want dan zou de keuze van de code iets over de binnenkant verraden.
+  return json(status, {
+    error: error.message,
+    ...(error.code ? { code: error.code } : {}),
+    ...(error.code && error.vars ? { vars: error.vars } : {}),
+  })
 }
 
 /** Vergelijkt twee strings zonder vroegtijdig af te breken op de eerste ongelijke byte. */

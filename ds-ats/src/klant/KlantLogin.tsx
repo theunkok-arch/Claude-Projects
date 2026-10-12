@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { GeenToegang, logIn } from '../lib/klant'
+import { GeenToegang, PortaalFout, logIn } from '../lib/klant'
+import { foutTekst, useTaal } from './i18n'
+import Taalkeuze from './Taalkeuze'
 
 /**
  * Het inlogscherm voor opdrachtgevers.
@@ -8,11 +10,15 @@ import { GeenToegang, logIn } from '../lib/klant'
  * het portaal, want wie hier belandt moet meteen zien dat dit niet zijn eigen
  * systeem is maar dat van zijn recruiter.
  *
- * De melding komt letterlijk van de server. Die maakt geen onderscheid tussen
- * een onbekend e-mailadres en een fout wachtwoord — anders is dit scherm een
- * manier om uit te vinden welke bedrijven klant zijn.
+ * De melding komt van de server, op code vertaald. Die maakt geen onderscheid
+ * tussen een onbekend e-mailadres en een fout wachtwoord: anders is dit scherm
+ * een manier om uit te vinden welke bedrijven klant zijn.
+ *
+ * De taalkeuze staat ook hier, en niet pas na het inloggen. Wie de Nederlandse
+ * tekst niet leest, moet juist op dit scherm al kunnen omzetten.
  */
 export default function KlantLogin({ onBinnen }: { onBinnen: () => void }) {
+  const { t } = useTaal()
   const [email, setEmail] = useState('')
   const [wachtwoord, setWachtwoord] = useState('')
   const [fout, setFout] = useState<string | null>(null)
@@ -26,7 +32,11 @@ export default function KlantLogin({ onBinnen }: { onBinnen: () => void }) {
       await logIn(email, wachtwoord)
       onBinnen()
     } catch (error) {
-      setFout(error instanceof GeenToegang || error instanceof Error ? error.message : 'Er ging iets mis.')
+      setFout(
+        error instanceof PortaalFout || error instanceof GeenToegang
+          ? foutTekst(t, error.code, error.vars, error.message)
+          : foutTekst(t, undefined, undefined, error instanceof Error ? error.message : ''),
+      )
     } finally {
       setBezig(false)
     }
@@ -35,16 +45,17 @@ export default function KlantLogin({ onBinnen }: { onBinnen: () => void }) {
   return (
     <main className="flex min-h-dvh items-center justify-center px-6">
       <form onSubmit={verstuur} className="w-full max-w-sm">
-        <p className="font-semibold tracking-tight">
-          Do <span className="text-oranje">Solutions</span>
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold">Kandidatenportaal</h1>
-        <p className="mt-1 mb-6 text-sm text-navy-400">
-          Log in met het e-mailadres en wachtwoord die je van ons hebt gekregen.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="font-semibold tracking-tight">
+            Do <span className="text-oranje">Solutions</span>
+          </p>
+          <Taalkeuze />
+        </div>
+        <h1 className="mt-2 text-2xl font-semibold">{t.login.portaal}</h1>
+        <p className="mt-1 mb-6 text-sm text-navy-400">{t.login.uitleg}</p>
 
         <label className="block text-sm font-medium" htmlFor="klant-email">
-          E-mailadres
+          {t.login.email}
         </label>
         <input
           id="klant-email"
@@ -57,7 +68,7 @@ export default function KlantLogin({ onBinnen }: { onBinnen: () => void }) {
         />
 
         <label className="mt-4 block text-sm font-medium" htmlFor="klant-wachtwoord">
-          Wachtwoord
+          {t.login.wachtwoord}
         </label>
         <input
           id="klant-wachtwoord"
@@ -79,13 +90,10 @@ export default function KlantLogin({ onBinnen }: { onBinnen: () => void }) {
           disabled={bezig || !email || !wachtwoord}
           className="tik mt-5 w-full rounded-xl bg-navy py-3.5 font-semibold text-white disabled:opacity-40"
         >
-          {bezig ? 'Bezig…' : 'Inloggen'}
+          {bezig ? t.login.bezig : t.login.inloggen}
         </button>
 
-        <p className="mt-6 text-xs text-navy-400">
-          Wachtwoord kwijt? Wij kunnen het niet opzoeken — het staat nergens bewaard. Vraag Do
-          Solutions om een nieuw wachtwoord.
-        </p>
+        <p className="mt-6 text-xs text-navy-400">{t.login.kwijt}</p>
       </form>
     </main>
   )

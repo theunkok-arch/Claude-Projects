@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import StageBadge from '../components/StageBadge'
 import { ScoreBadge, ScoreLegenda } from '../components/Score'
-import { dagen, datum } from '../lib/format'
+import { datum } from '../lib/format'
 import type { KlantKandidaat, KlantVacature as Vacature } from '../lib/klant'
+import { useT, vertaalWaarde } from './i18n'
+import type { Woordenboek } from './i18n/nl'
 
 /**
  * Eén vacature, uitgeklapt: de trechter, waarom kandidaten afvielen, en de
@@ -14,53 +16,51 @@ import type { KlantKandidaat, KlantVacature as Vacature } from '../lib/klant'
  * ontwikkelaarsgereedschappen omzeilt.
  */
 export default function KlantVacature({ vacature }: { vacature: Vacature }) {
+  const t = useT()
   const afgevallen = vacature.afgevallen.reduce((som, r) => som + r.aantal, 0)
+  const scoreTeksten = { legenda: t.score.legenda, nogNiet: t.score.nogNiet, banden: t.score.banden }
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-6">
       <Link to="/klant" className="tik inline-flex items-center text-sm text-navy-400">
-        ← Alle opdrachten
+        ← {t.vacature.terug}
       </Link>
 
-      <h1 className="mt-1 text-2xl font-semibold">{vacature.titel ?? 'Vacature'}</h1>
+      <h1 className="mt-1 text-2xl font-semibold">{vacature.titel ?? t.portaal.vacature}</h1>
       <p className="text-sm text-navy-400">
-        {[vacature.standplaats, vacature.status].filter(Boolean).join(' · ') || '—'}
+        {[vacature.standplaats, vertaalWaarde(t.vacaturestatus, vacature.status)]
+          .filter(Boolean)
+          .join(' · ') || '—'}
       </p>
 
       <dl className="mt-4 grid grid-cols-2 gap-y-1 rounded-2xl border border-lijn bg-white p-4 text-sm">
-        <dt className="text-navy-400">In het proces</dt>
+        <dt className="text-navy-400">{t.vacature.inProces}</dt>
         <dd className="text-right tabular-nums">{vacature.totaal - afgevallen}</dd>
-        <dt className="text-navy-400">Afgevallen</dt>
+        <dt className="text-navy-400">{t.vacature.afgevallen}</dt>
         <dd className="text-right tabular-nums">{afgevallen}</dd>
-        <dt className="text-navy-400">Startdatum</dt>
+        <dt className="text-navy-400">{t.vacature.startdatum}</dt>
         <dd className="text-right">{datum(vacature.startdatum)}</dd>
-        <dt className="text-navy-400">Streefdatum shortlist</dt>
+        <dt className="text-navy-400">{t.vacature.streefdatum}</dt>
         <dd className="text-right">{datum(vacature.streefdatumShortlist)}</dd>
       </dl>
 
-      <Funnel tredes={vacature.funnel} />
+      <Funnel tredes={vacature.funnel} t={t} />
 
       {vacature.afgevallen.length > 0 && (
         <section className="mt-8">
-          <h2 className="mb-1 font-semibold">Waarom kandidaten afvielen</h2>
-          <p className="mb-3 text-sm text-navy-400">
-            Geteld, niet per persoon. Een afvalreden is een oordeel over iemand; als aantal laat het
-            zien waar de zoekopdracht op stuit.
-          </p>
-          <Redenen rijen={vacature.afgevallen} />
+          <h2 className="mb-1 font-semibold">{t.vacature.waarom}</h2>
+          <p className="mb-3 text-sm text-navy-400">{t.vacature.waaromUitleg}</p>
+          <Redenen rijen={vacature.afgevallen} t={t} />
         </section>
       )}
 
       <section className="mt-8">
-        <h2 className="font-semibold">Kandidaten in het proces</h2>
-        <p className="mt-1 mb-3 text-sm text-navy-400">
-          Kandidaten staan op initialen tot ze weten dat ze bij jullie worden voorgedragen. Vanaf dat
-          moment zie je de volledige naam en werkgever.
-        </p>
+        <h2 className="font-semibold">{t.vacature.kandidaten}</h2>
+        <p className="mt-1 mb-3 text-sm text-navy-400">{t.vacature.kandidatenUitleg}</p>
 
         {vacature.kandidaten.length === 0 ? (
           <p className="rounded-2xl border border-lijn bg-white p-4 text-sm text-navy-400">
-            Er zit op dit moment niemand in het proces voor deze vacature.
+            {t.vacature.niemand}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -70,11 +70,11 @@ export default function KlantVacature({ vacature }: { vacature: Vacature }) {
               zegt zonder uitleg niet of dat goed nieuws is.
             */}
             <li>
-              <ScoreLegenda />
+              <ScoreLegenda teksten={scoreTeksten} />
             </li>
             {vacature.kandidaten.map((kandidaat) => (
               <li key={kandidaat.id}>
-                <Kandidaatkaart kandidaat={kandidaat} />
+                <Kandidaatkaart kandidaat={kandidaat} t={t} scoreTeksten={scoreTeksten} />
               </li>
             ))}
           </ul>
@@ -87,9 +87,7 @@ export default function KlantVacature({ vacature }: { vacature: Vacature }) {
         */}
         {vacature.onderDrempel > 0 && (
           <p className="mt-2 rounded-2xl border border-lijn bg-white p-4 text-sm text-navy-400">
-            <span className="font-medium text-navy tabular-nums">{vacature.onderDrempel}</span>{' '}
-            {vacature.onderDrempel === 1 ? 'kandidaat is' : 'kandidaten zijn'} beoordeeld en bleef
-            {vacature.onderDrempel === 1 ? '' : 'en'} onder de 50. Die staan hier niet apart.
+            {t.vacature.onderDrempel(vacature.onderDrempel)}
           </p>
         )}
       </section>
@@ -97,7 +95,15 @@ export default function KlantVacature({ vacature }: { vacature: Vacature }) {
   )
 }
 
-function Kandidaatkaart({ kandidaat }: { kandidaat: KlantKandidaat }) {
+function Kandidaatkaart({
+  kandidaat,
+  t,
+  scoreTeksten,
+}: {
+  kandidaat: KlantKandidaat
+  t: Woordenboek
+  scoreTeksten: { legenda: string; nogNiet: string; banden: Record<string, string> }
+}) {
   const regel = kandidaat.vrijgegeven
     ? [kandidaat.huidigeRol, kandidaat.huidigeWerkgever, kandidaat.woonplaats].filter(Boolean).join(' · ')
     : kandidaat.huidigeRol
@@ -117,14 +123,18 @@ function Kandidaatkaart({ kandidaat }: { kandidaat: KlantKandidaat }) {
           */}
           <p className="text-sm text-navy-400">{regel || '—'}</p>
         </div>
-        <StageBadge stage={kandidaat.fase ?? undefined} klein />
+        <StageBadge
+          stage={kandidaat.fase ?? undefined}
+          label={vertaalWaarde(t.stage, kandidaat.fase) ?? t.vacature.geenStage}
+          klein
+        />
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <ScoreBadge score={kandidaat.score} />
+        <ScoreBadge score={kandidaat.score} teksten={scoreTeksten} />
         {kandidaat.dagenInFase !== null && (
           <span className="text-xs text-navy-400 tabular-nums">
-            {dagen(kandidaat.dagenInFase)} in deze fase
+            {t.vacature.dagenInFase(kandidaat.dagenInFase)}
           </span>
         )}
       </div>
@@ -137,18 +147,23 @@ function Kandidaatkaart({ kandidaat }: { kandidaat: KlantKandidaat }) {
  * en telt dus in elke trede daaronder mee. Dat is wat het beeld van een
  * trechter geeft in plaats van een momentopname.
  */
-function Funnel({ tredes }: { tredes: Array<{ fase: string; bereikt: number; nuHier: number }> }) {
+function Funnel({
+  tredes,
+  t,
+}: {
+  tredes: Array<{ fase: string; bereikt: number; nuHier: number }>
+  t: Woordenboek
+}) {
   return (
     <section className="mt-8">
-      <h2 className="mb-1 font-semibold">Verloop</h2>
-      <p className="mb-3 text-sm text-navy-400">
-        Hoeveel kandidaten deze fase ooit hebben bereikt. Het getal tussen haakjes is wie er nu staat.
-      </p>
+      <h2 className="mb-1 font-semibold">{t.vacature.verloop}</h2>
+      <p className="mb-3 text-sm text-navy-400">{t.vacature.verloopUitleg}</p>
       <Balken
-        rijen={tredes.map((t) => ({
-          fase: t.fase,
-          waarde: t.bereikt,
-          bijschrift: t.nuHier > 0 ? `(${t.nuHier})` : '',
+        rijen={tredes.map((trede) => ({
+          fase: trede.fase,
+          label: vertaalWaarde(t.stage, trede.fase) ?? trede.fase,
+          waarde: trede.bereikt,
+          bijschrift: trede.nuHier > 0 ? `(${trede.nuHier})` : '',
         }))}
       />
     </section>
@@ -156,7 +171,10 @@ function Funnel({ tredes }: { tredes: Array<{ fase: string; bereikt: number; nuH
 }
 
 interface Trede {
+  /** De canonieke waarde uit de base, voor de kleur en als sleutel. */
   fase: string
+  /** Wat erop staat, vertaald. */
+  label: string
   waarde: number
   bijschrift: string
 }
@@ -170,7 +188,7 @@ function Balken({ rijen }: { rijen: Trede[] }) {
       {rijen.map((rij) => (
         <li key={rij.fase} className="flex items-center gap-2">
           <div className="w-32 shrink-0 sm:w-40">
-            <StageBadge stage={rij.fase} klein />
+            <StageBadge stage={rij.fase} label={rij.label} klein />
           </div>
           <div className="h-6 flex-1 overflow-hidden rounded-md bg-cream">
             <div
@@ -197,7 +215,13 @@ function Balken({ rijen }: { rijen: Trede[] }) {
  * waarvoor een opdrachtgever hier komt kijken. De fasebadges hierboven mogen
  * wel in een kolom, want die zijn kort en komen uit een vaste woordenlijst.
  */
-function Redenen({ rijen }: { rijen: Array<{ reden: string; aantal: number }> }) {
+function Redenen({
+  rijen,
+  t,
+}: {
+  rijen: Array<{ reden: string; aantal: number }>
+  t: Woordenboek
+}) {
   const top = Math.max(1, ...rijen.map((r) => r.aantal))
 
   return (
@@ -205,7 +229,7 @@ function Redenen({ rijen }: { rijen: Array<{ reden: string; aantal: number }> })
       {rijen.map((rij) => (
         <li key={rij.reden}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm">{rij.reden}</span>
+            <span className="text-sm">{vertaalWaarde(t.reden, rij.reden)}</span>
             <span className="shrink-0 text-sm tabular-nums">{rij.aantal}</span>
           </div>
           <div className="mt-1 h-3 overflow-hidden rounded-md bg-cream">
