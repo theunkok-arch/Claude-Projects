@@ -79,6 +79,19 @@ export default function KlantVacature({ vacature }: { vacature: Vacature }) {
             ))}
           </ul>
         )}
+
+        {/*
+          Kandidaten onder de drempel komen niet als regel terug. Het aantal wel,
+          want het werk is gedaan en de trechter telt ze ook: zonder deze regel
+          klopt de optelsom op dit scherm niet meer.
+        */}
+        {vacature.onderDrempel > 0 && (
+          <p className="mt-2 rounded-2xl border border-lijn bg-white p-4 text-sm text-navy-400">
+            <span className="font-medium text-navy tabular-nums">{vacature.onderDrempel}</span>{' '}
+            {vacature.onderDrempel === 1 ? 'kandidaat is' : 'kandidaten zijn'} beoordeeld en bleef
+            {vacature.onderDrempel === 1 ? '' : 'en'} onder de 50. Die staan hier niet apart.
+          </p>
+        )}
       </section>
     </main>
   )

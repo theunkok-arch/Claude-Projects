@@ -18,6 +18,8 @@ export interface ScoreDimensie {
 
 export declare const SCORE_BANDEN: ScoreBand[]
 
+export declare const DREMPEL_PASSEND: number
+
 export declare function scoreBand(score: number | null | undefined): ScoreBand | null
 
 export declare function scoreRegels(onderbouwing: string | null | undefined): {
