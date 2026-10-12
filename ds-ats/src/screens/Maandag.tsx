@@ -4,9 +4,9 @@ import { useAts } from '../store/AtsProvider'
 import { AuthFout } from '../lib/api'
 import { actieveRegels, bronVan, opUrgentie } from '../lib/metrics'
 import { datumKort } from '../lib/format'
-import { FUNNEL_STAGES } from '../../shared/stages.mjs'
+import { FUNNEL_STAGES, onbekendeStages } from '../../shared/stages.mjs'
 import { MAX_PARTIJEN, nieuwstePartij, partijen } from '../../shared/partijen.mjs'
-import { MAX_RONDES, rondes } from '../../shared/rondes.mjs'
+import { rondes } from '../../shared/rondes.mjs'
 import type { StageId } from '../../shared/stages.mjs'
 import AanmeldingKaart from '../components/AanmeldingKaart'
 import StageBadge from '../components/StageBadge'
@@ -119,7 +119,7 @@ export default function Maandag() {
 
   /** De zoekrondes binnen deze scope, hoogste ronde eerst. */
   const rondeLijst = useMemo(
-    () => rondes(naPartij.map((r) => r.aanmelding)).slice(0, MAX_RONDES),
+    () => rondes(naPartij.map((r) => r.aanmelding)),
     [naPartij],
   )
 
@@ -180,6 +180,17 @@ export default function Maandag() {
           overschreden: inScope.filter((r) => r.aanmelding.Stage === s && r.overschreden).length,
         }))
         .filter((rij) => rij.aantal > 0),
+    [inScope],
+  )
+
+  /*
+    Stages die de app niet kent. Normaal is dit leeg en zie je er niets van.
+    Staat er wel iets, dan is er buiten de app om geschreven en zijn die
+    aanmeldingen nergens anders te vinden: geen tegel, geen groep, geen norm.
+    Daarom een melding en geen stille rij ertussen.
+  */
+  const onbekend = useMemo(
+    () => onbekendeStages(inScope.map((r) => r.aanmelding.Stage)),
     [inScope],
   )
 
@@ -664,6 +675,29 @@ export default function Maandag() {
             ›
           </span>
         </Link>
+      )}
+
+      {onbekend.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-oranje bg-oranje/5 p-4">
+          <h2 className="font-semibold text-oranje">Stage die de app niet kent</h2>
+          <p className="mt-1 text-sm text-navy-400">
+            Deze aanmeldingen tellen wel als actief, maar staan in geen enkele tegel en krijgen geen
+            servicenorm. Zet ze op een stage uit de lijst, dan lopen ze weer mee.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {onbekend.map((rij) => (
+              <li key={rij.stage}>
+                <Link
+                  to={linkNaarStage(rij.stage as never)}
+                  className="tik flex items-center justify-between gap-3 rounded-xl border border-lijn bg-white px-4"
+                >
+                  <span className="min-w-0 truncate font-medium">{rij.stage}</span>
+                  <span className="shrink-0 text-xl font-semibold tabular-nums">{rij.aantal}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <h2 className="mt-6 mb-2 font-semibold">Per stage</h2>

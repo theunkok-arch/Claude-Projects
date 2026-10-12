@@ -59,11 +59,13 @@ function nummer(ronde) {
   return treffer ? Number.parseInt(treffer[0], 10) : null
 }
 
-/**
- * Hoeveel ronde-chips op het scherm passen.
- *
- * Lager dan MAX_PARTIJEN: een vacature krijgt er een paar rondes bij, geen
- * tientallen, en deze rij staat onder die van de partijen. Twee rijen die
- * allebei horizontaal scrollen kosten meer eerste scherm dan ze opleveren.
- */
-export const MAX_RONDES = 4
+/*
+  Hier stond MAX_RONDES = 4, met als onderbouwing dat een vacature er "een paar
+  rondes bij krijgt, geen tientallen". Dat klopte niet: op 12-10-2026 hadden
+  SNA Inspecteur en Interne Accountmanager er allebei zestien.
+
+  De chiprij scrolt al horizontaal, dus de limiet won geen schermruimte, hij
+  maakte alleen ronde 1 tot en met 12 onbereikbaar. Juist ronde 1 was de vraag
+  waarvoor dit filter is gebouwd: wie is er uit de eerste ronde blijven liggen.
+  Daarom geen limiet meer.
+*/

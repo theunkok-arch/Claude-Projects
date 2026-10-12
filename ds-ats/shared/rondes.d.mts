@@ -8,4 +8,3 @@ export declare function rondes(
   aanmeldingen: ReadonlyArray<{ Zoekronde?: string } | null | undefined> | null | undefined,
 ): Ronde[]
 
-export declare const MAX_RONDES: number

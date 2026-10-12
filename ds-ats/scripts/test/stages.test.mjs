@@ -14,6 +14,7 @@ import {
   dagenTussen,
   normOverschreden,
   werkdagenTussen,
+  onbekendeStages,
 } from '../../shared/stages.mjs'
 
 test('elke volgendeStage wijst naar een bestaande stage', () => {
@@ -107,4 +108,33 @@ test('de snelkoppeling is korter dan de volledige lijst', () => {
   // tweede kopie van dezelfde lijst.
   assert.ok(MEEST_GEBRUIKTE_REDENEN.length < ALLE_AFVAL_REDENEN.length)
   assert.equal(new Set(MEEST_GEBRUIKTE_REDENEN).size, MEEST_GEBRUIKTE_REDENEN.length)
+})
+
+test('een stage die hier niet staat wordt geteld in plaats van genegeerd', () => {
+  // Op 12-10-2026 stonden zeven aanmeldingen op "Nieuw", een optie die wel in de
+  // base zat en niet in dit bestand. Ze telden als actief, maar hadden geen
+  // tegel, geen groep en geen norm. Stil verdwenen is de ergste uitkomst.
+  const uit = onbekendeStages(['Gescoord', 'Nieuw', 'Nieuw', 'Benaderd'])
+  assert.deepEqual(uit, [{ stage: 'Nieuw', aantal: 2 }])
+})
+
+test('bekende stages leveren niets op, Afgevallen incluis', () => {
+  // Afgevallen staat niet in de trechter maar wel in STAGE_IDS. Hem hier
+  // meetellen zou bij elke vacature een valse melding geven.
+  assert.deepEqual(onbekendeStages(STAGE_IDS), [])
+  assert.deepEqual(onbekendeStages(['Afgevallen', 'Ingewerkt']), [])
+})
+
+test('leeg en ontbrekend zijn geen onbekende stage', () => {
+  assert.deepEqual(onbekendeStages(['', null, undefined]), [])
+  assert.deepEqual(onbekendeStages([]), [])
+  assert.deepEqual(onbekendeStages(undefined), [])
+})
+
+test('meerdere onbekende stages staan op aantal, grootste eerst', () => {
+  const uit = onbekendeStages(['Zzz', 'Aaa', 'Aaa', 'Zzz', 'Aaa'])
+  assert.deepEqual(uit, [
+    { stage: 'Aaa', aantal: 3 },
+    { stage: 'Zzz', aantal: 2 },
+  ])
 })

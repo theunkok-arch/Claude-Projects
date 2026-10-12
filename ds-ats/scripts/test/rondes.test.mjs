@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { MAX_RONDES, rondes } from '../../shared/rondes.mjs'
+import { rondes } from '../../shared/rondes.mjs'
 
 const aanmelding = (Zoekronde) => ({ Zoekronde })
 
@@ -56,6 +56,14 @@ test('geen aanmeldingen geeft een lege lijst en valt niet om', () => {
   assert.deepEqual(rondes(null), [])
 })
 
-test('de chiprij blijft kort genoeg voor één regel op een telefoon', () => {
-  assert.ok(MAX_RONDES >= 2 && MAX_RONDES <= 6)
+test('alle rondes komen terug, ook als het er zestien zijn', () => {
+  // SNA Inspecteur en Interne Accountmanager zaten er op 12-10-2026 allebei op
+  // zestien. De oude limiet van vier verborg ronde 1 tot en met 12, terwijl
+  // ronde 1 juist de vraag is waarvoor dit filter bestaat: wie is er uit de
+  // eerste ronde blijven liggen.
+  const veel = Array.from({ length: 16 }, (_, i) => aanmelding(`Ronde ${i + 1}`))
+  const uit = rondes(veel)
+  assert.equal(uit.length, 16)
+  assert.equal(uit[0].ronde, 'Ronde 16')
+  assert.equal(uit.at(-1).ronde, 'Ronde 1')
 })
