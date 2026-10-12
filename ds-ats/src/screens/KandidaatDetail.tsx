@@ -11,6 +11,7 @@ import AanmeldingFormulier, { aantalLeeg as aantalLeegAanmelding } from '../comp
 import Klantzicht from '../components/Klantzicht'
 import type { Regel } from '../lib/types'
 import BewerkKnop from '../components/BewerkKnop'
+import { ScoreBadge, ScoreLegenda, ScoreOnderbouwing } from '../components/Score'
 
 const ACTIVITEIT_TYPES = ['InMail', 'Reminder', 'Telefoon', 'Teams', 'E-mail', 'Notitie']
 
@@ -192,6 +193,16 @@ export default function KandidaatDetail() {
                   )}
                   <StageBadge stage={aanmelding.Stage} klein onClick={() => setSheetVoor(regel)} />
                 </div>
+
+                {/*
+                  De totaalscore hoort hier en niet pas onderaan bij de
+                  onderbouwing: tijdens een telefoontje is dit het eerste wat je
+                  wilt weten, en het cijfer alleen zegt niets zonder de band
+                  erbij.
+                */}
+                <div className="mt-2">
+                  <ScoreBadge score={aanmelding['Score totaal']} groot />
+                </div>
                 <div className="mt-2 flex items-baseline justify-between gap-3">
                   {/*
                     De reistijd stond alleen in het bewerkformulier, en een hard
@@ -241,9 +252,13 @@ export default function KandidaatDetail() {
                       </p>
                     )}
                     {aanmelding['Score-onderbouwing'] && (
-                      <p className="mt-2 border-t border-lijn pt-2 text-sm whitespace-pre-line">
-                        {aanmelding['Score-onderbouwing']}
-                      </p>
+                      <div className="mt-3 border-t border-lijn pt-3">
+                        <ScoreLegenda />
+                        <ScoreOnderbouwing
+                          onderbouwing={aanmelding['Score-onderbouwing']}
+                          score={aanmelding['Score totaal']}
+                        />
+                      </div>
                     )}
                   </>
                 )}
